@@ -110,8 +110,9 @@ export function AdminHeader() {
             <DropdownMenuItem
               className="text-red-500 cursor-pointer"
               onClick={() => {
+                localStorage.removeItem("admin_auth_token");
                 toast.success("Logged out successfully");
-                router.push("/");
+                router.push("/login");
               }}
             >
               Logout

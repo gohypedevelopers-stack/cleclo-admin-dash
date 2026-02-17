@@ -17,51 +17,86 @@ const AdminHeader = dynamic(
   { ssr: false },
 );
 
+import { usePathname, useRouter } from "next/navigation";
+
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const isLoginPage = pathname === "/login";
+
   // Show loading skeleton during SSR to prevent hydration mismatch
   if (!mounted) {
     return (
       <div className="min-h-screen bg-slate-50 flex">
-        <div className="w-64 h-screen bg-white border-r" />
+        {!isLoginPage && <div className="w-64 h-screen bg-white border-r" />}
         <div className="flex-1 flex flex-col">
-          <div className="h-16 border-b bg-white" />
+          {!isLoginPage && <div className="h-16 border-b bg-white" />}
           <main className="flex-1 p-8">{children}</main>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Fixed Sidebar */}
-      <div
-        className={cn(
-          "fixed top-0 left-0 h-screen z-40 transition-all duration-300",
-          isCollapsed ? "w-16" : "w-64",
-        )}
-      >
-        <AdminSidebar />
+  if (isLoginPage) {
+    return (
+      <div className="min-h-screen bg-white">
+        <main className="min-h-screen flex items-center justify-center">
+          {children}
+        </main>
       </div>
+    );
+  }
 
-      {/* Main Content with margin for sidebar */}
-      <div
-        className={cn(
-          "flex flex-col min-h-screen transition-all duration-300",
-          isCollapsed ? "ml-16" : "ml-64",
-        )}
-      >
-        <AdminHeader />
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+  return (
+    <AuthGate>
+      <div className="min-h-screen bg-slate-50">
+        {/* Fixed Sidebar */}
+        <div
+          className={cn(
+            "fixed top-0 left-0 h-screen z-40 transition-all duration-300",
+            isCollapsed ? "w-16" : "w-64",
+          )}
+        >
+          <AdminSidebar />
+        </div>
+
+        {/* Main Content with margin for sidebar */}
+        <div
+          className={cn(
+            "flex flex-col min-h-screen transition-all duration-300",
+            isCollapsed ? "ml-16" : "ml-64",
+          )}
+        >
+          <AdminHeader />
+          <main className="flex-1 p-8 overflow-auto">{children}</main>
+        </div>
       </div>
-    </div>
+    </AuthGate>
   );
+}
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("admin_auth_token");
+    if (!token) {
+      router.push("/login");
+    } else {
+      setAuthorized(true);
+    }
+  }, [router]);
+
+  if (!authorized) return null;
+
+  return <>{children}</>;
 }
 
 export default function ClientLayout({
