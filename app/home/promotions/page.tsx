@@ -25,52 +25,63 @@ import {
 const promotions = [
   {
     id: 1,
-    title: "First Order Free Delivery",
-    description: "Free pickup and delivery on your first order",
-    type: "New User",
-    discount: "Free Delivery",
+    title: "FREESHIP25",
+    description: "Free pickup and delivery on orders above ₹299",
+    type: "Free Pickup Campaign",
+    discount: "FREE SHIP",
     active: true,
     validUntil: "Mar 31, 2026",
   },
   {
     id: 2,
-    title: "Weekend Special",
+    title: "COUPON20",
     description: "20% off on all dry cleaning services",
-    type: "Weekend",
+    type: "Coupon-based Campaigns",
     discount: "20% OFF",
     active: true,
     validUntil: "Ongoing",
   },
   {
     id: 3,
-    title: "Bulk Order Discount",
-    description: "Order 10kg+ and get 15% discount",
-    type: "Bulk",
+    title: "CLEANEX15",
+    description: "15% off sponsored by Clean Express",
+    type: "Vendor-sponsored Offers",
     discount: "15% OFF",
     active: true,
     validUntil: "Ongoing",
   },
   {
     id: 4,
-    title: "Summer Sale",
-    description: "Flat ₹100 off on orders above ₹500",
-    type: "Seasonal",
-    discount: "₹100 OFF",
+    title: "PLATFORM50",
+    description: "Flat ₹50 off on all services - funded by Cleclo",
+    type: "Platform-Funded Offers",
+    discount: "₹50 OFF",
     active: false,
     validUntil: "Expired",
+  },
+  {
+    id: 5,
+    title: "EXPRESS2X",
+    description: "Get express delivery at 50% extra instead of 2x",
+    type: "Express Delivery Upsell",
+    discount: "50% EXTRA",
+    active: true,
+    validUntil: "Ongoing",
   },
 ];
 
 const getTypeColor = (type: string) => {
   switch (type) {
-    case "New User":
+    case "Coupon-based Campaigns":
       return "bg-blue-100 text-blue-700";
-    case "Weekend":
+    case "Vendor-sponsored Offers":
       return "bg-purple-100 text-purple-700";
-    case "Bulk":
+    case "Platform-Funded Offers":
       return "bg-amber-100 text-amber-700";
-    case "Seasonal":
-      return "bg-pink-100 text-pink-700";
+    case "Free Pickup Campaign":
+      return "bg-emerald-100 text-emerald-700";
+    case "Express Delivery Upsell":
+      return "bg-orange-100 text-orange-700";
     default:
       return "bg-gray-100 text-gray-700";
   }
@@ -125,10 +136,10 @@ export default function PromotionsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl text-black font-bold tracking-tight">
-            Promotions
+            Campaign Manager
           </h1>
           <p className="text-slate-500 mt-1">
-            Manage promotional cards on the home screen
+            Create and monitor coupons, vendor offers, and marketing campaigns
           </p>
         </div>
         <Button
@@ -283,10 +294,11 @@ export default function PromotionsPage() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Seasonal">Seasonal</SelectItem>
-                  <SelectItem value="New User">New User</SelectItem>
-                  <SelectItem value="Weekend">Weekend</SelectItem>
-                  <SelectItem value="Bulk">Bulk</SelectItem>
+                  <SelectItem value="Coupon-based Campaigns">Coupon-based</SelectItem>
+                  <SelectItem value="Vendor-sponsored Offers">Vendor-sponsored</SelectItem>
+                  <SelectItem value="Platform-Funded Offers">Platform-Funded</SelectItem>
+                  <SelectItem value="Free Pickup Campaign">Free Pickup</SelectItem>
+                  <SelectItem value="Express Delivery Upsell">Express Delivery</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Bike,
   User,
+  AlertTriangle,
 } from "lucide-react";
 
 interface NavItem {
@@ -37,12 +38,12 @@ const mainItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "App Content",
+    title: "Growth & Content Manager",
     href: "/app",
     icon: ImageIcon,
   },
   {
-    title: "Master Items",
+    title: "Service Catalog Manager",
     href: "/master/items",
     icon: Package,
   },
@@ -177,6 +178,11 @@ const financeItems: NavItem[] = [
 ];
 
 const supportItems: NavItem[] = [
+  {
+    title: "Issue Alerts",
+    href: "/issues",
+    icon: AlertTriangle,
+  },
   {
     title: "Feedback",
     href: "/support/feedback",

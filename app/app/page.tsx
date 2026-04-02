@@ -33,9 +33,9 @@ const appSections = [
         description: "Explainer videos and thumbnails",
       },
       {
-        name: "Promotions",
+        name: "Campaign Manager",
         href: "/home/promotions",
-        description: "Promotional cards slider",
+        description: "Manage coupons, offers, and delivery campaigns",
       },
     ],
   },
@@ -86,10 +86,10 @@ export default function AppContentPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl text-black font-bold tracking-tight">
-          App Content
+          Growth & Content Manager
         </h1>
         <p className="text-slate-500 mt-1">
-          Control what users see in the CLECLO app
+          Control what users see and how the platform grows
         </p>
       </div>
 

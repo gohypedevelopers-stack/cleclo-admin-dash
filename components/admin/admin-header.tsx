@@ -46,7 +46,7 @@ export function AdminHeader() {
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder="Search orders, users, vendors..."
+            placeholder="Search by ID, Phone, Vendor, City..."
             className="w-80 pl-10 bg-slate-50 border-slate-200"
           />
         </div>

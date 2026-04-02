@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Lock, Store, User } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Store, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,34 @@ import { toast } from "sonner";
 
 import { motion } from "framer-motion";
 
+import { Checkbox } from "@/components/ui/checkbox";
+
 export function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [identifier, setIdentifier] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [rememberMe, setRememberMe] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  function handleLogin() {
+  async function handleLogin() {
+    if (!identifier || !password) {
+      toast.error("Missing Fields", {
+        description: "Please enter both identifier and password.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     if (identifier === "cleclo@admin.com" && password === "1234567890") {
       localStorage.setItem("admin_auth_token", "admin-session-active");
+      if (rememberMe) {
+        localStorage.setItem("admin_remember_me", "true");
+      }
       toast.success("Login Successful", {
         description: "Welcome back, Super Admin.",
       });
@@ -28,6 +47,7 @@ export function LoginForm() {
       toast.error("Invalid Credentials", {
         description: "Please check your email and password.",
       });
+      setIsLoading(false);
     }
   }
 
@@ -55,8 +75,9 @@ export function LoginForm() {
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 font-quicksand">
               Welcome Back
             </h1>
-            <p className="text-base text-gray-500 max-w-xs mx-auto leading-relaxed font-poppins font-medium">
-              Access your admin portal and manage the platform.
+            <p className="text-base text-gray-500 max-w-md mx-auto leading-relaxed font-medium">
+              Securely access your Cleclo Admin Dashboard to manage vendors,
+              services and platform operations.
             </p>
           </div>
 
@@ -123,24 +144,52 @@ export function LoginForm() {
               </div>
             </div>
 
-            <div className="pt-6">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center space-x-2.5 group cursor-pointer">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(!!checked)}
+                  className="border-gray-300 data-[state=checked]:bg-[#3E8940] data-[state=checked]:border-[#3E8940] transition-all duration-300 w-5 h-5 rounded-md"
+                />
+                <Label
+                  htmlFor="remember"
+                  className="text-sm font-semibold text-gray-600 group-hover:text-[#3E8940] cursor-pointer transition-colors duration-300"
+                >
+                  Remember me
+                </Label>
+              </div>
+            </div>
+
+            <div className="pt-2">
               <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.015, y: -2 }}
+                whileTap={{ scale: 0.985 }}
+                className="w-full"
               >
                 <Button
                   type="button"
                   onClick={handleLogin}
-                  className="w-full h-14 text-lg font-bold bg-linear-to-r from-[#3E8940] to-[#2E6A30] hover:from-[#3E8940] hover:to-[#3E8940] text-white shadow-[0_10px_30px_rgba(62,137,64,0.3)] hover:shadow-[0_15px_35px_rgba(62,137,64,0.4)] transition-all duration-300 rounded-2xl border-none font-quicksand"
+                  disabled={isLoading}
+                  className="w-full h-14 text-lg font-bold bg-linear-to-r from-[#3E8940] via-[#4BA851] to-[#3E8940] bg-size-[200%_auto] hover:bg-position-[right_center] text-white shadow-[0_10px_25px_-5px_rgba(62,137,64,0.3)] hover:shadow-[0_20px_35px_-10px_rgba(62,137,64,0.4)] transition-all duration-500 rounded-2xl border-none font-quicksand disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden group"
                 >
-                  Secure Login
+                  {/* Subtle inner light effect */}
+                  <div className="absolute inset-0 bg-linear-to-b from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  
+                  {isLoading ? (
+                    <div className="flex items-center justify-center gap-2 relative z-10">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Verifying Credentials...</span>
+                    </div>
+                  ) : (
+                    <span className="relative z-10">Secure Login</span>
+                  )}
                 </Button>
               </motion.div>
 
               <div className="mt-8 text-center">
-                <p className="text-xs font-bold text-gray-400 flex items-center justify-center gap-2 uppercase tracking-widest">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Platform Security Verified
+                <p className="text-xs font-bold text-gray-400 flex items-center justify-center tracking-widest">
+                  🔒 Encrypted Access | Role-Based Security Enabled
                 </p>
               </div>
             </div>
