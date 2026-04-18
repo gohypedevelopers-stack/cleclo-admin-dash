@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Plus,
   Upload,
   Trash2,
   Edit,
-  Eye,
-  EyeOff,
   Calendar,
+  ArrowLeft,
   Link as LinkIcon,
   GripVertical,
 } from "lucide-react";
@@ -22,71 +22,167 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
-
-const banners = [
-  {
-    id: 1,
-    title: "Summer Sale - 20% Off",
-    image: "/banners/summer-sale.jpg",
-    linkedTo: "Dry Clean Service",
-    active: true,
-    expiryDate: "Feb 28, 2026",
-    clicks: 1245,
-  },
-  {
-    id: 2,
-    title: "New User Offer",
-    image: "/banners/new-user.jpg",
-    linkedTo: "All Services",
-    active: true,
-    expiryDate: "Mar 31, 2026",
-    clicks: 892,
-  },
-  {
-    id: 3,
-    title: "Express Delivery",
-    image: "/banners/express.jpg",
-    linkedTo: "Express Services",
-    active: false,
-    expiryDate: "Jan 31, 2026",
-    clicks: 567,
-  },
-];
+import { adminContentApi } from "@/lib/admin-api";
+import { toast } from "sonner";
+import { useRef } from "react";
 
 export default function BannersPage() {
-  const [bannerList, setBannerList] = useState(banners);
+  const [bannerList, setBannerList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newBanner, setNewBanner] = useState({
     title: "",
     linkedTo: "",
     expiryDate: "",
+    imageUrl: ""
   });
 
-  const toggleBanner = (id: number) => {
-    setBannerList((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, active: !b.active } : b)),
-    );
+  const toDateInputValue = (value?: string) => {
+    if (!value) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    if (value.includes("T")) return value.slice(0, 10);
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "";
+
+    const year = parsed.getUTCFullYear();
+    const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
-  const handleAddBanner = () => {
-    if (!newBanner.title || !newBanner.linkedTo) return;
+  const formatDisplayDate = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(parsed);
+  };
 
-    const newId = Math.max(...bannerList.map((b) => b.id)) + 1;
-    setBannerList((prev) => [
-      ...prev,
-      {
-        id: newId,
+  const loadBanners = async () => {
+    try {
+      setLoading(true);
+      const data = await adminContentApi.getBanners();
+      setBannerList(data);
+    } catch (error) {
+      console.error("Failed to load banners", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBanners();
+  }, []);
+
+  const toggleBanner = async (id: string, currentStatus: boolean) => {
+    try {
+      // Optimistic UI update
+      setBannerList((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, isActive: !currentStatus } : b))
+      );
+      await adminContentApi.updateBanner(id, { isActive: !currentStatus });
+    } catch (error) {
+      console.error("Failed to toggle banner", error);
+      loadBanners(); // revert back on failure
+    }
+  };
+
+  const openAdd = () => {
+    setEditingId(null);
+    setNewBanner({ title: "", linkedTo: "", expiryDate: "", imageUrl: "" });
+    setPreviewImage(null);
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (banner: any) => {
+    setEditingId(banner.id);
+    setNewBanner({
+      title: banner.title || "",
+      linkedTo: banner.ctaUrl || banner.ctaLabel || "",
+      expiryDate: toDateInputValue(banner.endAt),
+      imageUrl: banner.imageUrl || ""
+    });
+    setPreviewImage(banner.imageUrl || null);
+    setIsDialogOpen(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setPreviewImage(base64String);
+        setNewBanner(prev => ({ ...prev, imageUrl: base64String }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveBanner = async () => {
+    if (!newBanner.title || !newBanner.linkedTo) {
+        toast.error("Required Fields", { description: "Title and Link are required" });
+        return;
+    }
+
+    try {
+      const payload = {
         title: newBanner.title,
-        image: "/banners/placeholder.jpg", // Default placeholder
-        linkedTo: newBanner.linkedTo,
-        active: true,
-        expiryDate: newBanner.expiryDate || "No Expiry",
-        clicks: 0,
-      },
-    ]);
-    setNewBanner({ title: "", linkedTo: "", expiryDate: "" });
-    setIsDialogOpen(false);
+        ctaLabel: newBanner.linkedTo,
+        ctaUrl: newBanner.linkedTo,
+        ctaType: "external_url",
+        imageUrl: newBanner.imageUrl,
+        priorityRank: bannerList.length + 1,
+        isActive: true,
+        endAt: null as string | null
+      };
+
+      if (newBanner.expiryDate) {
+        const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(newBanner.expiryDate);
+        if (!isValidDate) {
+          toast.error("Invalid Date", { description: "Please select a valid expiry date" });
+          return;
+        }
+        // Persist as a UTC date so it stays stable across different local time zones.
+        payload.endAt = `${newBanner.expiryDate}T00:00:00.000Z`;
+      }
+
+      if (editingId) {
+        const updated = await adminContentApi.updateBanner(editingId, payload);
+        setBannerList((prev) => prev.map(b => b.id === editingId ? updated : b));
+        toast.success("Banner Updated Successfully");
+      } else {
+        const created = await adminContentApi.createBanner(payload);
+        setBannerList((prev) => [created, ...prev]);
+        toast.success("Banner Created Successfully");
+      }
+      
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to save banner", error);
+      toast.error("Operation Failed", { description: "Could not save banner changes" });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await adminContentApi.deleteBanner(id);
+      setBannerList((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Banner Deleted");
+    } catch (error) {
+      console.error("Failed to delete banner", error);
+      toast.error("Delete Failed");
+      loadBanners(); // Revert
+    }
   };
 
   return (
@@ -94,6 +190,12 @@ export default function BannersPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
+          <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          </Button>
           <h1 className="text-3xl text-black font-bold tracking-tight">
             Banners
           </h1>
@@ -103,75 +205,86 @@ export default function BannersPage() {
         </div>
         <Button
           className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/80"
-          onClick={() => setIsDialogOpen(true)}
+          onClick={openAdd}
         >
           <Plus className="h-4 w-4" />
           Add Banner
         </Button>
       </div>
 
-      {/* Banner List */}
-      <div className="bg-white rounded-xl shadow-sm border divide-y">
-        {bannerList.map((banner) => (
-          <div key={banner.id} className="p-4 flex items-center gap-4">
-            <GripVertical className="h-5 w-5 text-slate-300 cursor-grab" />
+      {loading ? (
+        <div className="text-center p-8 text-slate-500">Loading Banners...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border divide-y">
+          {bannerList.map((banner) => (
+            <div key={banner.id} className="p-4 flex items-center gap-4">
+              <GripVertical className="h-5 w-5 text-slate-300 cursor-grab" />
 
-            {/* Image Preview */}
-            <div className="w-32 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
-              <div className="text-slate-400 text-xs text-center p-2">
-                Banner Image
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-black truncate">
-                  {banner.title}
-                </h3>
-                {!banner.active && (
-                  <Badge className="bg-slate-100 text-slate-600 border-none text-xs">
-                    Inactive
-                  </Badge>
+              {/* Image Preview */}
+              <div className="w-32 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border">
+                {banner.imageUrl ? (
+                    <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+                ) : (
+                    <div className="text-slate-400 text-[10px] text-center p-2">
+                        No Image
+                    </div>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-sm text-slate-500">
-                <span className="flex items-center gap-1">
-                  <LinkIcon className="h-3.5 w-3.5" />
-                  {banner.linkedTo}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  Expires: {banner.expiryDate}
-                </span>
-                <span>{banner.clicks} clicks</span>
+
+              {/* Details */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-black truncate">
+                    {banner.title}
+                  </h3>
+                  {!banner.isActive && (
+                    <Badge className="bg-slate-100 text-slate-600 border-none text-xs">
+                      Inactive
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-sm text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    {banner.ctaLabel || 'No Link'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Expires: {banner.endAt ? formatDisplayDate(banner.endAt) : 'No Expiry'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={banner.isActive}
+                  onCheckedChange={() => toggleBanner(banner.id, banner.isActive)}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500 hover:text-slate-700"
+                  onClick={() => openEdit(banner)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleDelete(banner.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={banner.active}
-                onCheckedChange={() => toggleBanner(banner.id)}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-slate-500 hover:text-slate-700"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          {bannerList.length === 0 && (
+              <div className="text-center p-8 text-slate-500">No Banners Configured</div>
+          )}
+        </div>
+      )}
 
       {/* Tips */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
@@ -187,7 +300,10 @@ export default function BannersPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Banner</DialogTitle>
+            <DialogTitle>{editingId ? "Edit Banner" : "Add New Banner"}</DialogTitle>
+            <DialogDescription>
+              Provide the details for the promotional banner to be displayed on the home screen.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -220,18 +336,41 @@ export default function BannersPage() {
               <label className="text-sm font-medium text-slate-700">
                 Expiry Date
               </label>
-              <Input
-                placeholder="e.g., Mar 31, 2026"
-                value={newBanner.expiryDate}
-                onChange={(e) =>
-                  setNewBanner({ ...newBanner, expiryDate: e.target.value })
-                }
-                className="mt-1"
-              />
+              <div className="relative mt-1">
+                <Input
+                  type="date"
+                  value={newBanner.expiryDate}
+                  onChange={(e) =>
+                    setNewBanner({ ...newBanner, expiryDate: e.target.value })
+                  }
+                  className="scheme-light"
+                />
+              </div>
             </div>
-            <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              Image upload is disabled in demo mode
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                Banner Image
+              </label>
+              <div 
+                className="border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {previewImage ? (
+                    <img src={previewImage} alt="Preview" className="h-24 w-full object-cover rounded-lg" />
+                ) : (
+                    <>
+                        <Upload className="h-8 w-8 text-slate-400" />
+                        <span className="text-xs text-slate-500 text-center">Click to upload 1080x540 image</span>
+                    </>
+                )}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleImageChange}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -240,10 +379,9 @@ export default function BannersPage() {
             </Button>
             <Button
               className="bg-[#3E8940] hover:bg-[#3E8940]/90"
-              onClick={handleAddBanner}
+              onClick={handleSaveBanner}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Banner
+              {editingId ? "Save Changes" : "Create Banner"}
             </Button>
           </DialogFooter>
         </DialogContent>

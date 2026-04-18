@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Banknote,
@@ -16,6 +16,7 @@ import {
   Store,
   User,
   XCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,30 +38,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Mock data
-const vendorData = {
-  id: "VND-2024-089",
-  name: "Fresh Fold Services",
-  owner: "Rajesh Kumar",
-  email: "rajesh.k@freshfold.com",
-  phone: "+91 98765 43210",
-  address: "Shop 12, Crystal Plaza, Andheri West, Mumbai, Maharashtra 400053",
-  status: "Pending Review",
-  type: "Laundry & Dry Cleaning",
-  appliedDate: "Oct 22, 2024",
-  documents: [
-    { name: "Business Registration (GST)", status: "Verified", type: "pdf" },
-    { name: "Shop Establishment License", status: "Verified", type: "pdf" },
-    { name: "Owner Identity Proof (Aadhar)", status: "Pending", type: "image" },
-    { name: "Bank Account Details", status: "Verified", type: "pdf" },
-  ],
-  bankDetails: {
-    accountName: "Fresh Fold Services",
-    accountNumber: "XXXX-XXXX-8892",
-    bank: "HDFC Bank",
-    ifsc: "HDFC0001234",
-  },
-};
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
 
 export default function VendorReviewPage({
   params,
@@ -68,38 +51,101 @@ export default function VendorReviewPage({
   params: { id: string };
 }) {
   const router = useRouter();
+  const [vendorData, setVendorData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleApprove = () => {
+  useEffect(() => {
+    async function loadVendor() {
+      try {
+        const res = await fetch(`${AUTH_API_URL}/users/${params.id}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error("Failed to load vendor");
+        const data = await res.json();
+        setVendorData(data);
+      } catch (err) {
+        toast.error("Error loading vendor profile");
+        router.back();
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadVendor();
+  }, [params.id, router]);
+
+  const handleApprove = async () => {
     setIsProcessing(true);
-    // Simulate API call
-    setTimeout(() => {
-      toast.success("Vendor Approved Successfully", {
-        description:
-          "An email has been sent to the vendor with login credentials.",
+    try {
+      const res = await fetch(`${AUTH_API_URL}/vendors/${params.id}/approve`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isApproved: true })
       });
+      if (!res.ok) throw new Error("Approval failed");
+      toast.success("Vendor Approved Successfully", {
+        description: "An email has been sent to the vendor with login credentials.",
+      });
+      router.push("/vendors");
+    } catch (err) {
+      toast.error("Failed to approve vendor");
+    } finally {
       setIsProcessing(false);
-      router.push("/admin");
-    }, 1500);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!rejectReason.trim()) {
       toast.error("Please provide a reason for rejection");
       return;
     }
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${AUTH_API_URL}/vendors/${params.id}/suspend`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ suspended: true })
+      });
+      if (!res.ok) throw new Error("Rejection failed");
       setRejectDialogOpen(false);
       toast.error("Vendor Application Rejected", {
         description: "Rejection reason has been sent to the vendor.",
       });
+      router.push("/vendors");
+    } catch (err) {
+      toast.error("Failed to reject vendor");
+    } finally {
       setIsProcessing(false);
-      router.push("/admin");
-    }, 1500);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <h3 className="font-semibold text-slate-700">Loading Vendor Details...</h3>
+      </div>
+    );
+  }
+
+  if (!vendorData || !vendorData.vendorProfile) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center">
+        <h3 className="text-xl font-bold text-red-600">Vendor Not Found</h3>
+        <p className="text-slate-500 mt-2">The selected applicant profile does not exist.</p>
+        <Button onClick={() => router.back()} className="mt-4" variant="outline">Go Back</Button>
+      </div>
+    );
+  }
+
+  const profile = vendorData.vendorProfile;
+  const isPending = !profile.isApproved && !profile.suspended;
+
+  // Mock standard document verification mapping since documents are not strictly modeled strictly yet.
+  const documents = [
+    { name: "Business Registration (GST)", status: "Verified", type: "pdf", num: profile.gstNumber },
+    { name: "Bank Account Details", status: "Verified", type: "pdf", num: profile.accountNumber }
+  ];
 
   return (
     <div className="flex flex-col gap-8 pb-10">
@@ -119,34 +165,38 @@ export default function VendorReviewPage({
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                 Vendor Application
               </h1>
-              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">
-                {vendorData.status}
+              <Badge className={profile.isApproved ? "bg-green-100 text-green-700" : profile.suspended ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700 hover:bg-amber-100"}>
+                {profile.isApproved ? "Approved" : profile.suspended ? "Rejected" : "Pending Review"}
               </Badge>
             </div>
             <p className="text-sm text-slate-500 mt-1">
               Application ID: {vendorData.id} • Applied on{" "}
-              {vendorData.appliedDate}
+              {new Date(vendorData.createdAt).toLocaleDateString()}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => setRejectDialogOpen(true)}
-            disabled={isProcessing}
-          >
-            <XCircle className="h-4 w-4 mr-2" />
-            Reject Application
-          </Button>
-          <Button
-            className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white shadow-sm"
-            onClick={handleApprove}
-            disabled={isProcessing}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Approve Vendor
-          </Button>
+          {(!profile.isApproved || isPending) && !profile.suspended && (
+            <>
+              <Button
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => setRejectDialogOpen(true)}
+                disabled={isProcessing}
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Reject Application
+              </Button>
+              <Button
+                className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white shadow-sm"
+                onClick={handleApprove}
+                disabled={isProcessing}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Approve Vendor
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -168,7 +218,7 @@ export default function VendorReviewPage({
                     Business Name
                   </label>
                   <p className="font-medium text-slate-900 mt-1">
-                    {vendorData.name}
+                    {profile.businessName || "Not Provided"}
                   </p>
                 </div>
                 <div>
@@ -176,7 +226,7 @@ export default function VendorReviewPage({
                     Business Type
                   </label>
                   <p className="font-medium text-slate-900 mt-1">
-                    {vendorData.type}
+                    {profile.businessType || "Not Provided"}
                   </p>
                 </div>
               </div>
@@ -187,7 +237,7 @@ export default function VendorReviewPage({
                 <div className="flex items-start gap-2 mt-1">
                   <MapPin className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                   <p className="font-medium text-slate-900">
-                    {vendorData.address}
+                    {profile.outletAddress || "Address not provided"}
                   </p>
                 </div>
               </div>
@@ -208,7 +258,7 @@ export default function VendorReviewPage({
                   Owner Name
                 </label>
                 <p className="font-medium text-slate-900 mt-1">
-                  {vendorData.owner}
+                  {vendorData.name}
                 </p>
               </div>
               <div>
@@ -217,7 +267,7 @@ export default function VendorReviewPage({
                 </label>
                 <div className="flex items-center gap-2 mt-1">
                   <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  <p className="font-medium text-slate-900">
+                  <p className="font-medium text-slate-900 truncate">
                     {vendorData.email}
                   </p>
                 </div>
@@ -250,7 +300,7 @@ export default function VendorReviewPage({
                   Bank Name
                 </label>
                 <p className="font-medium text-slate-900 mt-1">
-                  {vendorData.bankDetails.bank}
+                  {profile.bankName || "Not Provided"}
                 </p>
               </div>
               <div>
@@ -258,7 +308,7 @@ export default function VendorReviewPage({
                   Account Holder
                 </label>
                 <p className="font-medium text-slate-900 mt-1">
-                  {vendorData.bankDetails.accountName}
+                  {profile.bankHolderName || "Not Provided"}
                 </p>
               </div>
               <div>
@@ -266,7 +316,7 @@ export default function VendorReviewPage({
                   Account Number
                 </label>
                 <p className="font-medium text-slate-900 mt-1 font-mono">
-                  {vendorData.bankDetails.accountNumber}
+                  {profile.accountNumber || "Not Provided"}
                 </p>
               </div>
               <div>
@@ -274,7 +324,7 @@ export default function VendorReviewPage({
                   IFSC Code
                 </label>
                 <p className="font-medium text-slate-900 mt-1 font-mono">
-                  {vendorData.bankDetails.ifsc}
+                  {profile.ifscCode || "Not Provided"}
                 </p>
               </div>
             </CardContent>
@@ -294,7 +344,7 @@ export default function VendorReviewPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {vendorData.documents.map((doc, idx) => (
+              {documents.map((doc, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50"
@@ -308,7 +358,7 @@ export default function VendorReviewPage({
                         {doc.name}
                       </p>
                       <p className="text-xs text-slate-500 uppercase">
-                        {doc.type} • 2.4 MB
+                        {doc.num}
                       </p>
                     </div>
                   </div>
@@ -329,20 +379,22 @@ export default function VendorReviewPage({
                 </div>
               ))}
 
-              <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-100">
-                <div className="flex gap-2">
-                  <ShieldAlert className="h-5 w-5 text-blue-600 shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-900">
-                      verification note
-                    </h4>
-                    <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                      Please ensure the shop establishment license name matches
-                      with the PAN card details provided.
-                    </p>
+              {isPending && (
+                <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-100">
+                  <div className="flex gap-2">
+                    <ShieldAlert className="h-5 w-5 text-blue-600 shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-bold text-blue-900">
+                        verification note
+                      </h4>
+                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                        Please ensure the shop establishment license name matches
+                        with the PAN card details provided.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

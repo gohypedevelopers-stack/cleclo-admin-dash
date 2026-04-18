@@ -36,9 +36,12 @@ import {
   MapPin,
   Calendar,
   Filter,
+  Loader2,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
-// Mock Data
+// Simulated historical sequence for charts
 const DELIVERY_DATA = [
   { name: "Mon", deliveries: 145, earnings: 4200 },
   { name: "Tue", deliveries: 132, earnings: 3800 },
@@ -59,44 +62,57 @@ const HOURLY_ACTIVITY = [
   { time: "12am", active: 20 },
 ];
 
-const RIDER_STATUS_DATA = [
-  { name: "Active", value: 65, color: "#3E8940" },
-  { name: "Busy", value: 25, color: "#F59E0B" },
-  { name: "Offline", value: 10, color: "#94A3B8" },
-];
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
 
-const TOP_RIDERS = [
-  {
-    name: "Rahul Kumar",
-    deliveries: 142,
-    rating: 4.9,
-    earnings: "₹4,250",
-    status: "Active",
-  },
-  {
-    name: "Amit Singh",
-    deliveries: 138,
-    rating: 4.8,
-    earnings: "₹4,100",
-    status: "Busy",
-  },
-  {
-    name: "Priya Sharma",
-    deliveries: 125,
-    rating: 4.9,
-    earnings: "₹3,950",
-    status: "Active",
-  },
-  {
-    name: "Vikram Malhotra",
-    deliveries: 110,
-    rating: 4.7,
-    earnings: "₹3,200",
-    status: "Offline",
-  },
-];
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
 
 export default function RiderAnalyticsPage() {
+  const [riders, setRiders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [usersRes, statsRes] = await Promise.all([
+          fetch(`${AUTH_API_URL}/users`, { headers: getAuthHeaders() }),
+          fetch(`${ORDER_API_URL}/dashboard/stats`, { headers: getAuthHeaders() }).catch(() => null)
+        ]);
+
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setRiders(usersData.filter((u: any) => u.role?.toLowerCase() === 'rider' || u.vendorProfile?.businessType === 'rider'));
+        }
+      } catch (err) {
+        toast.error("Failed to load generic overview.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+     return (
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <h3 className="font-semibold text-slate-700">Crunching Rider Metrics...</h3>
+      </div>
+    );
+  }
+
+  const activeCount = riders.filter(r => r.status?.toLowerCase() === 'active').length;
+  const offlineCount = riders.filter(r => r.status?.toLowerCase() !== 'active').length;
+  
+  const RIDER_STATUS_DATA = [
+    { name: "Active", value: activeCount > 0 ? activeCount : 0.1, color: "#3E8940" },
+    { name: "Offline", value: offlineCount, color: "#94A3B8" },
+  ];
+
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div className="flex items-center justify-between">
@@ -107,11 +123,11 @@ export default function RiderAnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 bg-white border-slate-200 hover:bg-slate-50 text-slate-700">
             <Calendar className="h-4 w-4" /> This Week
           </Button>
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
+          <Button variant="outline" size="icon" className="bg-white border-slate-200">
+            <Filter className="h-4 w-4 text-slate-700" />
           </Button>
           <Button className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white">
             Export Report
@@ -121,34 +137,12 @@ export default function RiderAnalyticsPage() {
 
       {/* KPI Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500">
-                  Total Earnings
-                </p>
-                <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  ₹1,45,200
-                </h3>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                <DollarSign className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-xs text-green-600 font-medium">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              <span>+12.5% from last week</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Total Deliveries
+                  Total Delivery Volume
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">
                   1,280
@@ -165,7 +159,28 @@ export default function RiderAnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Registered Riders
+                </p>
+                <h3 className="text-2xl font-bold text-slate-900 mt-1">
+                  {riders.length}
+                </h3>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <Users className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-xs text-slate-500">
+              <span className="text-green-600 font-medium">{activeCount} Currently Active</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -187,26 +202,26 @@ export default function RiderAnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+        <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow bg-[#3E8940] text-white">
+          <CardContent className="p-6 relative overflow-hidden">
+             {/* Decorative Background Assets */}
+            <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex items-center justify-between relative z-10">
               <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Active Riders
+                <p className="text-sm font-medium text-green-100">
+                  Fleet Utilization
                 </p>
-                <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  85
-                  <span className="text-sm text-slate-400 font-normal">
-                    /120
-                  </span>
+                <h3 className="text-2xl font-bold mt-1">
+                  {Math.round((activeCount / Math.max(riders.length, 1)) * 100)}%
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <Users className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Package className="h-5 w-5" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-xs text-slate-500">
-              <span>70% Fleet Utilization</span>
+            <div className="mt-4 flex items-center text-xs text-green-100 relative z-10">
+              <span>Optimized Fleet Capacity</span>
             </div>
           </CardContent>
         </Card>
@@ -313,7 +328,7 @@ export default function RiderAnalyticsPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                <span className="text-2xl font-bold text-slate-900">100</span>
+                <span className="text-2xl font-bold text-slate-900">{riders.length}</span>
                 <span className="text-xs text-slate-500 block">Total</span>
               </div>
             </div>
@@ -328,7 +343,7 @@ export default function RiderAnalyticsPage() {
                     {item.name}
                   </span>
                   <span className="text-xs text-slate-500 ml-auto">
-                    {item.value}%
+                    {item.value >= 1 ? item.value : 0}
                   </span>
                 </div>
               ))}
@@ -345,7 +360,7 @@ export default function RiderAnalyticsPage() {
             <CardDescription>Active riders throughout the day</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[250px] w-full">
+            <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={HOURLY_ACTIVITY}>
                   <CartesianGrid
@@ -381,17 +396,22 @@ export default function RiderAnalyticsPage() {
           <CardHeader>
             <CardTitle>Top Performing Riders</CardTitle>
             <CardDescription>
-              Based on deliveries and rating this week
+              Based on active registry
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {TOP_RIDERS.map((rider, idx) => (
-                <div key={idx} className="flex items-center justify-between">
+            <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {riders.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center py-6 text-slate-500">
+                   <p>No riders available.</p>
+                </div>
+              )}
+              {riders.map((rider, idx) => (
+                <div key={idx} className="flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg transition-colors">
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarFallback className="bg-amber-100 text-amber-700">
-                        {rider.name.charAt(0)}
+                      <AvatarFallback className="bg-amber-100 text-amber-700 uppercase">
+                        {(rider.name || "U")[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -399,23 +419,16 @@ export default function RiderAnalyticsPage() {
                         {rider.name}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span>{rider.deliveries} orders</span>
-                        <span>•</span>
-                        <span className="flex items-center text-amber-500 font-medium">
-                          ★ {rider.rating}
-                        </span>
+                        <span>{rider.phone}</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-slate-900">
-                      {rider.earnings}
-                    </p>
                     <Badge
                       variant="outline"
-                      className={`text-[10px] mt-1 ${rider.status === "Active" ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-50 text-slate-600"}`}
+                      className={`text-[10px] mt-1 ${rider.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-50 text-slate-600"}`}
                     >
-                      {rider.status}
+                      {rider.status || 'Pending'}
                     </Badge>
                   </div>
                 </div>

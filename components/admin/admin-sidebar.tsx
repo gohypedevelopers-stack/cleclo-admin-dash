@@ -244,7 +244,6 @@ export function AdminSidebar() {
                 <Link
                   href={item.href}
                   className="contents"
-                  onClick={(e) => hasSubItems && e.preventDefault()}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
                   {!isCollapsed && (
@@ -264,7 +263,10 @@ export function AdminSidebar() {
                   )}
                 </Link>
               ) : (
-                <>
+                <Link
+                  href={item.href}
+                  className="contents group cursor-pointer"
+                >
                   <item.icon className="h-5 w-5 shrink-0" />
                   {!isCollapsed && (
                     <>
@@ -276,10 +278,15 @@ export function AdminSidebar() {
                           "h-4 w-4 transition-transform",
                           isOpen && "rotate-180",
                         )}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleMenu(item.title);
+                        }}
                       />
                     </>
                   )}
-                </>
+                </Link>
               )}
 
               {isCollapsed && (

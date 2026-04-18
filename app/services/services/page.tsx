@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Save, Sparkles, ChevronRight, X } from "lucide-react";
+import { Plus, Save, Sparkles, ChevronRight, X, Trash2, Edit, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import { adminCatalogApi } from "@/lib/admin-api";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -15,50 +18,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-const initialServices = [
-  {
-    id: 1,
-    name: "Wash",
-    icon: "🧺",
-    color: "#3B82F6",
-    description: "Machine wash friendly items",
-    categoriesCount: 6,
-    itemsCount: 14,
-    active: true,
-  },
-  {
-    id: 2,
-    name: "Wash & Iron",
-    icon: "👔",
-    color: "#10B981",
-    description: "Wash with professional ironing",
-    categoriesCount: 6,
-    itemsCount: 6,
-    active: true,
-  },
-  {
-    id: 3,
-    name: "Dry Clean",
-    icon: "✨",
-    color: "#8B5CF6",
-    description: "Delicate & specialty items",
-    categoriesCount: 6,
-    itemsCount: 18,
-    active: true,
-  },
-  {
-    id: 4,
-    name: "Iron Only",
-    icon: "🔥",
-    color: "#F59E0B",
-    description: "Quick ironing service",
-    categoriesCount: 4,
-    itemsCount: 0,
-    active: false,
-  },
-];
 
-const icons = ["🧺", "👔", "✨", "🔥", "🧴", "🧼", "👗", "🧥", "🎽", "🩲"];
+
+const icons = ["👔", "👕", "👖", "👗", "🧥", "👚", "🩳", "🧢", "🧣", "👜", "👟", "🧵"];
 const colors = [
   "#3B82F6",
   "#10B981",
@@ -70,47 +32,111 @@ const colors = [
   "#84CC16",
 ];
 
+const getServiceItemCount = (service: any) => {
+  if (!Array.isArray(service?.categories)) return 0;
+  return service.categories.reduce((categorySum: number, category: any) => {
+    if (!Array.isArray(category?.subCategories)) return categorySum;
+    const subCategoryItems = category.subCategories.reduce(
+      (subSum: number, subCategory: any) =>
+        subSum + (Array.isArray(subCategory?.items) ? subCategory.items.length : 0),
+      0,
+    );
+    return categorySum + subCategoryItems;
+  }, 0);
+};
+
 export default function ServicesPage() {
-  const [serviceList, setServiceList] = useState(initialServices);
-  const [saved, setSaved] = useState(false);
+  const [serviceList, setServiceList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newService, setNewService] = useState({
     name: "",
     description: "",
-    icon: "🧺",
+    icon: "👔",
     color: "#3B82F6",
   });
 
-  const toggleService = (id: number) => {
-    setServiceList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)),
-    );
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      const data = await adminCatalogApi.getServices();
+      setServiceList(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const toggleService = async (id: string, current: boolean) => {
+    try {
+      setServiceList((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isActive: !current } : s)),
+      );
+      await adminCatalogApi.updateService(id, { isActive: !current });
+    } catch (e) {
+      toast.error("Failed to update status");
+      loadServices();
+    }
   };
 
-  const handleAddService = () => {
+  const openAdd = () => {
+    setEditingId(null);
+    setNewService({ name: "", description: "", icon: "👔", color: "#3B82F6" });
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (service: any) => {
+    setEditingId(service.id);
+    setNewService({ 
+      name: service.name, 
+      description: service.description || "", 
+      icon: service.icon || "👔", 
+      color: service.color || "#3B82F6" 
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await adminCatalogApi.deleteService(id);
+      setServiceList((prev) => prev.filter((s) => s.id !== id));
+      toast.success("Service removed");
+    } catch (e) {
+      toast.error("Failed to delete service");
+    }
+  };
+
+  const handleDialogSubmit = async () => {
     if (!newService.name.trim()) return;
 
-    const newId = Math.max(...serviceList.map((s) => s.id)) + 1;
-    setServiceList((prev) => [
-      ...prev,
-      {
-        id: newId,
+    try {
+      const payload = {
         name: newService.name,
         description: newService.description,
         icon: newService.icon,
         color: newService.color,
-        categoriesCount: 0,
-        itemsCount: 0,
-        active: true,
-      },
-    ]);
-    setNewService({ name: "", description: "", icon: "🧺", color: "#3B82F6" });
-    setIsDialogOpen(false);
+        isActive: true,
+      };
+
+      if (editingId) {
+        const updated = await adminCatalogApi.updateService(editingId, payload);
+        setServiceList((prev) => prev.map((s) => (s.id === editingId ? updated : s)));
+        toast.success("Service updated");
+      } else {
+        const created = await adminCatalogApi.createService(payload);
+        setServiceList((prev) => [...prev, created]);
+        toast.success("Service added");
+      }
+      setIsDialogOpen(false);
+    } catch (e) {
+      toast.error("Failed to save service");
+    }
   };
 
   return (
@@ -119,6 +145,12 @@ export default function ServicesPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
+            <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+              <Link href="/app">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Link>
+            </Button>
             <h1 className="text-3xl text-black font-bold tracking-tight">
               Services
             </h1>
@@ -130,17 +162,16 @@ export default function ServicesPage() {
             <Button
               variant="outline"
               className="gap-2"
-              onClick={() => setIsDialogOpen(true)}
+              onClick={openAdd}
             >
               <Plus className="h-4 w-4" />
               Add Service
             </Button>
             <Button
               className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/80"
-              onClick={handleSave}
+              onClick={loadServices}
             >
-              <Save className="h-4 w-4" />
-              {saved ? "Saved!" : "Save"}
+              Refresh
             </Button>
           </div>
         </div>
@@ -155,31 +186,33 @@ export default function ServicesPage() {
           </div>
           <div className="bg-white rounded-2xl border p-5 text-center">
             <p className="text-3xl font-bold text-green-600">
-              {serviceList.filter((s) => s.active).length}
+              {serviceList.filter((s) => s.isActive).length}
             </p>
             <p className="text-sm text-slate-500 mt-1">Active</p>
           </div>
           <div className="bg-white rounded-2xl border p-5 text-center">
             <p className="text-3xl font-bold text-blue-600">
-              {serviceList.reduce((sum, s) => sum + s.categoriesCount, 0)}
+              {serviceList.reduce((sum, s) => sum + (s.categories?.length || 0), 0)}
             </p>
             <p className="text-sm text-slate-500 mt-1">Categories</p>
           </div>
           <div className="bg-white rounded-2xl border p-5 text-center">
             <p className="text-3xl font-bold text-purple-600">
-              {serviceList.reduce((sum, s) => sum + s.itemsCount, 0)}
+              {serviceList.reduce((sum, s) => sum + getServiceItemCount(s), 0)}
             </p>
             <p className="text-sm text-slate-500 mt-1">Total Items</p>
           </div>
         </div>
 
-        {/* Service Cards Grid */}
+        {loading ? (
+            <div className="text-center p-12 text-slate-500">Loading services...</div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {serviceList.map((service) => (
             <div
               key={service.id}
               className={`bg-white rounded-2xl shadow-sm border overflow-hidden group hover:shadow-lg transition-all ${
-                !service.active ? "opacity-60" : ""
+                !service.isActive ? "opacity-60" : ""
               }`}
             >
               {/* Card Header with Color */}
@@ -208,36 +241,51 @@ export default function ServicesPage() {
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(service)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => handleDelete(service.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Switch
-                    checked={service.active}
-                    onCheckedChange={() => toggleService(service.id)}
+                    checked={service.isActive}
+                    onCheckedChange={() => toggleService(service.id, service.isActive)}
                   />
                 </div>
               </div>
 
               {/* Card Body */}
               <div className="p-6 pt-4 flex items-center justify-between">
-                <div className="flex gap-6">
-                  <div>
-                    <p
-                      className="text-2xl font-bold"
-                      style={{ color: service.color }}
-                    >
-                      {service.categoriesCount}
-                    </p>
-                    <p className="text-xs text-slate-500">Categories</p>
+                <div className="space-y-2">
+                  <div className="flex gap-6">
+                    <div>
+                      <p
+                        className="text-2xl font-bold"
+                        style={{ color: service.color }}
+                      >
+                        {service.categories?.length || 0}
+                      </p>
+                      <p className="text-xs text-slate-500">Categories</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-600">
+                        {getServiceItemCount(service)}
+                      </p>
+                      <p className="text-xs text-slate-500">Items</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-600">
-                      {service.itemsCount}
+                  {(service.categories?.length || 0) === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      No categories yet. Open View Categories to add data.
                     </p>
-                    <p className="text-xs text-slate-500">Items</p>
-                  </div>
+                  ) : null}
                 </div>
 
                 {/* View Button */}
                 <Link
-                  href={`/services/categories?service=${service.name}`}
+                  href={`/services/categories?serviceId=${service.id}&service=${encodeURIComponent(service.name)}`}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all"
                   style={{
                     backgroundColor: service.color + "15",
@@ -251,6 +299,7 @@ export default function ServicesPage() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Info Box */}
         <div className="bg-linear-to-r from-[#3E8940] to-[#5FAD61] rounded-2xl p-6 text-white">
@@ -270,7 +319,7 @@ export default function ServicesPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Service</DialogTitle>
+            <DialogTitle>{editingId ? "Edit Service" : "Add New Service"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -345,10 +394,9 @@ export default function ServicesPage() {
             </Button>
             <Button
               className="bg-[#3E8940] hover:bg-[#3E8940]/90"
-              onClick={handleAddService}
+              onClick={handleDialogSubmit}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Service
+              {editingId ? <><Save className="h-4 w-4 mr-2" />Save Changes</> : <><Plus className="h-4 w-4 mr-2" />Add Service</>}
             </Button>
           </DialogFooter>
         </DialogContent>

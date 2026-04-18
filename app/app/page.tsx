@@ -7,8 +7,10 @@ import {
   Gift,
   Megaphone,
   ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 const appSections = [
   {
@@ -75,6 +77,8 @@ const appSections = [
         name: "Add Money Settings",
         href: "/wallet/settings",
         description: "Min/max amounts, bonuses",
+        disabled: true,
+        disabledLabel: "Temporarily Disabled",
       },
     ],
   },
@@ -85,6 +89,12 @@ export default function AppContentPage() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
+        <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+          <Link href="/">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Link>
+        </Button>
         <h1 className="text-3xl text-black font-bold tracking-tight">
           Growth & Content Manager
         </h1>
@@ -116,21 +126,39 @@ export default function AppContentPage() {
               </div>
             </div>
             <div className="divide-y">
-              {section.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors group"
-                >
-                  <div>
-                    <p className="font-medium text-black group-hover:text-primary transition-colors">
-                      {item.name}
-                    </p>
-                    <p className="text-sm text-slate-500">{item.description}</p>
+              {section.items.map((item) =>
+                "disabled" in item && item.disabled ? (
+                  <div
+                    key={item.href}
+                    className="flex items-center justify-between p-4 bg-slate-50/60 cursor-not-allowed"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-500">{item.name}</p>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                          {("disabledLabel" in item && item.disabledLabel) || "Disabled"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-400">{item.description}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300" />
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-primary transition-colors" />
-                </Link>
-              ))}
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors group"
+                  >
+                    <div>
+                      <p className="font-medium text-black group-hover:text-primary transition-colors">
+                        {item.name}
+                      </p>
+                      <p className="text-sm text-slate-500">{item.description}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-primary transition-colors" />
+                  </Link>
+                ),
+              )}
             </div>
           </div>
         ))}

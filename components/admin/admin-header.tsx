@@ -3,7 +3,6 @@
 import {
   Bell,
   Search,
-  Menu,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -18,14 +17,47 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+
+type AdminUser = {
+  name: string;
+  email: string;
+  role: string;
+  adminRole: string;
+};
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export function AdminHeader() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const router = useRouter();
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("admin_user");
+      if (raw) setAdminUser(JSON.parse(raw));
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
+  const displayName = adminUser?.name || "Admin";
+  const displayRole = adminUser?.adminRole
+    ? adminUser.adminRole.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "Super Admin";
+  const initials = getInitials(displayName);
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
@@ -90,14 +122,13 @@ export function AdminHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 px-2">
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/avatars/admin.png" />
-                <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                  AD
+                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start">
-                <span className="text-sm font-medium">Admin</span>
-                <span className="text-xs text-slate-500">Super Admin</span>
+                <span className="text-sm font-medium">{displayName}</span>
+                <span className="text-xs text-slate-500">{displayRole}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>

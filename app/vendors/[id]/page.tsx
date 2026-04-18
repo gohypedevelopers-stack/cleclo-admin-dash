@@ -4,347 +4,231 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  ArrowLeft,
-  Phone,
-  MapPin,
-  Briefcase,
-  Star,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { VENDORS } from "@/lib/vendorsData";
-import { ORDERS } from "@/lib/ordersData";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
+
+const apiFetch = async (url: string, options?: RequestInit) => {
+  const res = await fetch(url, options);
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
+    localStorage.removeItem("admin_auth_token");
+    window.location.href = "/login";
+  }
+  return res;
+};
+
+const formatINR = (amount: number) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+
+const formatDate = (dateStr: string) => {
+  try { return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch { return dateStr; }
+};
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "Active":
-      return "bg-emerald-100 text-emerald-700 border-emerald-200/50";
-    case "Pending":
-      return "bg-amber-100 text-amber-700 border-amber-200/50";
-    case "Suspended":
-      return "bg-rose-100 text-rose-700 border-rose-200/50";
-    default:
-      return "bg-slate-100 text-slate-600 border-slate-200/50";
-  }
-};
-
-const getOrderStatusColor = (status: string) => {
-  switch (status) {
-    case "Processing":
-      return "bg-yellow-100 text-yellow-600 border-yellow-200/50";
-    case "Assigned":
-      return "bg-blue-100 text-blue-600 border-blue-200/50";
-    case "Ready":
-      return "bg-green-100 text-green-600 border-green-200/50";
-    case "Pending Pickup":
-      return "bg-orange-100 text-orange-600 border-orange-200/50";
-    default:
-      return "bg-slate-100 text-slate-600 border-slate-200/50";
+    case "Active": return "bg-emerald-100 text-emerald-700 border-emerald-200/50";
+    case "Pending": return "bg-amber-100 text-amber-700 border-amber-200/50";
+    case "Suspended": return "bg-rose-100 text-rose-700 border-rose-200/50";
+    default: return "bg-slate-100 text-slate-600 border-slate-200/50";
   }
 };
 
 export default function VendorDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const vendorId = params.id;
-  const vendor = VENDORS.find((v) => v.id === vendorId);
+  const vendorId = params.id as string;
 
-  // Filter orders for this specific vendor (mock logic: matching by vendor name string roughly)
-  // Note: ideally orders would have a vendor ID.
-  const vendorOrders = ORDERS.filter((order) => order.vendor === vendor?.name);
+  const [vendor, setVendor] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!vendor) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <div className="bg-white/50 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/40 text-center">
-          <p className="text-slate-500 font-medium">Vendor not found</p>
-          <Button
-            variant="outline"
-            className="mt-4 bg-white/80 hover:bg-white border-slate-200"
-            onClick={() => router.back()}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const fetchVendor = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Vendor not found");
+      setVendor(await res.json());
+      try {
+        const ordRes = await apiFetch(`${ORDER_API_URL}?vendorId=${vendorId}`, { headers: getAuthHeaders() });
+        if (ordRes.ok) { const d = await ordRes.json(); setOrders(Array.isArray(d) ? d : d.orders || []); }
+      } catch {}
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [vendorId]);
+
+  useEffect(() => { fetchVendor(); }, [fetchVendor]);
+
+  const handleApprove = async () => {
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}/approve`, { method: "PATCH", headers: getAuthHeaders(), body: JSON.stringify({ isApproved: true }) });
+      if (!res.ok) throw new Error("Failed"); toast.success("Vendor approved"); fetchVendor();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleSuspend = async () => {
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}/suspend`, { method: "PATCH", headers: getAuthHeaders(), body: JSON.stringify({ suspended: !vendor.isBlocked }) });
+      if (!res.ok) throw new Error("Failed"); toast.success(vendor.isBlocked ? "Reactivated" : "Suspended"); fetchVendor();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  if (isLoading) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading vendor...</p></div>;
+  if (error || !vendor) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><AlertTriangle className="h-10 w-10 text-red-500" /><p className="text-slate-500">{error || "Not found"}</p><Button variant="outline" onClick={() => router.back()}><ArrowLeft className="h-4 w-4 mr-2" /> Go Back</Button></div>;
+
+  const vp = vendor.vendorProfile || {};
+  const displayName = vp.businessName || vendor.name;
+  const ownerName = vp.ownerName || vendor.name;
+  const city = vendor.addresses?.[0]?.city || "—";
+  const status = vendor.isBlocked ? "Suspended" : !vp.isApproved ? "Pending" : "Active";
 
   return (
     <div className="flex flex-col gap-6 pb-10 max-w-7xl mx-auto">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full bg-white/50 hover:bg-white border border-white/40 shadow-sm transition-all duration-300 hover:scale-105"
-            onClick={() => router.back()}
-          >
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-slate-100" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 text-slate-700" />
           </Button>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest bg-slate-100/50 px-2 py-0.5 rounded-full border border-slate-200/50">
-                Vendor Details
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-slate-900 via-slate-800 to-slate-700">
-              {vendor.name}
-            </h1>
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest bg-slate-100/50 px-2 py-0.5 rounded-full border">Vendor Details</span>
+            <h1 className="text-3xl font-bold text-slate-900 mt-1">{displayName}</h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge
-            className={cn(
-              "text-xs px-3 py-1 font-semibold backdrop-blur-md shadow-sm border",
-              getStatusColor(vendor.status),
-            )}
-          >
-            {vendor.status}
-          </Badge>
+          {status === "Pending" && <Button size="sm" className="bg-[#3E8940] hover:bg-[#3E8940]/90 gap-2 rounded-xl" onClick={handleApprove}><CheckCircle className="h-4 w-4" /> Approve</Button>}
+          <Button variant="outline" size="sm" className={`gap-2 rounded-xl ${vendor.isBlocked ? "text-emerald-600" : "text-red-600"}`} onClick={handleSuspend}>
+            {vendor.isBlocked ? <><CheckCircle className="h-4 w-4" /> Reactivate</> : <><Ban className="h-4 w-4" /> Suspend</>}
+          </Button>
+          <Badge className={cn("text-xs px-3 py-1 font-semibold border", getStatusColor(status))}>{status}</Badge>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-12">
-        {/* Main Profile Card - Spans 4 columns */}
-        <div className="md:col-span-4 flex flex-col">
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden h-full transform transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] duration-500">
-            <div className="h-24 bg-linear-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center relative overlow-hidden">
-              <div className="absolute inset-0 opacity-30 pattern-grid-lg" />
-            </div>
+        {/* Left - Profile */}
+        <div className="md:col-span-4">
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div className="h-24 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50" />
             <div className="px-6 pb-6 -mt-10 relative z-10">
               <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
-                <AvatarFallback className="bg-linear-to-br from-slate-800 to-slate-950 text-white text-xl font-bold">
-                  {vendor.name
-                    .split(" ")
-                    .map((word) => word[0])
-                    .join("")
-                    .slice(0, 2)}
-                </AvatarFallback>
+                <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">{displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
-
               <div className="mt-3 mb-5">
-                <h2 className="text-xl font-bold text-slate-900">
-                  {vendor.name}
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  {vendor.owner}
-                </p>
+                <h2 className="text-xl font-bold text-slate-900">{displayName}</h2>
+                <p className="text-xs text-slate-500">{ownerName}</p>
               </div>
-
               <div className="space-y-3">
-                <div className="group flex items-center gap-3 p-2.5 rounded-xl bg-white/50 border border-transparent hover:border-blue-100 hover:bg-blue-50/30 transition-all duration-300">
-                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
-                    <Phone className="h-4 w-4" />
-                  </div>
-                  <div className="overflow-hidden">
-                    <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-                      Phone
-                    </span>
-                    <p className="text-xs font-semibold text-slate-700 truncate">
-                      {vendor.phone}
-                    </p>
-                  </div>
+                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
+                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><Phone className="h-4 w-4" /></div>
+                  <div><span className="text-[10px] text-slate-400 uppercase block">Phone</span><p className="text-xs font-semibold text-slate-700">{vendor.phone}</p></div>
                 </div>
-
-                <div className="group flex items-center gap-3 p-2.5 rounded-xl bg-white/50 border border-transparent hover:border-emerald-100 hover:bg-emerald-50/30 transition-all duration-300">
-                  <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-                    <MapPin className="h-4 w-4" />
+                {vendor.email && (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
+                    <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><Mail className="h-4 w-4" /></div>
+                    <div><span className="text-[10px] text-slate-400 uppercase block">Email</span><p className="text-xs font-semibold text-slate-700">{vendor.email}</p></div>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-                      Location
-                    </span>
-                    <p className="text-xs font-semibold text-slate-700">
-                      {vendor.location}
-                    </p>
-                  </div>
+                )}
+                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
+                  <div className="h-8 w-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600"><MapPin className="h-4 w-4" /></div>
+                  <div><span className="text-[10px] text-slate-400 uppercase block">City</span><p className="text-xs font-semibold text-slate-700">{city}</p></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column - Spans 8 columns */}
+        {/* Right */}
         <div className="md:col-span-8 flex flex-col gap-4">
-          {/* Stats Card */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] p-6 relative overflow-hidden group hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all duration-500">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-700">
-              <Briefcase className="h-24 w-24" />
-            </div>
-
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  Performance Overview
-                </h3>
-                <p className="text-slate-500 text-xs">
-                  Based on recent activity
-                </p>
-              </div>
-            </div>
-
+          {/* Stats */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5"><Briefcase className="h-24 w-24" /></div>
+            <h3 className="text-base font-bold text-slate-800 mb-4">Performance Overview</h3>
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white/60 rounded-xl p-3 border border-white/50">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Star className="h-3 w-3" /> Rating
-                </p>
-                <p className="text-xl font-bold text-slate-800">
-                  {vendor.rating > 0 ? vendor.rating : "N/A"}
-                </p>
-              </div>
-              <div className="bg-white/60 rounded-xl p-3 border border-white/50">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> Completion
-                </p>
-                <p className="text-xl font-bold text-slate-800">
-                  {vendor.completionRate}%
-                </p>
-              </div>
-              <div className="bg-white/60 rounded-xl p-3 border border-white/50">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  Total Orders
-                </p>
-                <p className="text-xl font-bold text-slate-800">
-                  {vendor.totalOrders}
-                </p>
-              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1 flex items-center gap-1"><Star className="h-3 w-3" /> Rating</p><p className="text-xl font-bold text-slate-800">{vp.rating || "N/A"}</p></div>
+              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Commission</p><p className="text-xl font-bold text-slate-800">{vp.commissionRate ? `${vp.commissionRate}%` : "—"}</p></div>
+              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Orders</p><p className="text-xl font-bold text-slate-800">{vendor._count?.ordersAsVendor ?? orders.length}</p></div>
             </div>
+          </div>
 
-            <div className="mt-4 bg-white/60 rounded-xl p-3 border border-white/50 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">
-                  Pending Payout
-                </p>
-                <p className="text-xl font-bold text-emerald-600">
-                  {vendor.pendingPayout}
-                </p>
-              </div>
-              <Button size="sm" variant="outline" className="text-xs h-8">
-                View History
-              </Button>
+          {/* Documents */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-slate-400" /> Verification Documents</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "KYC ID Proof", ok: !!vp.ownerIdProofUrl },
+                { label: "Business Proof", ok: !!vp.businessProofUrl },
+                { label: "Bank Verified", ok: !!vp.bankVerified },
+                { label: "GST Registered", ok: !!vp.gstRegistered },
+                { label: "Terms Accepted", ok: !!vp.termsAccepted },
+                { label: "SLA Agreement", ok: !!vp.slaAccepted },
+              ].map((doc) => (
+                <div key={doc.label} className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold ${doc.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+                  {doc.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  {doc.label}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Account Info */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] p-6 flex-1">
-            <h3 className="text-base font-bold text-slate-800 mb-4">
-              Account Information
-            </h3>
-
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-4">Account Information</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
-                  <AlertCircle className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">
-                    Vendor ID
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    {vendor.id}
-                  </p>
-                </div>
+                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center"><AlertCircle className="h-4 w-4 text-slate-600" /></div>
+                <div><p className="text-xs font-semibold text-slate-800">Vendor ID</p><p className="text-[10px] text-slate-500 font-mono">{vendor.id}</p></div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
-                  <Clock className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">
-                    Joined Date
-                  </p>
-                  <p className="text-[10px] text-slate-500">
-                    {vendor.joinedDate}
-                  </p>
-                </div>
+                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center"><Clock className="h-4 w-4 text-slate-600" /></div>
+                <div><p className="text-xs font-semibold text-slate-800">Joined</p><p className="text-[10px] text-slate-500">{formatDate(vendor.createdAt)}</p></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Orders Section */}
-      <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] p-6">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">
-          Assigned Orders
-        </h3>
-        {vendorOrders.length > 0 ? (
+      {/* Orders */}
+      <div className="bg-white rounded-2xl border shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">Assigned Orders</h3>
+        {orders.length > 0 ? (
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent border-slate-200/60">
-                <TableHead className="w-[100px] text-xs font-bold uppercase text-slate-400">
-                  ID
-                </TableHead>
-                <TableHead className="text-xs font-bold uppercase text-slate-400">
-                  Status
-                </TableHead>
-                <TableHead className="text-xs font-bold uppercase text-slate-400">
-                  Due Date
-                </TableHead>
-                <TableHead className="text-xs font-bold uppercase text-slate-400 text-right">
-                  Amount
-                </TableHead>
-                <TableHead className="text-xs font-bold uppercase text-slate-400 text-right">
-                  Actions
-                </TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-bold uppercase text-slate-400">ID</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-400">Status</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-400">Items</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-400 text-right">Amount</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-400 text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vendorOrders.map((order) => (
-                <TableRow
-                  key={order.id}
-                  className="hover:bg-slate-50/50 border-slate-100 transition-colors"
-                >
-                  <TableCell className="font-semibold text-slate-700 text-sm">
-                    {order.id}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={cn(
-                        "text-[10px] px-2 py-0.5 border font-medium shadow-sm",
-                        getOrderStatusColor(order.status),
-                      )}
-                    >
-                      {order.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-slate-600">
-                    {order.dueDate}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-slate-800 text-sm">
-                    {order.amount}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium text-slate-500 hover:text-slate-900"
-                      onClick={() => router.push(`/orders/${order.id}`)}
-                    >
-                      View
-                    </Button>
-                  </TableCell>
+              {orders.slice(0, 10).map((order: any) => (
+                <TableRow key={order.id} className="hover:bg-slate-50/50 cursor-pointer" onClick={() => router.push(`/orders/${order.id}`)}>
+                  <TableCell className="font-semibold text-sm">#{order.id.slice(0, 8).toUpperCase()}</TableCell>
+                  <TableCell><Badge className="text-[10px]">{order.status}</Badge></TableCell>
+                  <TableCell className="text-sm">{order.itemCount} items</TableCell>
+                  <TableCell className="text-right font-medium">{formatINR(order.totalAmount)}</TableCell>
+                  <TableCell className="text-right"><Button variant="ghost" size="sm" className="h-8 text-xs" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${order.id}`); }}>View</Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         ) : (
-          <div className="text-center py-8 text-slate-500 text-sm">
-            No active orders for this vendor.
-          </div>
+          <div className="text-center py-8 text-slate-500 text-sm">No orders found.</div>
         )}
       </div>
     </div>

@@ -19,58 +19,47 @@ import {
   ArrowRight,
   FileText,
   Eye,
+  Loader2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
-const pendingVerifications = [
-  {
-    id: "pv1",
-    name: "Rahul Kumar",
-    applied: "2 hours ago",
-    status: "Pending",
-    documents: [
-      { name: "Driving License", status: "Pending" },
-      { name: "Vehicle RC", status: "Pending" },
-      { name: "Insurance", status: "Pending" },
-    ],
-    avatar: "RK",
-    notes: "Please check the expiry date on Insurance.",
-  },
-  {
-    id: "pv2",
-    name: "Amit Singh",
-    applied: "5 hours ago",
-    status: "In Review",
-    documents: [
-      { name: "Driving License", status: "Verified" },
-      { name: "Vehicle RC", status: "Pending" },
-    ],
-    avatar: "AS",
-    notes: "",
-  },
-  {
-    id: "pv3",
-    name: "Priya Sharma",
-    applied: "1 day ago",
-    status: "Action Required",
-    documents: [{ name: "Insurance", status: "Rejected" }],
-    avatar: "PS",
-    notes: "Insurance document is blurry.",
-  },
-];
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
 
 export default function VerificationPage() {
   const router = useRouter();
+  const [pendingVerifications, setPendingVerifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPendingRiders() {
+      try {
+        setLoading(true);
+        const res = await fetch(`${AUTH_API_URL}/users`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error("Failed to load riders");
+        const data = await res.json();
+        
+        // Filter users who are specifically riders AND not active (i.e. pending approval)
+        const riders = data.filter((u: any) => 
+            (u.role?.toLowerCase() === 'rider' || u.vendorProfile?.businessType === 'rider') &&
+            u.status !== 'active'
+        );
+        
+        setPendingVerifications(riders);
+      } catch (err) {
+        toast.error("Failed to load generic overview.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPendingRiders();
+  }, []);
 
   const handleVerifyClick = (id: string) => {
     router.push(`/rider/verification/${id}`);
@@ -93,7 +82,7 @@ export default function VerificationPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-amber-500" />
-            Pending Requests
+            Pending Requests ({pendingVerifications.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -108,73 +97,83 @@ export default function VerificationPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pendingVerifications.map((item) => (
-                <TableRow key={item.id} className="group hover:bg-slate-50">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-amber-100 text-amber-700">
-                          {item.avatar}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <span className="font-semibold text-slate-900 block">
-                          {item.name}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          ID: {item.id}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-slate-500">
-                    {item.applied}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {item.documents.map((doc, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="outline"
-                          className={`text-[10px] bg-white ${
-                            doc.status === "Verified"
-                              ? "border-green-200 text-green-700"
-                              : doc.status === "Rejected"
-                                ? "border-red-200 text-red-700"
-                                : "border-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {doc.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={
-                          item.status === "Pending"
-                            ? "bg-amber-100 text-amber-700 border-amber-200"
-                            : item.status === "Action Required"
-                              ? "bg-red-100 text-red-700 border-red-200"
-                              : "bg-blue-100 text-blue-700 border-blue-200"
-                        }
-                      >
-                        {item.status}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      className="bg-[#3E8940] hover:bg-[#3E8940]/90"
-                      onClick={() => handleVerifyClick(item.id)}
-                    >
-                      Verify
-                    </Button>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-48 text-center text-slate-500">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-[#3E8940] mb-2" />
+                    Loading Applications...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : pendingVerifications.length === 0 ? (
+                 <TableRow>
+                  <TableCell colSpan={5} className="h-48 text-center text-slate-500">
+                    No pending riders require verification.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pendingVerifications.map((item) => (
+                  <TableRow key={item.id} className="group hover:bg-slate-50">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarFallback className="bg-amber-100 text-amber-700 uppercase">
+                            {(item.name || "U")[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <span className="font-semibold text-slate-900 block truncate max-w-[150px]">
+                            {item.name}
+                          </span>
+                          <span className="text-xs text-slate-500 truncate max-w-[150px]">
+                            ID: {item.id}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-slate-500">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-white border-slate-200 text-slate-600"
+                        >
+                          Driving License
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-white border-slate-200 text-slate-600"
+                        >
+                          Vehicle RC
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          className={
+                            item.status === "pending" || !item.status
+                              ? "bg-amber-100 text-amber-700 border-amber-200"
+                              : "bg-red-100 text-red-700 border-red-200"
+                          }
+                        >
+                          {item.status || "Pending Verification"}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        className="bg-[#3E8940] hover:bg-[#3E8940]/90"
+                        onClick={() => handleVerifyClick(item.id)}
+                      >
+                        Verify
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

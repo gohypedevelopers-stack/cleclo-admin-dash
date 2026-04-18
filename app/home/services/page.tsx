@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, EyeOff, Palette, GripVertical, Save, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Eye, EyeOff, GripVertical, Save, Plus, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,129 +15,107 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { adminCatalogApi } from "@/lib/admin-api";
+import { toast } from "sonner";
 
-const services = [
-  {
-    id: 1,
-    name: "Wash & Fold",
-    icon: "🧺",
-    color: "#3E8940",
-    visible: true,
-    order: 1,
-    types: ["Wash"],
-  },
-  {
-    id: 2,
-    name: "Wash & Iron",
-    icon: "👔",
-    color: "#4A90D9",
-    visible: true,
-    order: 2,
-    types: ["Wash", "Iron"],
-  },
-  {
-    id: 3,
-    name: "Dry Clean",
-    icon: "🧥",
-    color: "#9B59B6",
-    visible: true,
-    order: 3,
-    types: ["Dry Clean"],
-  },
-  {
-    id: 4,
-    name: "Iron Only",
-    icon: "🔥",
-    color: "#E67E22",
-    visible: true,
-    order: 4,
-    types: ["Iron"],
-  },
-  {
-    id: 5,
-    name: "Premium Care",
-    icon: "✨",
-    color: "#F1C40F",
-    visible: false,
-    order: 5,
-    types: ["Wash", "Dry Clean", "Iron"],
-  },
-  {
-    id: 6,
-    name: "Shoe Cleaning",
-    icon: "👟",
-    color: "#1ABC9C",
-    visible: false,
-    order: 6,
-    types: ["Wash"],
-  },
-];
+type ServiceCategory = {
+  id: string;
+  name: string;
+};
+
+type ServiceRecord = {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  isActive: boolean;
+  displayOrder?: number;
+  categories?: ServiceCategory[];
+};
 
 export default function ServicesGridPage() {
-  const [serviceList, setServiceList] = useState(services);
-  const [saved, setSaved] = useState(false);
+  const [serviceList, setServiceList] = useState<ServiceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newService, setNewService] = useState({
     name: "",
     icon: "🧺",
     color: "#3E8940",
-    types: [] as string[],
   });
 
-  const toggleVisibility = (id: number) => {
-    setServiceList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s)),
-    );
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      const data = await adminCatalogApi.getServices();
+      const normalized = Array.isArray(data) ? (data as ServiceRecord[]) : [];
+      const sorted = [...normalized].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      setServiceList(sorted);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load services");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const toggleVisibility = async (id: string, current: boolean) => {
+    try {
+      setServiceList((prev) =>
+        prev.map((service) => (service.id === id ? { ...service, isActive: !current } : service))
+      );
+      await adminCatalogApi.updateService(id, { isActive: !current });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update visibility");
+      loadServices();
+    }
   };
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    toast.success("All service changes are already saved to database");
   };
 
-  const handleAddService = () => {
-    if (!newService.name) return;
+  const handleAddService = async () => {
+    if (!newService.name.trim()) {
+      toast.error("Service name is required");
+      return;
+    }
 
-    const newId = Math.max(...serviceList.map((s) => s.id)) + 1;
-    const newOrder = Math.max(...serviceList.map((s) => s.order)) + 1;
-
-    setServiceList((prev) => [
-      ...prev,
-      {
-        id: newId,
-        name: newService.name,
+    try {
+      const maxOrder = serviceList.reduce((max, service) => Math.max(max, service.displayOrder || 0), 0);
+      const payload = {
+        name: newService.name.trim(),
         icon: newService.icon,
         color: newService.color,
-        visible: true,
-        order: newOrder,
-        types: newService.types,
-      },
-    ]);
+        displayOrder: maxOrder + 1,
+        isActive: true,
+      };
 
-    setNewService({
-      name: "",
-      icon: "🧺",
-      color: "#3E8940",
-      types: [],
-    });
-    setIsDialogOpen(false);
-  };
-
-  const toggleServiceType = (type: string) => {
-    setNewService((prev) => {
-      const types = prev.types.includes(type)
-        ? prev.types.filter((t) => t !== type)
-        : [...prev.types, type];
-      return { ...prev, types };
-    });
+      const created = await adminCatalogApi.createService(payload);
+      setServiceList((prev) => [...prev, created as ServiceRecord]);
+      setNewService({ name: "", icon: "🧺", color: "#3E8940" });
+      setIsDialogOpen(false);
+      toast.success("Service added");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to add service");
+    }
   };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
+          <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+            <Link href="/app">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          </Button>
           <h1 className="text-3xl text-black font-bold tracking-tight">
             Services Grid
           </h1>
@@ -158,92 +137,99 @@ export default function ServicesGridPage() {
             onClick={handleSave}
           >
             <Save className="h-4 w-4" />
-            {saved ? "Saved!" : "Save Changes"}
+            Saved to DB
           </Button>
         </div>
       </div>
 
-      {/* Services Grid */}
-      <div className="bg-white rounded-xl shadow-sm border divide-y">
-        {serviceList.map((service) => (
-          <div key={service.id} className="p-4 flex items-center gap-4">
-            <GripVertical className="h-5 w-5 text-slate-300 cursor-grab" />
+      {loading ? (
+        <div className="text-center p-8 text-slate-500">Loading services...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border divide-y">
+          {serviceList.map((service) => {
+            const serviceColor = service.color || "#3E8940";
+            const serviceIcon = service.icon || "🧺";
 
-            {/* Icon Preview */}
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-              style={{ backgroundColor: service.color + "20" }}
-            >
-              {service.icon}
-            </div>
+            return (
+              <div key={service.id} className="p-4 flex items-center gap-4">
+                <GripVertical className="h-5 w-5 text-slate-300 cursor-grab" />
 
-            {/* Details */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-black">{service.name}</h3>
-                {!service.visible && (
-                  <Badge className="bg-slate-100 text-slate-600 border-none text-xs">
-                    Hidden
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
-                    style={{ backgroundColor: service.color }}
-                  />
-                  <span className="text-xs text-slate-500">
-                    {service.color}
-                  </span>
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                  style={{ backgroundColor: `${serviceColor}20` }}
+                >
+                  {serviceIcon}
                 </div>
-                <div className="hidden sm:flex gap-1">
-                  {service.types?.map((type) => (
-                    <Badge
-                      key={type}
-                      variant="outline"
-                      className="text-[10px] h-5 px-1.5"
-                    >
-                      {type}
-                    </Badge>
-                  ))}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-black">{service.name}</h3>
+                    {!service.isActive && (
+                      <Badge className="bg-slate-100 text-slate-600 border-none text-xs">
+                        Hidden
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
+                        style={{ backgroundColor: serviceColor }}
+                      />
+                      <span className="text-xs text-slate-500">
+                        {serviceColor}
+                      </span>
+                    </div>
+                    <div className="hidden sm:flex gap-1">
+                      {(service.categories || []).map((category) => (
+                        <Badge
+                          key={category.id}
+                          variant="outline"
+                          className="text-[10px] h-5 px-1.5"
+                        >
+                          {category.name}
+                        </Badge>
+                      ))}
+                      {(!service.categories || service.categories.length === 0) && (
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                          No categories
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    {service.isActive ? (
+                      <Eye className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-slate-400" />
+                    )}
+                    <Switch
+                      checked={service.isActive}
+                      onCheckedChange={() => toggleVisibility(service.id, service.isActive)}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            );
+          })}
+          {serviceList.length === 0 && (
+            <div className="text-center p-8 text-slate-500">No services configured</div>
+          )}
+        </div>
+      )}
 
-            {/* Actions */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                {service.visible ? (
-                  <Eye className="h-4 w-4 text-green-600" />
-                ) : (
-                  <EyeOff className="h-4 w-4 text-slate-400" />
-                )}
-                <Switch
-                  checked={service.visible}
-                  onCheckedChange={() => toggleVisibility(service.id)}
-                />
-              </div>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Palette className="h-4 w-4" />
-                Edit
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Info */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <h4 className="font-semibold text-blue-800 mb-2">Tips</h4>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Drag services to reorder them on the home screen</li>
-          <li>• Hidden services won&apos;t appear to users</li>
-          <li>• Click Edit to change icon and color</li>
+          <li>• Service visibility is saved immediately to database</li>
+          <li>• New services are created by admin and stored in catalog DB</li>
+          <li>• Category tags are fetched live from saved catalog data</li>
         </ul>
       </div>
 
-      {/* Add Service Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -288,27 +274,6 @@ export default function ServicesGridPage() {
                     }
                   />
                 </div>
-              </div>
-            </div>
-
-            <div>
-              <Label className="mb-2 block">Service Types</Label>
-              <div className="flex gap-4">
-                {["Wash", "Iron", "Dry Clean"].map((type) => (
-                  <div key={type} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`type-${type}`}
-                      checked={newService.types.includes(type)}
-                      onCheckedChange={() => toggleServiceType(type)}
-                    />
-                    <label
-                      htmlFor={`type-${type}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {type}
-                    </label>
-                  </div>
-                ))}
               </div>
             </div>
           </div>

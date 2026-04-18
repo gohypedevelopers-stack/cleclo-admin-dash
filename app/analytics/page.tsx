@@ -23,6 +23,7 @@ import {
   IndianRupee,
   Activity,
   Calendar,
+  Loader2,
 } from "lucide-react";
 import {
   AreaChart,
@@ -39,8 +40,11 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { useEffect, useState } from "react";
+import { dashboardApi, type DashboardOverview } from "@/lib/dashboard-api";
+import { toast } from "sonner";
 
-// Mock Data
+// Simulated historical sequence for charts since the API currently provides snapshots only
 const revenueData = [
   { name: "Jan", revenue: 45000, orders: 320 },
   { name: "Feb", revenue: 52000, orders: 350 },
@@ -71,6 +75,47 @@ const customerGrowthData = [
 ];
 
 export default function AnalyticsPage() {
+  const [data, setData] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        setLoading(true);
+        // Note: For extensive charts, this should be extended in the backend API.
+        // We use the overview data for the top-line macro statistics.
+        const res = await dashboardApi.getOverview({ period: "this_year" });
+        setData(res);
+      } catch (err) {
+        toast.error("Failed to load analytics");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
+
+  const getKpi = (key: string, fallback: string | number) => {
+    if (!data) return fallback;
+    const kpi = data.kpis.find((k) => k.key === key);
+    return kpi ? kpi.value : fallback;
+  };
+
+  const getKpiNote = (key: string, fallback: string) => {
+    if (!data) return fallback;
+    const kpi = data.kpis.find((k) => k.key === key);
+    return kpi ? kpi.note : fallback;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <h3 className="font-semibold text-slate-700">Crunching Numbers...</h3>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8 pb-8">
       {/* Header */}
@@ -106,20 +151,19 @@ export default function AnalyticsPage() {
         <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
-              Total Revenue
+              Platform Revenue
             </CardTitle>
             <div className="h-8 w-8 rounded-lg bg-green-50 flex items-center justify-center">
               <IndianRupee className="h-4 w-4 text-[#3E8940]" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">₹8,45,230</div>
+            <div className="text-2xl font-bold text-slate-900">{getKpi('gross_platform_revenue', '₹8,45,230')}</div>
             <div className="flex items-center text-xs mt-1">
               <span className="text-green-600 font-medium flex items-center bg-green-50 px-1.5 py-0.5 rounded">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +20.1%
               </span>
-              <span className="text-slate-400 ml-2">from last year</span>
+              <span className="text-slate-400 ml-2">{getKpiNote('gross_platform_revenue', 'from last year')}</span>
             </div>
           </CardContent>
         </Card>
@@ -127,20 +171,19 @@ export default function AnalyticsPage() {
         <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
-              Active Orders
+              Avg Order Value
             </CardTitle>
             <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
               <ShoppingBag className="h-4 w-4 text-blue-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">1,234</div>
+            <div className="text-2xl font-bold text-slate-900">{getKpi('avg_order_value', '₹1,234')}</div>
             <div className="flex items-center text-xs mt-1">
               <span className="text-green-600 font-medium flex items-center bg-green-50 px-1.5 py-0.5 rounded">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +15%
               </span>
-              <span className="text-slate-400 ml-2">from last month</span>
+              <span className="text-slate-400 ml-2">{getKpiNote('avg_order_value', 'from last month')}</span>
             </div>
           </CardContent>
         </Card>
@@ -148,20 +191,19 @@ export default function AnalyticsPage() {
         <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
-              New Users
+              Active Users
             </CardTitle>
             <div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center">
               <Users className="h-4 w-4 text-purple-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">573</div>
+            <div className="text-2xl font-bold text-slate-900">{getKpi('users_total', '573')}</div>
             <div className="flex items-center text-xs mt-1">
               <span className="text-green-600 font-medium flex items-center bg-green-50 px-1.5 py-0.5 rounded">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +8.2%
               </span>
-              <span className="text-slate-400 ml-2">new signups</span>
+              <span className="text-slate-400 ml-2">Total platform users</span>
             </div>
           </CardContent>
         </Card>
@@ -169,20 +211,19 @@ export default function AnalyticsPage() {
         <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
-              Engagement Rate
+              Issue Resolution
             </CardTitle>
             <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
               <Activity className="h-4 w-4 text-amber-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">24.5%</div>
+            <div className="text-2xl font-bold text-slate-900">{getKpi('issue_reported_count', '24')}</div>
             <div className="flex items-center text-xs mt-1">
               <span className="text-red-500 font-medium flex items-center bg-red-50 px-1.5 py-0.5 rounded">
                 <TrendingUp className="h-3 w-3 mr-1 rotate-180" />
-                -2%
               </span>
-              <span className="text-slate-400 ml-2">bounce rate</span>
+              <span className="text-slate-400 ml-2">{getKpiNote('issue_reported_count', 'issues across all orders')}</span>
             </div>
           </CardContent>
         </Card>

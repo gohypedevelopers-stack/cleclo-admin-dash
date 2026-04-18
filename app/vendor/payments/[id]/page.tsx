@@ -13,120 +13,81 @@ import {
   Calendar,
   User,
   Hash,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-// Mock Data (duplicated from main page for now)
-const PAYMENTS = [
-  {
-    id: "TXN-8832",
-    vendor: "Sparkle Cleaners",
-    vendorId: "VEN-001",
-    amount: "₹12,450.00",
-    date: "Oct 24, 2024",
-    status: "Completed",
-    method: "Bank Transfer",
-    reference: "HDFC-882910",
-  },
-  {
-    id: "TXN-8831",
-    vendor: "Quick Wash Hub",
-    vendorId: "VEN-004",
-    amount: "₹8,200.00",
-    date: "Oct 24, 2024",
-    status: "Processing",
-    method: "UPI",
-    reference: "UPI-992019",
-  },
-  {
-    id: "TXN-8830",
-    vendor: "Iron Masters",
-    vendorId: "VEN-002",
-    amount: "₹4,150.00",
-    date: "Oct 23, 2024",
-    status: "Completed",
-    method: "Bank Transfer",
-    reference: "ICICI-772819",
-  },
-  {
-    id: "TXN-8829",
-    vendor: "Luxe Laundry",
-    vendorId: "VEN-005",
-    amount: "₹15,890.00",
-    date: "Oct 22, 2024",
-    status: "Failed",
-    method: "Bank Transfer",
-    reference: "SBI-112003",
-  },
-  {
-    id: "TXN-8828",
-    vendor: "Sparkle Cleaners",
-    vendorId: "VEN-001",
-    amount: "₹9,300.00",
-    date: "Oct 20, 2024",
-    status: "Completed",
-    method: "Bank Transfer",
-    reference: "HDFC-881002",
-  },
-  {
-    id: "TXN-8827",
-    vendor: "Fresho Laundromat",
-    vendorId: "VEN-003",
-    amount: "₹6,750.00",
-    date: "Oct 19, 2024",
-    status: "Completed",
-    method: "UPI",
-    reference: "UPI-882910",
-  },
-  {
-    id: "TXN-8826",
-    vendor: "Quick Wash Hub",
-    vendorId: "VEN-004",
-    amount: "₹5,400.00",
-    date: "Oct 18, 2024",
-    status: "Completed",
-    method: "Bank Transfer",
-    reference: "AXIS-229102",
-  },
-];
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "Completed":
+  const norm = status?.toLowerCase() || "";
+  if (norm === "paid" || norm === "completed") {
       return (
         <Badge className="bg-green-100 text-green-700 border-none font-medium gap-1.5 hover:bg-green-100">
           <CheckCircle className="h-3 w-3" />
           Completed
         </Badge>
       );
-    case "Processing":
-      return (
-        <Badge className="bg-amber-100 text-amber-700 border-none font-medium gap-1.5 hover:bg-amber-100">
-          <Clock className="h-3 w-3" />
-          Processing
-        </Badge>
-      );
-    case "Failed":
+  }
+  if (norm === "failed" || norm === "error") {
       return (
         <Badge className="bg-red-100 text-red-700 border-none font-medium gap-1.5 hover:bg-red-100">
           <XCircle className="h-3 w-3" />
           Failed
         </Badge>
       );
-    default:
-      return <Badge variant="secondary">{status}</Badge>;
   }
+  return (
+    <Badge className="bg-amber-100 text-amber-700 border-none font-medium gap-1.5 hover:bg-amber-100">
+        <Clock className="h-3 w-3" />
+        Processing
+    </Badge>
+  );
 };
 
 export default function VendorPaymentDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = decodeURIComponent(params.id as string);
+  
+  const [payment, setPayment] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Ideally, fetch from API. For now, find in mock data.
-  // We'll decode the ID if it was URL encoded, though simple IDs are fine.
-  const decodedId = decodeURIComponent(id);
-  const payment = PAYMENTS.find((p) => p.id === decodedId);
+  useEffect(() => {
+    async function fetchPayment() {
+      try {
+        setLoading(true);
+        // We fetch all settlements to find this specific ID since there is no standard GET /id exposed yet
+        const res = await fetch(`${AUTH_API_URL}/settlements`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error("Failed to load settlements");
+        const data = await res.json();
+        
+        const txn = data.find((p: any) => p.id === id);
+        setPayment(txn || null);
+      } catch (err) {
+        toast.error("Failed to load generic transaction details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPayment();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <h3 className="font-semibold text-slate-700">Loading Transaction Details...</h3>
+      </div>
+    );
+  }
 
   if (!payment) {
     return (
@@ -138,7 +99,7 @@ export default function VendorPaymentDetailsPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Back to Payments
         </Button>
-        <div className="flex items-center justify-center p-12">
+        <div className="flex flex-col items-center justify-center p-12">
           <p className="text-slate-500">Transaction not found.</p>
         </div>
       </div>
@@ -195,7 +156,7 @@ export default function VendorPaymentDetailsPage() {
                 <span className="text-sm text-slate-500 flex items-center gap-2">
                   <Hash className="h-3 w-3" /> Transaction ID
                 </span>
-                <span className="font-medium text-slate-900 text-lg">
+                <span className="font-medium text-slate-900 text-lg break-all">
                   {payment.id}
                 </span>
               </div>
@@ -204,7 +165,7 @@ export default function VendorPaymentDetailsPage() {
                   <Calendar className="h-3 w-3" /> Date
                 </span>
                 <span className="font-medium text-slate-900 text-lg">
-                  {payment.date}
+                  {new Date(payment.createdAt || payment.date).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
@@ -212,7 +173,7 @@ export default function VendorPaymentDetailsPage() {
                   <CreditCard className="h-3 w-3" /> Amount
                 </span>
                 <span className="font-bold text-[#3E8940] text-2xl">
-                  {payment.amount}
+                  ₹{payment.amount || 0}
                 </span>
               </div>
             </div>
@@ -225,11 +186,11 @@ export default function VendorPaymentDetailsPage() {
                 <div className="bg-slate-50 p-4 rounded-lg space-y-3">
                   <div className="flex justify-between">
                     <span className="text-slate-500 text-sm">Name</span>
-                    <span className="font-medium">{payment.vendor}</span>
+                    <span className="font-medium">{payment.vendor?.name || payment.vendor}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500 text-sm">Vendor ID</span>
-                    <span className="font-medium">{payment.vendorId}</span>
+                    <span className="font-medium break-all">{payment.vendorId}</span>
                   </div>
                 </div>
               </div>
@@ -239,11 +200,11 @@ export default function VendorPaymentDetailsPage() {
                 <div className="bg-slate-50 p-4 rounded-lg space-y-3">
                   <div className="flex justify-between">
                     <span className="text-slate-500 text-sm">Method</span>
-                    <span className="font-medium">{payment.method}</span>
+                    <span className="font-medium">{payment.method || "System Automated"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500 text-sm">Reference ID</span>
-                    <span className="font-medium">{payment.reference}</span>
+                    <span className="font-medium break-all">{payment.transactionId || payment.reference || "N/A"}</span>
                   </div>
                 </div>
               </div>

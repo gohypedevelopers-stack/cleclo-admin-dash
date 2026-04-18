@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Plus,
   Trash2,
@@ -8,6 +9,7 @@ import {
   GripVertical,
   Save,
   LayoutGrid,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,12 @@ export default function SectionsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
+          <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+            <Link href="/services/services">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          </Button>
           <h1 className="text-3xl text-black font-bold tracking-tight">
             Sections
           </h1>

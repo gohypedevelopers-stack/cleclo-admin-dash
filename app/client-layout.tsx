@@ -69,12 +69,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Main Content with margin for sidebar */}
         <div
           className={cn(
-            "flex flex-col min-h-screen transition-all duration-300",
+            "flex h-screen flex-col transition-all duration-300",
             isCollapsed ? "ml-16" : "ml-64",
           )}
         >
           <AdminHeader />
-          <main className="flex-1 p-8 overflow-auto">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto p-8">{children}</main>
         </div>
       </div>
     </AuthGate>
