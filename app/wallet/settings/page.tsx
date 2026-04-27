@@ -14,19 +14,20 @@ export default function WalletSettingsPage() {
   const isWalletSectionEnabled = true;
 
   const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
   const [settings, setSettings] = useState({
     minAddAmount: 100,
     maxAddAmount: 10000,
     bonusEnabled: true,
     bonuses: [] as any[],
   });
-  const [saved, setSaved] = useState(false);
-
   const loadBackend = async () => {
     try {
       setLoading(true);
-      const config = await adminWalletApi.getConfig();
-      const rewards = await adminWalletApi.getRewards();
+      const [config, rewards] = await Promise.all([
+        adminWalletApi.getConfig(),
+        adminWalletApi.getRewards()
+      ]);
       
       setSettings({
         minAddAmount: config?.minAddAmount || 100,
@@ -330,6 +331,9 @@ export default function WalletSettingsPage() {
                     </Button>
                     </div>
                 )}
+                </div>
+
+                </div>
                 </div>
 
                 {/* Preview */}

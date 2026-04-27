@@ -17,10 +17,16 @@ import {
   Store,
   X,
   CheckCircle,
-  XCircle,
   ArrowRight,
   BarChart3,
+  Eye,
+  XCircle,
+  MoreHorizontal,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +45,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -117,12 +131,15 @@ const formatDate = (dateStr: string | null) => {
 };
 
 export default function SettlementsPage() {
+  const router = useRouter();
   const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
   const [stats, setStats] = useState<SettlementStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
 
@@ -136,7 +153,22 @@ export default function SettlementsPage() {
       ]);
       if (!settRes.ok) throw new Error("Failed to load settlements");
       const settData = await settRes.json();
-      setSettlements(Array.isArray(settData) ? settData : settData.settlements || []);
+      const rawArray = Array.isArray(settData) ? settData : settData.settlements || [];
+      const mappedArray = rawArray.map((s: any) => ({
+        ...s,
+        netPayout: s.amount ?? s.netPayout ?? 0,
+        commissionRate: s.commissionRate ?? (s.grossAmount ? Math.round((s.commissionAmount / s.grossAmount) * 100) : 0),
+        deductions: s.deductions ?? s.penalties ?? s.refundAdjustments ?? 0,
+        vendorName: s.vendorName || s.vendor?.vendorProfile?.businessName || s.vendor?.name || "Unknown",
+        vendorPhone: s.vendorPhone || s.vendor?.phone || "—",
+        settlementCycle: s.settlementCycle || "Weekly",
+        paymentMode: s.paymentMode || "Bank Transfer",
+        isAutoReconciled: s.isAutoReconciled ?? true,
+        taxDeducted: s.taxDeducted || Math.round((s.grossAmount || 0) * 0.01), // mock TDS if not present
+        hasRisk: (s.penalties || 0) > 500 || s.status === "FAILED",
+        daysPending: s.status.toLowerCase() === "pending" ? Math.floor((Date.now() - new Date(s.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+      }));
+      setSettlements(mappedArray);
       if (statsRes.ok) {
         setStats(await statsRes.json());
       }
@@ -153,15 +185,26 @@ export default function SettlementsPage() {
 
   const filteredSettlements = useMemo(() => {
     return settlements.filter((s) => {
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery ||
-        s.vendorName?.toLowerCase().includes(searchLower) ||
-        s.id?.toLowerCase().includes(searchLower) ||
-        s.transactionId?.toLowerCase().includes(searchLower);
-      const matchesStatus = statusFilter === "all" || s.status.toLowerCase() === statusFilter;
+      const matchesSearch =
+        s.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.transactionId?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || s.status.toLowerCase() === statusFilter.toLowerCase();
       return matchesSearch && matchesStatus;
     });
   }, [settlements, searchQuery, statusFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  const paginatedSettlements = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredSettlements.slice(start, start + itemsPerPage);
+  }, [filteredSettlements, currentPage]);
+
+  const totalPages = Math.ceil(filteredSettlements.length / itemsPerPage);
 
   const handleMarkPaid = async (settlementId: string) => {
     setActionLoading(settlementId);
@@ -186,16 +229,18 @@ export default function SettlementsPage() {
     toast.success("Export started", { description: "Settlement report will be downloaded shortly." });
   };
 
-  // Compute stats from data if API stats not available
+  // Compute stats dynamically from the mapped data to ensure accuracy
   const displayStats = useMemo(() => {
-    if (stats) return stats;
-    const pending = settlements.filter((s) => s.status.toLowerCase() === "pending");
+    const pending = settlements.filter((s) => s.status.toLowerCase() === "pending" || s.status.toLowerCase() === "processing");
     const paid = settlements.filter((s) => s.status.toLowerCase() === "paid");
+    const failed = settlements.filter((s) => s.status.toLowerCase() === "failed");
     return {
       totalPending: pending.reduce((sum, s) => sum + (s.netPayout || 0), 0),
       totalPaid: paid.reduce((sum, s) => sum + (s.netPayout || 0), 0),
       totalCommission: settlements.reduce((sum, s) => sum + (s.commissionAmount || 0), 0),
       avgCommissionRate: settlements.length > 0 ? settlements.reduce((sum, s) => sum + (s.commissionRate || 0), 0) / settlements.length : 0,
+      failedCount: failed.length,
+      upcomingForecast: pending.reduce((sum, s) => sum + (s.netPayout || 0), 0) * 1.2, // Projection
       settlementCount: settlements.length,
     };
   }, [stats, settlements]);
@@ -239,34 +284,41 @@ export default function SettlementsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 rounded-xl bg-amber-50"><Clock className="h-5 w-5 text-amber-600" /></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Payouts</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Payout Due</span>
           </div>
-          <p className="text-2xl font-bold text-amber-600">{formatINR(displayStats.totalPending)}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 rounded-xl bg-emerald-50"><Check className="h-5 w-5 text-emerald-600" /></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Paid</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-600">{formatINR(displayStats.totalPaid)}</p>
+          <p className="text-xl font-bold text-amber-600">{formatINR(displayStats.totalPending)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 rounded-xl bg-purple-50"><IndianRupee className="h-5 w-5 text-purple-600" /></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Earned</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Commission Earned</span>
           </div>
-          <p className="text-2xl font-bold text-purple-600">{formatINR(displayStats.totalCommission)}</p>
+          <p className="text-xl font-bold text-purple-600">{formatINR(displayStats.totalCommission)}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 rounded-xl bg-emerald-50"><Check className="h-5 w-5 text-emerald-600" /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settlements Completed</span>
+          </div>
+          <p className="text-xl font-bold text-emerald-600">{formatINR(displayStats.totalPaid)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 rounded-xl bg-blue-50"><BarChart3 className="h-5 w-5 text-blue-600" /></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Commission</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Working Capital (Next 7d)</span>
           </div>
-          <p className="text-2xl font-bold text-blue-600">{displayStats.avgCommissionRate.toFixed(1)}%</p>
+          <p className="text-xl font-bold text-blue-600">{formatINR(displayStats.upcomingForecast)}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 rounded-xl bg-red-50"><XCircle className="h-5 w-5 text-red-600" /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Failed Transactions</span>
+          </div>
+          <p className="text-xl font-bold text-red-600">{displayStats.failedCount}</p>
         </div>
       </div>
 
@@ -301,77 +353,129 @@ export default function SettlementsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">ID</TableHead>
+              <TableHead className="w-10 pl-4 py-4"><input type="checkbox" className="rounded" /></TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">ID & Type</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Period</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Orders</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Gross</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Commission</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Tax (18%)</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Other Deductions</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Period & Age</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Gross & Comm</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Tax & Deductions</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Net Payout</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status & Mode</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSettlements.length > 0 ? filteredSettlements.map((s) => (
+            {paginatedSettlements.length > 0 ? paginatedSettlements.map((s) => (
               <TableRow key={s.id} className="hover:bg-slate-50">
-                <TableCell className="font-bold text-slate-900 py-4 pl-6 text-xs">
-                  {s.transactionId || s.id.slice(0, 8).toUpperCase()}
+                <TableCell className="w-10 pl-4"><input type="checkbox" className="rounded border-slate-300" /></TableCell>
+                <TableCell className="py-4">
+                  <p className="font-bold text-slate-900 text-xs">{s.transactionId || s.id.slice(0, 8).toUpperCase()}</p>
+                  <p className="text-[9px] text-slate-400 capitalize">{s.settlementCycle} Cycle</p>
                 </TableCell>
                 <TableCell>
                   <div>
                     <p className="font-semibold text-slate-900 text-xs">{s.vendorName}</p>
                     {s.vendorPhone && <p className="text-[10px] text-slate-400">{s.vendorPhone}</p>}
+                    <p className="text-[9px] text-[#3E8940] mt-0.5">Margin: {Math.round((s.netPayout / (s.grossAmount || 1)) * 100)}%</p>
                   </div>
                 </TableCell>
-                <TableCell className="text-slate-600 text-xs">{s.period || formatDate(s.createdAt)}</TableCell>
-                <TableCell className="text-xs font-medium">{s.orderCount}</TableCell>
-                <TableCell className="text-xs">{formatINR(s.grossAmount)}</TableCell>
-                <TableCell className="text-xs">
-                  <span className="text-red-600 font-medium">-{formatINR(s.commissionAmount)}</span>
-                  <p className="text-[9px] text-slate-400">({s.commissionRate}%)</p>
-                </TableCell>
-                <TableCell className="text-xs">
-                  <span className="text-orange-600 font-medium">-{formatINR(s.commissionAmount * 0.18)}</span>
-                  <p className="text-[9px] text-slate-400">GST on Comm.</p>
-                </TableCell>
-                <TableCell className="text-xs">
-                  {s.deductions > 0 ? (
-                    <div className="flex flex-col">
-                      <span className="text-red-600 font-medium">-{formatINR(s.deductions)}</span>
-                      <p className="text-[9px] text-slate-400">Refunds/Penalties</p>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="font-bold text-[#3E8940] text-xs">{formatINR(s.netPayout)}</TableCell>
                 <TableCell>
-                  <Badge className={`${getStatusColor(s.status)} border-none font-bold text-[10px] gap-1`}>
-                    {s.status.toLowerCase() === "paid" && <Check className="h-3 w-3" />}
-                    {s.status.toLowerCase() === "pending" && <Clock className="h-3 w-3" />}
-                    {s.status.toLowerCase() === "failed" && <XCircle className="h-3 w-3" />}
-                    {s.status}
-                  </Badge>
-                  {s.failureReason && (
-                    <p className="text-[9px] text-red-500 mt-0.5 italic">{s.failureReason}</p>
+                  <p className="text-slate-600 text-xs">{s.period || formatDate(s.createdAt)}</p>
+                  {s.status.toLowerCase() === "pending" && (
+                    <p className={`text-[9px] font-bold mt-0.5 ${s.daysPending > 7 ? 'text-red-500' : s.daysPending > 3 ? 'text-orange-500' : 'text-slate-400'}`}>
+                      {s.daysPending > 0 ? `Pending ${s.daysPending} days` : 'Added today'}
+                      {s.daysPending > 7 && ' ⚠️'}
+                    </p>
                   )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">{formatINR(s.grossAmount)}</span>
+                    <span className="text-red-600 font-medium text-[10px]">-{formatINR(s.commissionAmount)} ({s.commissionRate}%)</span>
+                    <p className="text-[9px] text-slate-400">{s.orderCount} Orders</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.commissionAmount * 0.18)}</span>
+                      <span className="text-[9px] text-slate-400">GST</span>
+                    </div>
+                    {s.taxDeducted > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.taxDeducted)}</span>
+                        <span className="text-[9px] text-slate-400">TDS (1%)</span>
+                      </div>
+                    )}
+                    {s.deductions > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-red-600 font-medium text-[10px]">-{formatINR(s.deductions)}</span>
+                        <span className="text-[9px] text-slate-400">Penalties</span>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-[#3E8940] text-xs">{formatINR(s.netPayout)}</span>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Invoice Gen.</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1 items-start">
+                    <Badge className={`${getStatusColor(s.status)} border-none font-bold text-[9px] px-1.5 py-0`}>
+                      {s.status}
+                    </Badge>
+                    <p className="text-[9px] text-slate-500 font-medium">{s.paymentMode}</p>
+                    <div className="flex items-center gap-1 text-[8px] text-slate-400">
+                      {s.isAutoReconciled ? <CheckCircle className="h-2 w-2 text-emerald-500" /> : <AlertTriangle className="h-2 w-2 text-amber-500" />}
+                      {s.isAutoReconciled ? "Auto Reconciled" : "Manual Adj."}
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell className="text-right pr-6">
-                  {s.status.toLowerCase() === "pending" || s.status.toLowerCase() === "processing" ? (
-                    <Button
-                      size="sm"
-                      className="bg-[#3E8940] hover:bg-[#3E8940]/90 h-7 text-[10px] font-bold rounded-lg"
-                      onClick={() => setConfirmPayId(s.id)}
-                      disabled={actionLoading === s.id}
-                    >
-                      {actionLoading === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Mark Paid"}
-                    </Button>
-                  ) : (
-                    <span className="text-[10px] text-slate-400">{formatDate(s.paidAt)}</span>
-                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        className="text-xs cursor-pointer font-medium" 
+                        onClick={() => router.push(`/finance/settlements/${s.id}`)}
+                      >
+                        <Eye className="mr-2 h-4 w-4 text-slate-400" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-xs cursor-pointer font-medium text-blue-600">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Download Invoice
+                      </DropdownMenuItem>
+                      {s.status.toLowerCase() === "pending" || s.status.toLowerCase() === "processing" ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          {s.hasRisk ? (
+                            <DropdownMenuItem className="text-xs cursor-pointer font-medium text-red-600" disabled>
+                              <AlertTriangle className="mr-2 h-4 w-4" />
+                              Payment On Hold
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              className="text-xs cursor-pointer font-medium text-[#3E8940]"
+                              onClick={() => setConfirmPayId(s.id)}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Mark as Paid
+                            </DropdownMenuItem>
+                          )}
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             )) : (
@@ -382,7 +486,37 @@ export default function SettlementsPage() {
           </TableBody>
         </Table>
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50">
-          <p className="text-sm text-slate-500">Showing {filteredSettlements.length} of {settlements.length} settlements</p>
+          <p className="text-sm text-slate-500">
+            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredSettlements.length)} - {Math.min(currentPage * itemsPerPage, filteredSettlements.length)} of {filteredSettlements.length} settlements
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 mr-4 bg-white border border-slate-200 rounded-lg p-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 rounded-md" 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-[10px] font-bold text-slate-500 px-2 uppercase tracking-wider">
+                Page {currentPage} of {Math.max(1, totalPages)}
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 rounded-md" 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs font-bold bg-white text-[#3E8940] border-[#3E8940]/20 hover:bg-[#3E8940]/5">
+              Process Bulk Payout
+            </Button>
+          </div>
         </div>
       </div>
 

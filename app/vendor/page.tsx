@@ -25,6 +25,8 @@ export default function VendorDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [weeklyActivity, setWeeklyActivity] = useState<{ day: string; active: number }[]>([]);
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
 
   const fetchVendors = useCallback(async () => {
     setIsLoading(true); setError(null);
@@ -35,7 +37,21 @@ export default function VendorDashboardPage() {
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
   }, []);
 
-  useEffect(() => { fetchVendors(); }, [fetchVendors]);
+  const fetchWeeklyActivity = useCallback(async () => {
+    setWeeklyLoading(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/weekly-activity`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setWeeklyActivity(Array.isArray(data.weeklyActivity) ? data.weeklyActivity : []);
+    } catch {
+      setWeeklyActivity([]);
+    } finally {
+      setWeeklyLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchVendors(); fetchWeeklyActivity(); }, [fetchVendors, fetchWeeklyActivity]);
 
   if (isLoading && vendors.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading vendor dashboard...</p></div>;
   if (error && vendors.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><AlertTriangle className="h-10 w-10 text-red-500" /><p className="text-slate-500">{error}</p><Button onClick={fetchVendors} className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white gap-2 rounded-xl"><RefreshCw className="h-4 w-4" /> Retry</Button></div>;
@@ -75,6 +91,51 @@ export default function VendorDashboardPage() {
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2"><div><CardTitle className="text-sm font-bold text-slate-800">Vendor Growth</CardTitle><p className="text-xs text-slate-500">Monthly registrations</p></div><Badge className="bg-blue-100 text-blue-700 border-none">Live</Badge></CardHeader>
           <CardContent className="p-4 pt-0"><div className="h-[180px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={growthData}><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} /><Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "12px" }} /><Bar dataKey="vendors" fill="#3b82f6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
+        </Card>
+
+        {/* Weekly Active Vendors */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-800">Weekly Active Vendors</CardTitle>
+              <p className="text-xs text-slate-500">Vendors with orders each day this week</p>
+            </div>
+            <Badge className="bg-[#3E8940]/10 text-[#3E8940] border-none font-semibold">Live</Badge>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="h-[180px]">
+              {weeklyLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#3E8940]" />
+                </div>
+              ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weeklyActivity} margin={{ top: 4, right: 8, left: -28, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="wavGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3E8940" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#3E8940" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} allowDecimals={false} />
+                  <Tooltip
+                    cursor={{ stroke: "#cbd5e1", strokeWidth: 1 }}
+                    content={({ active: a, payload, label }) =>
+                      a && payload?.length ? (
+                        <div className="bg-white border border-slate-100 shadow-lg rounded-xl px-4 py-3 text-sm">
+                          <p className="font-semibold text-slate-700 mb-1">{label}</p>
+                          <p className="text-[#3E8940] font-bold">active : {payload[0]?.value}</p>
+                        </div>
+                      ) : null
+                    }
+                  />
+                  <Area type="monotone" dataKey="active" stroke="#3E8940" strokeWidth={2} fill="url(#wavGrad)" dot={false} activeDot={{ r: 5, fill: "#3E8940", stroke: "#fff", strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
         </Card>
       </div>
 

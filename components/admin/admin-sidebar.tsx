@@ -386,9 +386,9 @@ export function AdminSidebar() {
     return "Admin Panel";
   };
 
-  // Finance admin sees a simplified main navigation
+  // Main navigation items depending on role
   const getMainItems = () => {
-    if (adminRole === "finance_admin") {
+    if (adminRole === "finance_admin" || adminRole === "operations_admin") {
       return mainItems.filter((item) => item.href === "/");
     }
     return mainItems;
@@ -430,17 +430,28 @@ export function AdminSidebar() {
           {renderNavItems(getMainItems())}
         </div>
 
-        <div className="pt-2 border-t border-slate-100">
-          {adminRole !== "finance_admin" && renderNavItems(managementItems, "Management")}
-        </div>
+        {adminRole !== "finance_admin" && (
+          <div className="pt-2 border-t border-slate-100">
+            {renderNavItems(managementItems, "Management")}
+          </div>
+        )}
 
-        <div className="pt-2 border-t border-slate-100">
-          {adminRole !== "operations_admin" && renderNavItems(financeItems, "Finance")}
-        </div>
+        {adminRole !== "operations_admin" && (
+          <div className="pt-2 border-t border-slate-100">
+            {renderNavItems(financeItems, "Finance")}
+          </div>
+        )}
       </div>
 
       <div className="px-3 py-2 space-y-1 border-t border-slate-100 pt-4">
-        {renderNavItems(adminRole === "finance_admin" ? supportItems.filter(i => i.title === "Settings") : supportItems)}
+        {renderNavItems(
+          adminRole === "finance_admin"
+            ? supportItems.filter((i) => i.title === "Settings")
+            : adminRole === "operations_admin"
+            ? supportItems.filter((i) => i.title !== "Settings")
+            : supportItems,
+          "Support"
+        )}
       </div>
     </div>
   );

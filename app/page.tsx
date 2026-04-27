@@ -26,6 +26,8 @@ import {
   BarChart3,
   ArrowRight,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -169,6 +171,8 @@ export default function AdminDashboardPage() {
   const [cityFilter, setCityFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 5;
 
   // Detect admin role from localStorage
   React.useEffect(() => {
@@ -224,6 +228,7 @@ export default function AdminDashboardPage() {
 
   React.useEffect(() => {
     fetchDashboard();
+    setCurrentPage(1);
   }, [fetchDashboard]);
 
   const handleClearFilters = () => {
@@ -239,6 +244,16 @@ export default function AdminDashboardPage() {
       description: "You will receive an email once the report is ready.",
     });
   };
+
+  const orders = data?.primaryTable.type === "orders" ? (data.primaryTable.rows as DashboardOrderRow[]) : [];
+  const settlements = data?.primaryTable.type === "settlements" ? (data.primaryTable.rows as DashboardSettlementRow[]) : [];
+
+  const paginatedOrders = React.useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return orders.slice(start, start + itemsPerPage);
+  }, [orders, currentPage]);
+  
+  const totalPages = Math.ceil(orders.length / itemsPerPage);
 
   // Loading state
   if (isLoading && !data) {
@@ -273,9 +288,6 @@ export default function AdminDashboardPage() {
   }
 
   if (!data) return null;
-
-  const orders = data.primaryTable.type === "orders" ? (data.primaryTable.rows as DashboardOrderRow[]) : [];
-  const settlements = data.primaryTable.type === "settlements" ? (data.primaryTable.rows as DashboardSettlementRow[]) : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -551,8 +563,8 @@ export default function AdminDashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.length > 0 ? (
-                    orders.map((order) => (
+                  {paginatedOrders.length > 0 ? (
+                    paginatedOrders.map((order) => (
                       <TableRow
                         key={order.id}
                         className="hover:bg-slate-50/80 border-b border-slate-50 last:border-0 cursor-pointer transition-colors"
@@ -593,6 +605,36 @@ export default function AdminDashboardPage() {
                   )}
                 </TableBody>
               </Table>
+              {orders.length > 0 && (
+                <div className="flex items-center justify-between p-4 border-t bg-slate-50/50 mt-4">
+                  <p className="text-sm text-slate-500">
+                    Showing {Math.min((currentPage - 1) * itemsPerPage + 1, orders.length)} - {Math.min(currentPage * itemsPerPage, orders.length)} of {orders.length} orders
+                  </p>
+                  <div className="flex items-center gap-1.5 mr-4 bg-white border border-slate-200 rounded-lg p-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 rounded-md" 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-[10px] font-bold text-slate-500 px-2 uppercase tracking-wider">
+                      Page {currentPage} of {Math.max(1, totalPages)}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 rounded-md" 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

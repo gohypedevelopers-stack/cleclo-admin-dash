@@ -159,13 +159,40 @@ export const adminCatalogApi = {
         });
         if (!res.ok) throw new Error('Failed to delete item');
         return res.json();
+    },
+    bulkUpload: async (items: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/bulk-upload`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ items })
+        });
+        if (!res.ok) throw new Error('Bulk upload failed');
+        return res.json();
+    },
+    bulkPriceUpdate: async (updates: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/bulk-price-update`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ updates })
+        });
+        if (!res.ok) throw new Error('Bulk price update failed');
+        return res.json();
+    },
+    pricePreview: async (items: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/price-preview`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ items })
+        });
+        if (!res.ok) throw new Error('Price preview failed');
+        return res.json();
     }
 };
 
 export const adminContentApi = {
     // BANNERS
     getBanners: async () => {
-        const res = await apiFetch(`${CATALOG_API_URL}/banners`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${CATALOG_API_URL}/content/banners`, { headers: getAuthHeaders() });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to fetch banners');
@@ -173,7 +200,7 @@ export const adminContentApi = {
         return res.json();
     },
     createBanner: async (data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/banners`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/banners`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -185,7 +212,7 @@ export const adminContentApi = {
         return res.json();
     },
     updateBanner: async (id: string, data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/banners/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/banners/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -197,7 +224,7 @@ export const adminContentApi = {
         return res.json();
     },
     deleteBanner: async (id: string) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/banners/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/banners/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -210,7 +237,7 @@ export const adminContentApi = {
 
     // VIDEOS
     getVideos: async () => {
-        const res = await apiFetch(`${CATALOG_API_URL}/videos`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${CATALOG_API_URL}/content/videos`, { headers: getAuthHeaders() });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to fetch videos');
@@ -218,7 +245,7 @@ export const adminContentApi = {
         return res.json();
     },
     createVideo: async (data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/videos`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/videos`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -230,7 +257,7 @@ export const adminContentApi = {
         return res.json();
     },
     updateVideo: async (id: string, data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/videos/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/videos/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -242,7 +269,7 @@ export const adminContentApi = {
         return res.json();
     },
     deleteVideo: async (id: string) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/videos/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/videos/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -255,7 +282,7 @@ export const adminContentApi = {
 
     // CAMPAIGNS (PROMOTIONS)
     getCampaigns: async () => {
-        const res = await apiFetch(`${CATALOG_API_URL}/campaigns`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${CATALOG_API_URL}/content/campaigns`, { headers: getAuthHeaders() });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to fetch campaigns');
@@ -263,7 +290,7 @@ export const adminContentApi = {
         return res.json();
     },
     createCampaign: async (data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/campaigns`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/campaigns`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -275,7 +302,7 @@ export const adminContentApi = {
         return res.json();
     },
     updateCampaign: async (id: string, data: any) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/campaigns/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/campaigns/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -287,7 +314,7 @@ export const adminContentApi = {
         return res.json();
     },
     deleteCampaign: async (id: string) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/campaigns/${id}`, {
+        const res = await apiFetch(`${CATALOG_API_URL}/content/campaigns/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -301,12 +328,12 @@ export const adminContentApi = {
 
 export const adminWalletApi = {
     getConfig: async () => {
-        const res = await apiFetch(`${AUTH_API_URL}/wallet/config`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-config`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to fetch wallet config');
         return res.json();
     },
     updateConfig: async (data: any) => {
-        const res = await apiFetch(`${AUTH_API_URL}/wallet/config`, {
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-config`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -315,12 +342,12 @@ export const adminWalletApi = {
         return res.json();
     },
     getRewards: async () => {
-        const res = await apiFetch(`${AUTH_API_URL}/wallet/rewards`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-reward-rules`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to fetch rewards');
         return res.json();
     },
     createReward: async (data: any) => {
-        const res = await apiFetch(`${AUTH_API_URL}/wallet/rewards`, {
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-reward-rules`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -329,12 +356,17 @@ export const adminWalletApi = {
         return res.json();
     },
     updateReward: async (id: string, data: any) => {
-        const res = await apiFetch(`${AUTH_API_URL}/wallet/rewards/${id}`, {
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-reward-rules/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('Failed to update reward');
+        return res.json();
+    },
+    getLiabilitySummary: async () => {
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-liability/summary`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch liability summary');
         return res.json();
     }
 };
@@ -356,12 +388,12 @@ export const adminUserApi = {
 
 export const adminReferralApi = {
     getCampaigns: async () => {
-        const res = await apiFetch(`${AUTH_API_URL}/referrals/campaigns`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${AUTH_API_URL}/referral/referral-campaigns`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to fetch referral campaigns');
         return res.json();
     },
     createCampaign: async (data: any) => {
-        const res = await apiFetch(`${AUTH_API_URL}/referrals/campaigns`, {
+        const res = await apiFetch(`${AUTH_API_URL}/referral/referral-campaigns`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -373,7 +405,7 @@ export const adminReferralApi = {
         return res.json();
     },
     updateCampaign: async (id: string, data: any) => {
-        const res = await apiFetch(`${AUTH_API_URL}/referrals/campaigns/${id}`, {
+        const res = await apiFetch(`${AUTH_API_URL}/referral/referral-campaigns/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -385,7 +417,7 @@ export const adminReferralApi = {
         return res.json();
     },
     deleteCampaign: async (id: string) => {
-        const res = await apiFetch(`${AUTH_API_URL}/referrals/campaigns/${id}`, {
+        const res = await apiFetch(`${AUTH_API_URL}/referral/referral-campaigns/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -393,6 +425,104 @@ export const adminReferralApi = {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to delete referral campaign');
         }
+        return res.json();
+    }
+};
+
+export const adminLocationApi = {
+    getCities: async () => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/cities`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch cities');
+        return res.json();
+    },
+    createCity: async (data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/cities`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create city');
+        return res.json();
+    },
+    updateCity: async (id: string, data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/cities/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to update city');
+        return res.json();
+    },
+    deleteCity: async (id: string) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/cities/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('Failed to delete city');
+        return res.json();
+    },
+    getAreas: async (cityCode?: string) => {
+        const url = cityCode ? `${CATALOG_API_URL}/location/areas?cityCode=${cityCode}` : `${CATALOG_API_URL}/location/areas`;
+        const res = await apiFetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch areas');
+        return res.json();
+    },
+    createArea: async (data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/areas`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create area');
+        return res.json();
+    },
+    updateArea: async (id: string, data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/areas/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to update area');
+        return res.json();
+    },
+    deleteArea: async (id: string) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/areas/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('Failed to delete area');
+        return res.json();
+    },
+    getTimeSlots: async (cityCode?: string) => {
+        const url = cityCode ? `${CATALOG_API_URL}/location/time-slots?cityCode=${cityCode}` : `${CATALOG_API_URL}/location/time-slots`;
+        const res = await apiFetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch time slots');
+        return res.json();
+    },
+    createTimeSlot: async (data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/time-slots`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create time slot');
+        return res.json();
+    },
+    updateTimeSlot: async (id: string, data: any) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/time-slots/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to update time slot');
+        return res.json();
+    },
+    deleteTimeSlot: async (id: string) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/time-slots/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('Failed to delete time slot');
         return res.json();
     }
 };

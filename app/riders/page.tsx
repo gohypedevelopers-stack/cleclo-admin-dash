@@ -97,12 +97,12 @@ export default function RidersAllPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div><h1 className="text-3xl text-black font-bold tracking-tight">Rider Fleet Intelligence</h1><p className="text-slate-500 mt-1">Manage rider performance, health, and utilization</p></div>
+        <div><h1 className="text-2xl md:text-3xl text-black font-bold tracking-tight">Rider Fleet Intelligence</h1><p className="text-sm text-slate-500 mt-1">Manage rider performance, health, and utilization</p></div>
         {isLoading && <Loader2 className="h-5 w-5 animate-spin text-[#3E8940]" />}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <p className="text-2xl font-bold text-slate-700">{riders.length}</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Fleet</p>
@@ -128,9 +128,10 @@ export default function RidersAllPage() {
         <Select value={filterType} onValueChange={setFilterType}><SelectTrigger className="w-40 rounded-xl"><Filter className="h-4 w-4 mr-2 text-slate-400" /><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="blocked">Blocked</SelectItem></SelectContent></Select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-x-auto">
-        <Table>
-          <TableHeader><TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[1200px]">
+            <TableHeader><TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
             <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Rider</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">City/Zone</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Deliveries</TableHead>
@@ -202,6 +203,7 @@ export default function RidersAllPage() {
             }) : <TableRow><TableCell colSpan={10} className="h-32 text-center text-slate-500">No riders found.</TableCell></TableRow>}
           </TableBody>
         </Table>
+        </div>
         <div className="flex items-center justify-between p-4 border-t"><p className="text-sm text-slate-500">Showing {filtered.length} of {riders.length} riders</p></div>
       </div>
     </div>

@@ -59,6 +59,7 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 
+
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 
 const getAuthHeaders = () => ({
@@ -281,6 +282,7 @@ export default function VendorsPage() {
           </div>
         ))}
       </div>
+
 
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border shadow-sm">

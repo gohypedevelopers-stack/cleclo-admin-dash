@@ -77,8 +77,6 @@ const appSections = [
         name: "Add Money Settings",
         href: "/wallet/settings",
         description: "Min/max amounts, bonuses",
-        disabled: true,
-        disabledLabel: "Temporarily Disabled",
       },
     ],
   },

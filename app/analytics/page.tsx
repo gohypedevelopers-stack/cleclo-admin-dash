@@ -44,55 +44,42 @@ import { useEffect, useState } from "react";
 import { dashboardApi, type DashboardOverview } from "@/lib/dashboard-api";
 import { toast } from "sonner";
 
-// Simulated historical sequence for charts since the API currently provides snapshots only
-const revenueData = [
-  { name: "Jan", revenue: 45000, orders: 320 },
-  { name: "Feb", revenue: 52000, orders: 350 },
-  { name: "Mar", revenue: 48000, orders: 330 },
-  { name: "Apr", revenue: 61000, orders: 420 },
-  { name: "May", revenue: 55000, orders: 380 },
-  { name: "Jun", revenue: 67000, orders: 450 },
-  { name: "Jul", revenue: 72000, orders: 480 },
-  { name: "Aug", revenue: 65000, orders: 440 },
-  { name: "Sep", revenue: 78000, orders: 520 },
-  { name: "Oct", revenue: 85000, orders: 580 },
-  { name: "Nov", revenue: 92000, orders: 630 },
-  { name: "Dec", revenue: 88000, orders: 600 },
-];
-
-const categoryData = [
-  { name: "Dry Clean", value: 45, color: "#3E8940" },
-  { name: "Wash & Fold", value: 30, color: "#22c55e" },
-  { name: "Ironing", value: 15, color: "#86efac" },
-  { name: "Premium", value: 10, color: "#14532d" },
-];
-
-const customerGrowthData = [
-  { name: "Week 1", new: 120, returning: 450 },
-  { name: "Week 2", new: 132, returning: 480 },
-  { name: "Week 3", new: 145, returning: 510 },
-  { name: "Week 4", new: 160, returning: 550 },
-];
+const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
+});
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [revenueData, setRevenueData] = useState<{ name: string; revenue: number; orders: number }[]>([]);
+  const [categoryData, setCategoryData] = useState<{ name: string; value: number; color: string }[]>([]);
+  const [customerGrowthData, setCustomerGrowthData] = useState<{ name: string; new: number; returning: number }[]>([]);
+  const [totalOrders, setTotalOrders] = useState<number | null>(null);
 
   useEffect(() => {
-    async function loadStats() {
+    async function loadAll() {
       try {
         setLoading(true);
-        // Note: For extensive charts, this should be extended in the backend API.
-        // We use the overview data for the top-line macro statistics.
-        const res = await dashboardApi.getOverview({ period: "this_year" });
-        setData(res);
+        const [overviewRes, analyticsRes] = await Promise.all([
+          dashboardApi.getOverview({ period: "this_year" }),
+          fetch(`${ORDER_API_URL}/analytics`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        setData(overviewRes);
+        if (analyticsRes) {
+          setRevenueData(analyticsRes.revenueData || []);
+          setCategoryData(analyticsRes.serviceData || []);
+          setCustomerGrowthData(analyticsRes.customerGrowthData || []);
+          setTotalOrders(analyticsRes.totalOrders ?? null);
+        }
       } catch (err) {
         toast.error("Failed to load analytics");
       } finally {
         setLoading(false);
       }
     }
-    loadStats();
+    loadAll();
   }, []);
 
   const getKpi = (key: string, fallback: string | number) => {
@@ -334,7 +321,11 @@ export default function AnalyticsPage() {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
                   <span className="text-3xl font-bold text-slate-900">
-                    4.5k
+                    {totalOrders !== null
+                      ? totalOrders >= 1000
+                        ? `${(totalOrders / 1000).toFixed(1)}k`
+                        : totalOrders
+                      : "—"}
                   </span>
                   <p className="text-xs text-slate-500 uppercase font-semibold">
                     Total

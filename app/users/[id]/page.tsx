@@ -131,11 +131,13 @@ export default function UserDetailPage() {
             <h1 className="text-3xl font-bold text-slate-900 mt-1">{user.name}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className={`gap-2 ${user.status === 'blocked' ? "text-emerald-600 border-emerald-200 bg-emerald-50" : "text-red-600 border-red-200 bg-red-50"}`} onClick={handleBlock}>
-            {user.status === 'blocked' ? <><CheckCircle className="h-4 w-4" /> Unblock</> : <><Ban className="h-4 w-4" /> Block</>}
+        <div className="flex items-center gap-2">
+          <Badge className={cn("text-[11px] sm:text-xs px-3 sm:px-4 py-1.5 font-semibold border shadow-none rounded-full h-8", getStatusColor(status))}>
+            {status}
+          </Badge>
+          <Button variant="outline" className={`gap-1.5 rounded-full shadow-none bg-white h-8 text-xs sm:text-sm sm:h-10 px-3 sm:px-4 ${user.status === 'blocked' ? "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 border-emerald-200" : "text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"}`} onClick={handleBlock}>
+            {user.status === 'blocked' ? <><CheckCircle className="h-3.5 w-3.5" /> Unblock</> : <><Ban className="h-3.5 w-3.5" /> Block</>}
           </Button>
-          <Badge className={cn("text-xs px-3 py-1 font-semibold border", getStatusColor(status))}>{status}</Badge>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-12">

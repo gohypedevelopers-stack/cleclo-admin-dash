@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Owner ID Proof — Test Document</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .doc { width: 720px; background: #fff; border-radius: 16px; box-shadow: 0 4px 32px rgba(0,0,0,0.10); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+    .gov-seal { width: 64px; height: 64px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; flex-shrink: 0; }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+    .header p { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .watermark { background: #fefce8; border: 1.5px dashed #fbbf24; color: #92400e; font-size: 11px; font-weight: 700; text-align: center; padding: 8px; letter-spacing: 1px; text-transform: uppercase; }
+    .body { padding: 32px 36px; }
+    .doc-id { background: #f1f5f9; border-radius: 10px; padding: 10px 16px; font-size: 12px; color: #64748b; margin-bottom: 24px; display: flex; justify-content: space-between; }
+    .doc-id span { font-weight: 700; color: #1e293b; }
+    .photo-row { display: flex; gap: 24px; margin-bottom: 24px; }
+    .photo-box { width: 110px; height: 130px; border-radius: 12px; background: linear-gradient(135deg, #e0f2fe, #bae6fd); border: 2px solid #7dd3fc; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 36px; color: #0369a1; flex-shrink: 0; }
+    .photo-box span { font-size: 11px; color: #0369a1; margin-top: 6px; font-weight: 600; }
+    .info-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 3px; }
+    .field label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field p { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .divider { border: none; border-top: 1.5px solid #f1f5f9; margin: 24px 0; }
+    .section-title { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stamp-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    .stamp { text-align: center; }
+    .stamp .box { width: 110px; height: 80px; border: 2px dashed #e2e8f0; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 28px; }
+    .stamp p { font-size: 10px; color: #94a3b8; font-weight: 600; }
+    .valid-badge { background: #dcfce7; border: 1.5px solid #86efac; color: #166534; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 100px; display: inline-flex; align-items: center; gap: 6px; }
+    .footer { background: #f8fafc; border-top: 1.5px solid #f1f5f9; padding: 14px 36px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+<div class="doc">
+  <div class="header">
+    <div class="gov-seal">🪪</div>
+    <div>
+      <h1>IDENTITY VERIFICATION DOCUMENT</h1>
+      <p>Government of India — National Identity Authority</p>
+    </div>
+  </div>
+  <div class="watermark">⚠ TEST DOCUMENT — FOR CLECLO ADMIN VERIFICATION ONLY — NOT A REAL IDENTITY DOCUMENT ⚠</div>
+  <div class="body">
+    <div class="doc-id">
+      <div>Document ID: <span>KYC-OWN-2026-PRW-001</span></div>
+      <div>Issued: <span>01 Jan 2026</span></div>
+      <div>Valid Until: <span>31 Dec 2031</span></div>
+    </div>
+
+    <div class="photo-row">
+      <div class="photo-box">👤<span>Photo</span></div>
+      <div class="info-grid">
+        <div class="field"><label>Full Name</label><p>Rahul Malhotra</p></div>
+        <div class="field"><label>Date of Birth</label><p>15 Mar 1988</p></div>
+        <div class="field"><label>Gender</label><p>Male</p></div>
+        <div class="field"><label>Nationality</label><p>Indian</p></div>
+        <div class="field"><label>ID Number</label><p>XXXX-XXXX-7892</p></div>
+        <div class="field"><label>PAN</label><p>ABCDE1234F</p></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-title">Address &amp; Contact</div>
+    <div class="detail-grid">
+      <div class="field"><label>Address Line 1</label><p>12 Bandra West</p></div>
+      <div class="field"><label>City</label><p>Mumbai</p></div>
+      <div class="field"><label>State</label><p>Maharashtra</p></div>
+      <div class="field"><label>PIN Code</label><p>400050</p></div>
+      <div class="field"><label>Phone</label><p>+91 9700000001</p></div>
+      <div class="field"><label>Email</label><p>premiumwash@cleclo.com</p></div>
+    </div>
+
+    <hr class="divider">
+    <div class="stamp-row">
+      <div>
+        <span class="valid-badge">✅ VERIFIED &amp; VALID</span>
+        <p style="font-size:11px;color:#64748b;margin-top:8px;">Verified by CleClo KYC Team on 15 Jan 2026</p>
+      </div>
+      <div class="stamp">
+        <div class="box">🔏</div>
+        <p>Issuing Authority Seal</p>
+      </div>
+      <div class="stamp">
+        <div class="box">✍️</div>
+        <p>Document Holder Signature</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>CleClo Admin Panel — Test Document</span>
+    <span>Document Reference: CLECLO/KYC/OWN/2026/001</span>
+    <span>Generated: 27 Apr 2026</span>
+  </div>
+</div>
+</body>
+</html>

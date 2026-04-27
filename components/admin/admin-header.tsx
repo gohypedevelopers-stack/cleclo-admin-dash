@@ -3,8 +3,6 @@
 import {
   Bell,
   Search,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 
 type AdminUser = {
   name: string;
@@ -43,7 +42,6 @@ export function AdminHeader() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const router = useRouter();
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-
   useEffect(() => {
     try {
       const raw = localStorage.getItem("admin_user");
@@ -62,18 +60,42 @@ export function AdminHeader() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
           onClick={toggleSidebar}
-          className="text-slate-500 hover:text-slate-700"
+          aria-label={isCollapsed ? "Open sidebar" : "Close sidebar"}
+          className="group flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 active:scale-95"
         >
-          {isCollapsed ? (
-            <PanelLeftOpen className="h-5 w-5" />
-          ) : (
-            <PanelLeftClose className="h-5 w-5" />
-          )}
-        </Button>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Left panel stripe */}
+            <rect x="2" y="2" width="3.5" height="12" rx="1" fill="currentColor" opacity="0.25" />
+            {/* Right panel border outline */}
+            <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+            {/* Chevron arrow — flips direction */}
+            {isCollapsed ? (
+              <path
+                d="M7.5 5.5L10 8L7.5 10.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : (
+              <path
+                d="M9.5 5.5L7 8L9.5 10.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </svg>
+        </button>
 
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
