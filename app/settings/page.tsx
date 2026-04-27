@@ -72,7 +72,7 @@ const DEFAULT_CONFIG: PlatformConfig = {
   riderAlerts: true,
   maxLoginAttempts: 5,
   captchaAfterAttempts: 3,
-  supportedCities: ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune"],
+  supportedCities: ["Bangalore", "Delhi", "Hyderabad", "Mumbai", "Pune"],
   defaultDeliveryType: "Standard",
   minOrderAmount: 99,
   maxOrderAmount: 25000,
@@ -405,5 +405,6 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+
   );
 }

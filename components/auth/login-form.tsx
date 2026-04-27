@@ -15,6 +15,10 @@ import {
   ChevronDown,
   ArrowUpAZ,
   Shield,
+  Store,
+  Wallet,
+  Mail,
+  MessageCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,9 +34,9 @@ const AUTH_URL = "http://localhost:3001";
 type Step = "credentials" | "otp";
 
 const ADMIN_ROLES = [
-  { value: "super_admin", label: "Super Admin", description: "Full platform access" },
-  { value: "operations_admin", label: "Operations Admin", description: "Orders, vendors & riders" },
-  { value: "finance_admin", label: "Finance Admin", description: "Settlements & payouts" },
+  { value: "super_admin", label: "Super Admin", description: "Full platform oversight with vendor, finance and growth controls.", icon: ShieldCheck },
+  { value: "operations_admin", label: "Operations Admin", description: "Operational control across orders, vendors, riders and platform support.", icon: Store },
+  { value: "finance_admin", label: "Finance Admin", description: "Finance first access for settlements, payouts, balances and payment visibility.", icon: Wallet },
 ];
 
 export function LoginForm() {
@@ -43,8 +47,9 @@ export function LoginForm() {
   const [password, setPassword] = React.useState("");
   const [selectedRole, setSelectedRole] = React.useState("super_admin");
   const [showRoleDropdown, setShowRoleDropdown] = React.useState(false);
-  const [rememberMe, setRememberMe] = React.useState(false);
+  const [rememberMe, setRememberMe] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [deliveryChannel, setDeliveryChannel] = React.useState<"email" | "whatsapp">("email");
 
   // Caps Lock detection
   const [capsLockOn, setCapsLockOn] = React.useState(false);
@@ -132,7 +137,7 @@ export function LoginForm() {
           identifier: identifier.trim(),
           password,
           requestedRole: selectedRole,
-          deliveryChannel: "email",
+          deliveryChannel,
           captchaChallengeId: captchaRequired ? captchaChallengeId : undefined,
           captchaAnswer: captchaRequired ? captchaAnswer : undefined,
         }),
@@ -280,42 +285,40 @@ export function LoginForm() {
       transition={{ duration: 0.6, ease: "easeOut" }}
       className="w-full"
     >
-      <div className="bg-white/70 backdrop-blur-xl p-8 md:p-10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white/50 relative overflow-hidden group">
-        <div className="absolute inset-0 bg-linear-to-br from-white/40 to-transparent pointer-events-none" />
-
+      <div className="bg-white/95 backdrop-blur-3xl p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
         <div className="relative z-10">
           {/* Header with Cleclo Logo */}
           <div className="text-center space-y-3 mb-10">
             <motion.div
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              className="mx-auto mb-4 flex flex-col items-center gap-2"
+              className="mx-auto mb-6"
             >
               {step === "otp" ? (
-                <div className="w-20 h-20 bg-linear-to-br from-[#3E8940]/10 to-[#3E8940]/5 rounded-3xl flex items-center justify-center shadow-[inset_0_2px_10px_rgba(62,137,64,0.1)] ring-1 ring-[#3E8940]/20">
-                  <ShieldCheck className="w-10 h-10 text-[#3E8940] drop-shadow-[0_2px_4px_rgba(62,137,64,0.2)]" />
+                <div className="w-20 h-20 mx-auto bg-green-50 rounded-full flex items-center justify-center shadow-sm border border-green-100">
+                  <ShieldCheck className="w-10 h-10 text-[#3E8940]" />
                 </div>
               ) : (
-                <>
+                <div className="mx-auto w-fit bg-white px-10 py-3 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-50 flex items-center justify-center">
                   <Image
                     src="/logo.png"
                     alt="Cleclo"
                     width={160}
                     height={55}
-                    className="h-14 w-auto object-contain"
+                    className="h-10 w-auto object-contain"
                     priority
                   />
-                  <span className="text-[11px] font-bold text-[#3E8940] uppercase tracking-[0.2em]">
-                    Admin Dashboard
-                  </span>
-                </>
+                </div>
               )}
             </motion.div>
 
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 font-quicksand">
+            <h2 className="text-[11px] font-bold text-[#3E8940] uppercase tracking-[0.25em]">
+              {step === "otp" ? "SECURITY VERIFICATION" : "ADMIN DASHBOARD"}
+            </h2>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 font-quicksand mt-2">
               {step === "otp" ? "Verify Identity" : "Welcome Back"}
             </h1>
-            <p className="text-base text-gray-500 max-w-md mx-auto leading-relaxed font-medium">
+            <p className="text-[13px] text-slate-500 max-w-md mx-auto leading-relaxed font-medium mt-3">
               {step === "otp"
                 ? `Enter the 6-digit code sent to ${maskedTarget}`
                 : "Securely access your Cleclo Admin Dashboard to manage vendors, services and platform operations."}
@@ -330,90 +333,53 @@ export function LoginForm() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.3 }}
-                className="space-y-5"
+                className="space-y-6"
               >
-                {/* ─── Role Selector ──────────────────────────────── */}
-                <div className="space-y-2" ref={roleDropdownRef}>
-                  <Label className="text-xs font-bold uppercase tracking-[0.15em] text-[#3E8940] ml-1">
-                    Admin Role
+                {/* ─── Role Selector Grid ──────────────────────────────── */}
+                <div className="space-y-3">
+                  <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3E8940]">
+                    Access Role
                   </Label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-                      className="w-full h-14 bg-white/50 border border-gray-100 hover:border-[#3E8940]/30 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all duration-300 rounded-2xl px-4 flex items-center justify-between text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-[#3E8940]/10 flex items-center justify-center">
-                          <Shield className="w-4.5 h-4.5 text-[#3E8940]" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{selectedRoleInfo.label}</p>
-                          <p className="text-[11px] text-gray-400 font-medium">{selectedRoleInfo.description}</p>
-                        </div>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showRoleDropdown ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    <AnimatePresence>
-                      {showRoleDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {ADMIN_ROLES.map((role) => {
+                      const isSelected = selectedRole === role.value;
+                      return (
+                        <button
+                          key={role.value}
+                          type="button"
+                          onClick={() => setSelectedRole(role.value)}
+                          className={`flex flex-col items-start text-left p-4 rounded-2xl border transition-all duration-300 ${
+                            isSelected
+                              ? "border-[#3E8940] bg-[#3E8940]/5 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          }`}
                         >
-                          {ADMIN_ROLES.map((role) => (
-                            <button
-                              key={role.value}
-                              type="button"
-                              onClick={() => {
-                                setSelectedRole(role.value);
-                                setShowRoleDropdown(false);
-                              }}
-                              className={`w-full px-4 py-3.5 flex items-center gap-3 transition-colors text-left ${
-                                selectedRole === role.value
-                                  ? "bg-[#3E8940]/5 border-l-2 border-l-[#3E8940]"
-                                  : "hover:bg-gray-50 border-l-2 border-l-transparent"
-                              }`}
-                            >
-                              <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                  selectedRole === role.value ? "bg-[#3E8940]/15" : "bg-gray-100"
-                                }`}
-                              >
-                                <Shield
-                                  className={`w-4 h-4 ${
-                                    selectedRole === role.value ? "text-[#3E8940]" : "text-gray-400"
-                                  }`}
-                                />
-                              </div>
-                              <div>
-                                <p
-                                  className={`text-sm font-semibold ${
-                                    selectedRole === role.value ? "text-[#3E8940]" : "text-gray-700"
-                                  }`}
-                                >
-                                  {role.label}
-                                </p>
-                                <p className="text-[11px] text-gray-400">{role.description}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                              isSelected ? "bg-[#3E8940]/10" : "bg-slate-100"
+                            }`}
+                          >
+                            <role.icon
+                              className={`w-4 h-4 ${isSelected ? "text-[#3E8940]" : "text-slate-400"}`}
+                            />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-900 mb-1">{role.label}</p>
+                          <p className="text-[10px] text-slate-500 leading-relaxed pr-2">
+                            {role.description}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* ─── Email ──────────────────────────────── */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-[0.15em] text-[#3E8940] ml-1">Email</Label>
+                <div className="space-y-3">
+                  <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3E8940]">
+                    Mobile or Email
+                  </Label>
                   <div className="relative group">
-                    <User className="absolute left-4 top-4.5 text-gray-400 group-focus-within:text-[#3E8940] transition-colors duration-300 h-5 w-5" />
+                    <User className="absolute left-4 top-4 text-slate-400 group-focus-within:text-[#3E8940] transition-colors duration-300 h-5 w-5" />
                     <Input
                       value={identifier}
                       onChange={(e) => {
@@ -422,7 +388,7 @@ export function LoginForm() {
                       }}
                       onKeyDown={handleKeyDown}
                       placeholder="admin@cleclo.com"
-                      className={`pl-12 h-14 bg-white/50 border-gray-100 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all duration-300 rounded-2xl text-base ${
+                      className={`pl-12 h-14 bg-white border-slate-200 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all duration-300 rounded-2xl text-sm ${
                         identifierError ? "border-red-300 focus:border-red-400 focus:ring-red-100" : ""
                       }`}
                     />
@@ -431,7 +397,7 @@ export function LoginForm() {
                     <motion.p
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-red-500 font-medium ml-1 flex items-center gap-1.5"
+                      className="text-xs text-red-500 font-medium flex items-center gap-1.5"
                     >
                       <AlertCircle className="h-3.5 w-3.5" />
                       {identifierError}
@@ -440,17 +406,17 @@ export function LoginForm() {
                 </div>
 
                 {/* ─── Password ──────────────────────────── */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase tracking-[0.15em] text-[#3E8940] ml-1">
+                    <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3E8940]">
                       Password
                     </Label>
-                    <a href="#" className="text-xs font-bold text-[#3E8940]/80 hover:text-[#3E8940]">
+                    <a href="#" className="text-[11px] font-bold text-[#3E8940]/80 hover:text-[#3E8940]">
                       Forgot Password?
                     </a>
                   </div>
                   <div className="relative group">
-                    <Lock className="absolute left-4 top-4.5 text-gray-400 group-focus-within:text-[#3E8940] transition-colors duration-300 h-5 w-5" />
+                    <Lock className="absolute left-4 top-4 text-slate-400 group-focus-within:text-[#3E8940] transition-colors duration-300 h-5 w-5" />
                     <Input
                       value={password}
                       onChange={(e) => {
@@ -460,15 +426,15 @@ export function LoginForm() {
                       onKeyDown={handlePasswordKeyEvent}
                       onKeyUp={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
                       type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className={`pl-12 pr-12 h-14 bg-white/50 border-gray-100 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all duration-300 rounded-2xl text-base ${
+                      placeholder="Enter your password"
+                      className={`pl-12 pr-12 h-14 bg-white border-slate-200 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all duration-300 rounded-2xl text-sm ${
                         passwordError ? "border-red-300 focus:border-red-400 focus:ring-red-100" : ""
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-4.5 text-gray-400 hover:text-[#3E8940]"
+                      className="absolute right-4 top-4 text-slate-400 hover:text-[#3E8940]"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -481,10 +447,10 @@ export function LoginForm() {
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="flex items-center gap-1.5 ml-1"
+                        className="flex items-center gap-1.5"
                       >
                         <ArrowUpAZ className="h-3.5 w-3.5 text-amber-500" />
-                        <span className="text-xs text-amber-600 font-semibold">Caps Lock is ON</span>
+                        <span className="text-[11px] text-amber-600 font-bold uppercase">Caps Lock is ON</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -494,7 +460,7 @@ export function LoginForm() {
                     <motion.p
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-red-500 font-medium ml-1 flex items-center gap-1.5"
+                      className="text-xs text-red-500 font-medium flex items-center gap-1.5"
                     >
                       <AlertCircle className="h-3.5 w-3.5" />
                       {passwordError}
@@ -503,7 +469,7 @@ export function LoginForm() {
 
                   {/* Attempts remaining warning */}
                   {failedAttempts > 0 && failedAttempts < 5 && (
-                    <p className="text-[11px] text-amber-600 font-medium ml-1">
+                    <p className="text-[11px] text-amber-600 font-medium">
                       ⚠ {5 - failedAttempts} attempt{5 - failedAttempts !== 1 ? "s" : ""} remaining before lockout
                     </p>
                   )}
@@ -538,19 +504,74 @@ export function LoginForm() {
                   )}
                 </AnimatePresence>
 
-                <div className="flex items-center justify-between px-1">
+                {/* ─── Two-Factor Verification ──────────────────────────────── */}
+                <div className="space-y-3">
+                  <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3E8940]">
+                    Two-Factor Verification
+                  </Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryChannel("email")}
+                      className={`flex flex-col items-start text-left p-4 rounded-2xl border transition-all duration-300 ${
+                        deliveryChannel === "email"
+                          ? "border-[#3E8940] bg-[#3E8940]/5 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                          deliveryChannel === "email" ? "bg-[#3E8940]/10" : "bg-slate-100"
+                        }`}
+                      >
+                        <Mail
+                          className={`w-4 h-4 ${deliveryChannel === "email" ? "text-[#3E8940]" : "text-slate-400"}`}
+                        />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-900 mb-1">OTP on Email</p>
+                      <p className="text-[10px] text-slate-500 leading-relaxed pr-2">
+                        Send the verification code to your admin email.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryChannel("whatsapp")}
+                      className={`flex flex-col items-start text-left p-4 rounded-2xl border transition-all duration-300 ${
+                        deliveryChannel === "whatsapp"
+                          ? "border-[#3E8940] bg-[#3E8940]/5 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                          deliveryChannel === "whatsapp" ? "bg-[#3E8940]/10" : "bg-slate-100"
+                        }`}
+                      >
+                        <MessageCircle
+                          className={`w-4 h-4 ${deliveryChannel === "whatsapp" ? "text-[#3E8940]" : "text-slate-400"}`}
+                        />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-900 mb-1">OTP on WhatsApp</p>
+                      <p className="text-[10px] text-slate-500 leading-relaxed pr-2">
+                        Deliver the code to the registered WhatsApp number.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5 cursor-pointer">
                     <Checkbox
                       id="remember"
                       checked={rememberMe}
                       onCheckedChange={(checked) => setRememberMe(!!checked)}
-                      className="border-gray-300 data-[state=checked]:bg-[#3E8940] data-[state=checked]:border-[#3E8940] w-5 h-5 rounded-md"
+                      className="border-slate-300 data-[state=checked]:bg-[#3E8940] data-[state=checked]:border-[#3E8940] w-5 h-5 rounded-md"
                     />
                     <Label
                       htmlFor="remember"
-                      className="text-sm font-semibold text-gray-600 hover:text-[#3E8940] cursor-pointer"
+                      className="text-sm font-semibold text-slate-700 hover:text-[#3E8940] cursor-pointer"
                     >
-                      Remember me for 30 days
+                      Remember me
                     </Label>
                   </div>
                 </div>
@@ -561,7 +582,7 @@ export function LoginForm() {
                       type="button"
                       onClick={handleLogin}
                       disabled={isLoading}
-                      className="w-full h-14 text-lg font-bold bg-gradient-to-r from-[#3E8940] to-[#2d6b2f] hover:from-[#357a37] hover:to-[#265d28] text-white shadow-lg hover:shadow-xl hover:shadow-[#3E8940]/20 rounded-2xl transition-all duration-300"
+                      className="w-full h-14 text-base font-bold bg-[#3E8940] hover:bg-[#327333] text-white rounded-2xl transition-all duration-300 shadow-sm"
                     >
                       {isLoading ? (
                         <div className="flex items-center justify-center gap-2.5">
@@ -609,8 +630,8 @@ export function LoginForm() {
                   </div>
                 )}
 
-                <div className="space-y-2.5 text-center">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-[#3E8940] block mb-2">
+                <div className="space-y-3 text-center">
+                  <Label className="text-[11px] font-bold uppercase tracking-widest text-[#3E8940] block mb-2">
                     Code Verification
                   </Label>
                   <Input
@@ -619,7 +640,7 @@ export function LoginForm() {
                     onKeyDown={handleKeyDown}
                     placeholder="000 000"
                     maxLength={6}
-                    className="h-16 bg-white/50 border-gray-100 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all rounded-2xl text-3xl text-center font-bold tracking-[0.5em] placeholder:text-gray-200"
+                    className="h-16 bg-white border-slate-200 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all rounded-2xl text-3xl text-center font-bold tracking-[0.5em] placeholder:text-slate-200"
                   />
                 </div>
 
@@ -629,7 +650,7 @@ export function LoginForm() {
                       type="button"
                       onClick={handleVerifyOtp}
                       disabled={isLoading || otpCode.length < 4}
-                      className="w-full h-14 text-lg font-bold bg-gradient-to-r from-[#3E8940] to-[#2d6b2f] hover:from-[#357a37] hover:to-[#265d28] text-white shadow-lg hover:shadow-xl hover:shadow-[#3E8940]/20 rounded-2xl transition-all duration-300"
+                      className="w-full h-14 text-base font-bold bg-[#3E8940] hover:bg-[#327333] text-white rounded-2xl transition-all duration-300 shadow-sm"
                     >
                       {isLoading ? (
                         <div className="flex items-center justify-center gap-2.5">
@@ -646,7 +667,7 @@ export function LoginForm() {
                     <button
                       type="button"
                       onClick={() => setStep("credentials")}
-                      className="text-slate-500 font-bold hover:text-slate-800"
+                      className="text-slate-500 font-bold hover:text-slate-800 transition-colors"
                     >
                       ← Back
                     </button>
@@ -654,7 +675,7 @@ export function LoginForm() {
                       type="button"
                       onClick={handleResend}
                       disabled={resendCooldown > 0}
-                      className="flex items-center gap-2 text-[#3E8940] font-bold disabled:opacity-50"
+                      className="flex items-center gap-2 text-[#3E8940] font-bold disabled:opacity-50 transition-opacity"
                     >
                       <RefreshCw
                         className={`h-4 w-4 ${resendCooldown === 0 ? "hover:rotate-180 transition-transform duration-500" : ""}`}
@@ -667,15 +688,12 @@ export function LoginForm() {
             )}
           </AnimatePresence>
 
-          <footer className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-center gap-5">
-            <div className="flex items-center gap-1.5 text-gray-400">
-              <Lock className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Encrypted Access</span>
-            </div>
-            <div className="w-1 h-1 rounded-full bg-gray-200" />
-            <div className="flex items-center gap-1.5 text-gray-400">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Role-Based Security</span>
+          <footer className="mt-8 pt-6 flex items-center justify-center gap-3 border-t border-slate-50">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Lock className="h-3 w-3" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.1em]">
+                Encrypted Access | Role-Based Security Enabled
+              </span>
             </div>
           </footer>
         </div>

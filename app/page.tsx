@@ -63,6 +63,22 @@ import {
   type DashboardIssueDigest,
 } from "@/lib/dashboard-api";
 
+// Role-specific dashboard sections
+import {
+  OrderStatusDistribution,
+  SlaRiskPanel,
+  VendorSlaScorecard,
+  RiderPerformanceSnapshot,
+} from "@/components/dashboard/ops-dashboard-sections";
+import {
+  CommissionIntelligence,
+  SettlementAgingTracker,
+  PayoutReconciliation,
+  RevenueByVendor,
+  WorkingCapitalForecast,
+  TaxCompliancePanel,
+} from "@/components/dashboard/finance-dashboard-sections";
+
 const ACCENT_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   blue: { bg: "bg-blue-50", text: "text-blue-600", icon: "text-blue-500" },
   emerald: { bg: "bg-emerald-50", text: "text-emerald-600", icon: "text-emerald-500" },
@@ -144,6 +160,7 @@ export default function AdminDashboardPage() {
   const [data, setData] = React.useState<DashboardOverview | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [adminRole, setAdminRole] = React.useState<string>("super_admin");
 
   const [timeRange, setTimeRange] = React.useState("today");
   const [selectedIssue, setSelectedIssue] = React.useState<DashboardIssueDigest | null>(null);
@@ -152,6 +169,19 @@ export default function AdminDashboardPage() {
   const [cityFilter, setCityFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Detect admin role from localStorage
+  React.useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("admin_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.adminRole) setAdminRole(user.adminRole);
+      }
+    } catch (e) {
+      console.error("Failed to parse admin role", e);
+    }
+  }, []);
 
   // Debounced search
   const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -397,10 +427,30 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* ─── Operations Admin: SLA & Allocation Risk ──────────── */}
+      {adminRole === "operations_admin" && orders.length > 0 && (
+        <SlaRiskPanel orders={orders} />
+      )}
+
+      {/* ─── Operations Admin: Order Status Distribution ─────── */}
+      {adminRole === "operations_admin" && orders.length > 0 && (
+        <OrderStatusDistribution orders={orders} />
+      )}
+
+      {/* ─── Finance Admin: Commission Intelligence ──────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <CommissionIntelligence settlements={settlements} />
+      )}
+
+      {/* ─── Finance Admin: Settlement Aging ──────────────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <SettlementAgingTracker settlements={settlements} />
+      )}
+
       {/* Main Content Grid */}
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className={`grid gap-8 ${data.approvals.length > 0 || data.issueDigest.length > 0 ? "lg:grid-cols-3" : "lg:grid-cols-1"}`}>
         {/* Primary Table */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6 overflow-hidden">
+        <div className={`${data.approvals.length > 0 || data.issueDigest.length > 0 ? "lg:col-span-2" : "lg:col-span-1"} bg-white rounded-xl shadow-sm border border-slate-100 p-6 overflow-hidden`}>
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -586,107 +636,108 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="space-y-6">
-          {/* Pending Vendor Approvals */}
-          {data.approvals.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-500" />
-                  Pending Approvals
-                </h3>
-                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-bold px-2 rounded-full">
-                  {data.approvals.length}
-                </Badge>
-              </div>
-              <div className="space-y-3">
-                {data.approvals.slice(0, 5).map((vendor) => (
-                  <div key={vendor.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-bold text-sm text-slate-900">{vendor.vendorName}</p>
-                      <Badge className={`${getPriorityColor(vendor.priority)} border-none text-[9px] font-bold px-2 py-0.5 rounded-md`}>
-                        {vendor.priority}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-3">
-                      <span>{vendor.city}</span>
-                      <span>•</span>
-                      <span>{vendor.appliedLabel}</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                      <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.documentStatus === "Documents Verified" ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-amber-300 text-amber-700 bg-amber-50"}`}>
-                        {vendor.documentStatus}
-                      </Badge>
-                      <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.bankVerified ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                        {vendor.bankVerified ? "Bank ✓" : "Bank ✗"}
-                      </Badge>
-                      <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.agreementSigned ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                        {vendor.agreementSigned ? "Agreement ✓" : "Agreement ✗"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 font-medium">{vendor.commissionModel}</span>
-                      <Button size="sm" className="bg-[#3E8940] hover:bg-[#3E8940]/90 h-7 text-[10px] font-semibold shadow-sm px-3 rounded-lg" onClick={() => router.push(`/vendors/review/${vendor.id}`)}>
-                        Review
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Button variant="ghost" className="w-full mt-4 text-sm font-semibold text-[#3E8940] hover:text-[#3E8940]/90 hover:bg-green-50" onClick={() => router.push("/vendors")}>
-                View All Vendors
-              </Button>
-            </div>
-          )}
-
-          {/* Issue Alerts */}
-          {data.issueDigest.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  Issue Alerts
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
-                    {data.summary.openIssues}
+        {(data.approvals.length > 0 || data.issueDigest.length > 0) && (
+          <div className="space-y-6">
+            {/* Pending Vendor Approvals */}
+            {data.approvals.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    Pending Approvals
+                  </h3>
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-bold px-2 rounded-full">
+                    {data.approvals.length}
                   </Badge>
-                  <Button variant="ghost" size="sm" className="h-7 text-[10px] font-bold text-[#3E8940] hover:bg-green-50 px-2" onClick={() => router.push("/issues")}>
-                    View Page
-                  </Button>
                 </div>
-              </div>
-              <div className="space-y-3">
-                {data.issueDigest.map((issue) => {
-                  const colors = getSeverityColor(issue.severity);
-                  return (
-                    <div
-                      key={issue.id}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
-                      onClick={() => setSelectedIssue(issue)}
-                    >
-                      {/* Severity left stripe */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${colors.badge.split(" ")[0]}`} />
-
-                      <div className="flex items-center justify-between mb-2 pl-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold text-[10px] px-2 py-0.5 rounded-md ${colors.badge}`}>
-                            #{issue.orderId}
-                          </span>
-                          {issue.unread && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
-                              NEW
-                            </span>
-                          )}
-                        </div>
-                        <Badge className={`${colors.badge} border-none text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
-                          {issue.severity}
+                <div className="space-y-3">
+                  {data.approvals.slice(0, 5).map((vendor) => (
+                    <div key={vendor.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-bold text-sm text-slate-900">{vendor.vendorName}</p>
+                        <Badge className={`${getPriorityColor(vendor.priority)} border-none text-[9px] font-bold px-2 py-0.5 rounded-md`}>
+                          {vendor.priority}
                         </Badge>
                       </div>
-                      <p className={`text-sm font-bold mb-0.5 pl-2 ${colors.text}`}>
-                        {issue.type}
-                      </p>
-                      <p className={`text-[10px] font-bold uppercase tracking-tight pl-2 ${colors.text} opacity-60`}>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-3">
+                        <span>{vendor.city}</span>
+                        <span>•</span>
+                        <span>{vendor.appliedLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap mb-3">
+                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.documentStatus === "Documents Verified" ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-amber-300 text-amber-700 bg-amber-50"}`}>
+                          {vendor.documentStatus}
+                        </Badge>
+                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.bankVerified ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
+                          {vendor.bankVerified ? "Bank ✓" : "Bank ✗"}
+                        </Badge>
+                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.agreementSigned ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
+                          {vendor.agreementSigned ? "Agreement ✓" : "Agreement ✗"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400 font-medium">{vendor.commissionModel}</span>
+                        <Button size="sm" className="bg-[#3E8940] hover:bg-[#3E8940]/90 h-7 text-[10px] font-semibold shadow-sm px-3 rounded-lg" onClick={() => router.push(`/vendors/review/${vendor.id}`)}>
+                          Review
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="ghost" className="w-full mt-4 text-sm font-semibold text-[#3E8940] hover:text-[#3E8940]/90 hover:bg-green-50" onClick={() => router.push("/vendors")}>
+                  View All Vendors
+                </Button>
+              </div>
+            )}
+
+            {/* Issue Alerts */}
+            {data.issueDigest.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Issue Alerts
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
+                      {data.summary.openIssues}
+                    </Badge>
+                    <Button variant="ghost" size="sm" className="h-7 text-[10px] font-bold text-[#3E8940] hover:bg-green-50 px-2" onClick={() => router.push("/issues")}>
+                      View Page
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {data.issueDigest.map((issue) => {
+                    const colors = getSeverityColor(issue.severity);
+                    return (
+                      <div
+                        key={issue.id}
+                        className={`p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
+                        onClick={() => setSelectedIssue(issue)}
+                      >
+                        {/* Severity left stripe */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${colors.badge.split(" ")[0]}`} />
+
+                        <div className="flex items-center justify-between mb-2 pl-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-[10px] px-2 py-0.5 rounded-md ${colors.badge}`}>
+                              #{issue.orderId}
+                            </span>
+                            {issue.unread && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <Badge className={`${colors.badge} border-none text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
+                            {issue.severity}
+                          </Badge>
+                        </div>
+                        <p className={`text-sm font-bold mb-0.5 pl-2 ${colors.text}`}>
+                          {issue.type}
+                        </p>
+                        <p className={`text-[10px] font-bold uppercase tracking-tight pl-2 ${colors.text} opacity-60`}>
                         Vendor: {issue.vendor} • {issue.city}
                       </p>
                     </div>
@@ -696,7 +747,38 @@ export default function AdminDashboardPage() {
             </div>
           )}
         </div>
-      </div>
+      )}
+    </div>
+
+      {/* ─── Operations Admin: Vendor SLA Scorecard ──────────── */}
+      {adminRole === "operations_admin" && orders.length > 0 && (
+        <VendorSlaScorecard orders={orders} />
+      )}
+
+      {/* ─── Operations Admin: Rider Performance ─────────────── */}
+      {adminRole === "operations_admin" && (
+        <RiderPerformanceSnapshot />
+      )}
+
+      {/* ─── Finance Admin: Payout Reconciliation ────────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <PayoutReconciliation settlements={settlements} />
+      )}
+
+      {/* ─── Finance Admin: Revenue by Vendor ────────────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <RevenueByVendor settlements={settlements} />
+      )}
+
+      {/* ─── Finance Admin: Working Capital Forecast ──────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <WorkingCapitalForecast settlements={settlements} />
+      )}
+
+      {/* ─── Finance Admin: Tax Compliance ────────────────────── */}
+      {adminRole === "finance_admin" && settlements.length > 0 && (
+        <TaxCompliancePanel settlements={settlements} />
+      )}
 
       {/* Issue Detail Dialog */}
       <Dialog open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>

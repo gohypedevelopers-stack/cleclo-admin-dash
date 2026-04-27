@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/dashboard/sidebar-provider";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -200,6 +200,21 @@ export function AdminSidebar() {
   const searchParams = useSearchParams();
   const { isCollapsed } = useSidebar();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
+  const [adminRole, setAdminRole] = useState<string>("super_admin");
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("admin_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.adminRole) {
+          setAdminRole(user.adminRole);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse admin role", e);
+    }
+  }, []);
 
   const toggleMenu = (title: string) => {
     setOpenMenus((prev) =>
@@ -365,6 +380,20 @@ export function AdminSidebar() {
     </div>
   );
 
+  const getRolePanelLabel = () => {
+    if (adminRole === "operations_admin") return "Operations Panel";
+    if (adminRole === "finance_admin") return "Finance Panel";
+    return "Admin Panel";
+  };
+
+  // Finance admin sees a simplified main navigation
+  const getMainItems = () => {
+    if (adminRole === "finance_admin") {
+      return mainItems.filter((item) => item.href === "/");
+    }
+    return mainItems;
+  };
+
   return (
     <div className="flex h-full w-full flex-col justify-between border-r bg-card py-4 overflow-y-auto hidden-scrollbar">
       <div className="space-y-6 px-3">
@@ -392,26 +421,26 @@ export function AdminSidebar() {
                   />
                 </div>
                 <span className="text-xs text-[#3E8940] font-bold tracking-wider uppercase text-center">
-                  Admin Panel
+                  {getRolePanelLabel()}
                 </span>
               </div>
             )}
           </div>
 
-          {renderNavItems(mainItems)}
+          {renderNavItems(getMainItems())}
         </div>
 
         <div className="pt-2 border-t border-slate-100">
-          {renderNavItems(managementItems, "Management")}
+          {adminRole !== "finance_admin" && renderNavItems(managementItems, "Management")}
         </div>
 
         <div className="pt-2 border-t border-slate-100">
-          {renderNavItems(financeItems, "Finance")}
+          {adminRole !== "operations_admin" && renderNavItems(financeItems, "Finance")}
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-1 border-t border-slate-100 pt-4">
-        {renderNavItems(supportItems)}
+        {renderNavItems(adminRole === "finance_admin" ? supportItems.filter(i => i.title === "Settings") : supportItems)}
       </div>
     </div>
   );

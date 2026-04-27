@@ -339,6 +339,21 @@ export const adminWalletApi = {
     }
 };
 
+export const adminUserApi = {
+    adjustLoyalty: async (userId: string, data: { points: number, type: 'earned' | 'redeemed', reason: string }) => {
+        const res = await apiFetch(`${AUTH_API_URL}/users/${userId}/loyalty/adjust`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to adjust loyalty points');
+        }
+        return res.json();
+    }
+};
+
 export const adminReferralApi = {
     getCampaigns: async () => {
         const res = await apiFetch(`${AUTH_API_URL}/referrals/campaigns`, { headers: getAuthHeaders() });

@@ -83,16 +83,45 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("admin_auth_token");
     if (!token) {
       router.push("/login");
-    } else {
-      setAuthorized(true);
+      return;
     }
-  }, [router]);
+
+    try {
+      const userStr = localStorage.getItem("admin_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const role = user.adminRole;
+
+        // Finance Admin Route Protection
+        if (role === "finance_admin") {
+          // Can only access /finance, /, /settings
+          if (pathname.startsWith("/users") || pathname.startsWith("/customer") || pathname.startsWith("/vendor") || pathname.startsWith("/rider") || pathname.startsWith("/orders") || pathname.startsWith("/issues")) {
+            router.push("/finance/settlements");
+            return;
+          }
+        }
+
+        // Operations Admin Route Protection
+        if (role === "operations_admin") {
+          if (pathname.startsWith("/finance")) {
+            router.push("/");
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    setAuthorized(true);
+  }, [router, pathname]);
 
   if (!authorized) return null;
 

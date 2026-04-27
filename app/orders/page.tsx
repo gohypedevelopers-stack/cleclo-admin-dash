@@ -84,7 +84,24 @@ interface OrderRecord {
   rating?: number;
   issue?: { type: string; severity: string } | null;
   address?: { city?: string; area?: string };
+  platformMargin?: number;
+  expectedDeliveryDate?: string | null;
 }
+
+const calculateSlaStatus = (createdAt: string, status: string, deliveryType: string) => {
+  if (["DELIVERED", "CANCELLED", "RECEIVED_BY_VENDOR"].includes(status)) return null;
+  
+  const createdTime = new Date(createdAt).getTime();
+  const now = new Date().getTime();
+  const elapsedHours = (now - createdTime) / (1000 * 60 * 60);
+  
+  const slaLimit = deliveryType.toLowerCase().includes("express") ? 24 : 72;
+  const remainingHours = slaLimit - elapsedHours;
+  
+  if (remainingHours < 0) return { label: `${Math.abs(Math.round(remainingHours))}h Overdue`, color: "bg-red-100 text-red-700", isBreached: true };
+  if (remainingHours <= 12) return { label: `${Math.round(remainingHours)}h Left`, color: "bg-amber-100 text-amber-700", isBreached: false };
+  return { label: `${Math.round(remainingHours)}h Left`, color: "bg-emerald-100 text-emerald-700", isBreached: false };
+};
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -303,12 +320,12 @@ export default function OrdersPage() {
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Order</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Customer</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Pickup</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Delivery</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Pickup / Delivery</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">SLA Timer</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Type</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Items</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Amount</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Items</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Revenue & Margin</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -319,15 +336,24 @@ export default function OrdersPage() {
               const pickupPerson = order.pickupRider?.name || order.rider?.name || null;
               const deliveryPerson = order.deliveryRider?.name || order.rider?.name || null;
 
+              const marginAmount = order.platformMargin || (order.totalAmount * 0.2); // Est 20% if missing
+              const marginPct = Math.round((marginAmount / order.totalAmount) * 100) || 0;
+              const slaStatus = calculateSlaStatus(order.createdAt, order.status, order.deliveryType);
+              const isUnassigned = !pickupPerson && !deliveryPerson && !["DELIVERED", "CANCELLED"].includes(order.status);
+              const hasDamage = order.issue?.type?.toLowerCase().includes("damage");
+
               return (
-                <TableRow key={order.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/orders/${order.id}`)}>
+                <TableRow key={order.id} className={`hover:bg-slate-50 cursor-pointer ${isUnassigned ? "bg-red-50/30" : ""}`} onClick={() => router.push(`/orders/${order.id}`)}>
                   <TableCell className="py-4 pl-6">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
                         {order.status === "DELIVERED" ? <Package className="h-4 w-4 text-purple-600" /> : <Truck className="h-4 w-4 text-purple-600" />}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 text-xs">#{order.id.slice(0, 8).toUpperCase()}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="font-bold text-slate-900 text-xs">#{order.id.slice(0, 8).toUpperCase()}</p>
+                          {hasDamage && <Badge className="bg-red-100 text-red-700 border-none px-1 text-[8px] h-3">DAMAGE</Badge>}
+                        </div>
                         <p className="text-[10px] text-slate-400">{formatDate(order.createdAt)}</p>
                       </div>
                     </div>
@@ -342,17 +368,25 @@ export default function OrdersPage() {
                     <p className="text-[10px] text-purple-600 font-bold uppercase">{vendorName}</p>
                   </TableCell>
                   <TableCell>
-                    {pickupPerson ? (
-                      <p className="text-xs font-bold text-slate-900">{pickupPerson}</p>
-                    ) : (
-                      <p className="text-xs text-red-500 italic font-medium">Not Assigned</p>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-[8px] px-1 h-3.5 border-slate-200">P</Badge>
+                        {pickupPerson ? <span className="text-[10px] font-bold text-slate-700">{pickupPerson}</span> : <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1 rounded-sm">Unassigned</span>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-[8px] px-1 h-3.5 border-slate-200">D</Badge>
+                        {deliveryPerson ? <span className="text-[10px] font-bold text-slate-700">{deliveryPerson}</span> : <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1 rounded-sm">Unassigned</span>}
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    {deliveryPerson ? (
-                      <p className="text-xs font-bold text-slate-900">{deliveryPerson}</p>
+                  <TableCell className="text-center">
+                    {slaStatus ? (
+                      <Badge className={`${slaStatus.color} border-none font-bold text-[10px]`}>
+                        {slaStatus.isBreached ? <AlertTriangle className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+                        {slaStatus.label}
+                      </Badge>
                     ) : (
-                      <p className="text-xs text-red-500 italic font-medium">Not Assigned</p>
+                      <span className="text-slate-300 text-[10px]">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -360,15 +394,18 @@ export default function OrdersPage() {
                       {order.deliveryType || "Standard"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center h-7 w-7 rounded-full bg-slate-50 border border-slate-200">
+                  <TableCell className="text-center">
+                    <div className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-slate-50 border border-slate-200">
                       <span className="text-xs font-bold text-slate-700">{order.itemCount}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <span className="font-bold text-slate-900 text-xs">{formatINR(order.totalAmount)}</span>
+                  <TableCell className="text-right">
+                    <p className="font-bold text-slate-900 text-xs">{formatINR(order.totalAmount)}</p>
+                    {marginAmount > 0 && (
+                      <p className="text-[9px] font-bold text-emerald-600 mt-0.5">+{formatINR(marginAmount)} ({marginPct}%)</p>
+                    )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Badge className={`${getStatusColor(order.status)} border-none font-bold gap-1 px-2.5 py-0.5 rounded-full whitespace-nowrap text-[10px]`}>
                       {getStatusIcon(order.status)}
                       {formatStatusLabel(order.status)}

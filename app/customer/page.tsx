@@ -139,12 +139,14 @@ export default function CustomerPage() {
                   <TableHead>Contact Info</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Wallet</TableHead>
+                  <TableHead>Points</TableHead>
+                  <TableHead>Tier</TableHead>
                   <TableHead>Joined</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCustomers.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="h-24 text-center">No customers found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-24 text-center">No customers found.</TableCell></TableRow>
                 ) : (
                   filteredCustomers.map((customer) => (
                     <TableRow key={customer.id} className="hover:bg-slate-50/50 cursor-pointer">
@@ -152,6 +154,16 @@ export default function CustomerPage() {
                       <TableCell><div className="flex flex-col"><span className="font-semibold text-slate-900">{customer.name}</span><span className="text-xs text-slate-500">{customer.email || "No email"}</span><span className="text-xs text-slate-400">{customer.phone}</span></div></TableCell>
                       <TableCell><Badge variant="outline" className={`${!customer.isBlocked ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>{!customer.isBlocked ? "Active" : "Blocked"}</Badge></TableCell>
                       <TableCell className="font-medium text-slate-900">₹{customer.walletBalance || 0}</TableCell>
+                      <TableCell className="font-bold text-blue-600">{customer.loyaltyPoints || 0}</TableCell>
+                      <TableCell>
+                        <Badge className={`${
+                          customer.loyaltyTier === "Platinum" ? "bg-indigo-100 text-indigo-700 border-indigo-200" :
+                          customer.loyaltyTier === "Gold" ? "bg-amber-100 text-amber-700 border-amber-200" :
+                          "bg-slate-100 text-slate-700 border-slate-200"
+                        } border font-bold text-[10px]`}>
+                          {customer.loyaltyTier || "Silver"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-slate-500 text-sm">{formatDate(customer.createdAt)}</TableCell>
                     </TableRow>
                   ))

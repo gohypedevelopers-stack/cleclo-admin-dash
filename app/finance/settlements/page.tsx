@@ -307,7 +307,8 @@ export default function SettlementsPage() {
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Orders</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Gross</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Commission</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Deductions</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Tax (18%)</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Other Deductions</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Net Payout</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
@@ -328,13 +329,20 @@ export default function SettlementsPage() {
                 <TableCell className="text-slate-600 text-xs">{s.period || formatDate(s.createdAt)}</TableCell>
                 <TableCell className="text-xs font-medium">{s.orderCount}</TableCell>
                 <TableCell className="text-xs">{formatINR(s.grossAmount)}</TableCell>
-                <TableCell className="text-red-600 text-xs font-medium">
-                  -{formatINR(s.commissionAmount)}
-                  <span className="text-[9px] text-slate-400 ml-1">({s.commissionRate}%)</span>
+                <TableCell className="text-xs">
+                  <span className="text-red-600 font-medium">-{formatINR(s.commissionAmount)}</span>
+                  <p className="text-[9px] text-slate-400">({s.commissionRate}%)</p>
+                </TableCell>
+                <TableCell className="text-xs">
+                  <span className="text-orange-600 font-medium">-{formatINR(s.commissionAmount * 0.18)}</span>
+                  <p className="text-[9px] text-slate-400">GST on Comm.</p>
                 </TableCell>
                 <TableCell className="text-xs">
                   {s.deductions > 0 ? (
-                    <span className="text-orange-600 font-medium">-{formatINR(s.deductions)}</span>
+                    <div className="flex flex-col">
+                      <span className="text-red-600 font-medium">-{formatINR(s.deductions)}</span>
+                      <p className="text-[9px] text-slate-400">Refunds/Penalties</p>
+                    </div>
                   ) : (
                     <span className="text-slate-400">—</span>
                   )}
