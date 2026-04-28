@@ -25,7 +25,9 @@ import {
   Download,
   UserPlus,
   ShoppingBag,
-  TrendingUp,
+  TrendingUp, Camera,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +64,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 
@@ -101,20 +104,30 @@ interface UserRecord {
   };
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "Active": return "bg-emerald-100 text-emerald-700 border-emerald-200";
-    case "Blocked": return "bg-red-100 text-red-700 border-red-200";
-    case "Suspended": return "bg-red-100 text-red-700 border-red-200";
-    case "Pending": return "bg-amber-100 text-amber-700 border-amber-200";
-    default: return "bg-slate-100 text-slate-700 border-slate-200";
-  }
+type NewUserPayload = {
+  name: string;
+  phone: string;
+  password: string;
+  role: string;
+  address: string;
+  lat: number;
+  lng: number;
+  image?: string;
+  email?: string;
 };
 
-// Single source of truth for user status — checks both isBlocked boolean and status string
-const getUserStatus = (user: UserRecord): "Blocked" | "Active" => {
-  if (user.isBlocked === true) return "Blocked";
-  if (user.status === "blocked" || user.status === "suspended") return "Blocked";
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Unexpected error";
+
+const getStatusColor = (status: string) => {
+  const s = status?.toLowerCase();
+  if (s === "active") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (s === "blocked" || s === "suspended") return "bg-red-100 text-red-700 border-red-200";
+  if (s === "pending") return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-slate-100 text-slate-700 border-slate-200";
+};
+
+const getUserStatus = (user: UserRecord): string => {
+  if (user.isBlocked === true || user.status === "blocked" || user.status === "suspended") return "Blocked";
   return "Active";
 };
 
@@ -133,31 +146,6 @@ const getRoleBadge = (role: string) => {
   }
 };
 
-const getSegmentTag = (user: UserRecord) => {
-  if (user.role !== "customer") return null;
-  const spent = user.totalSpent || 0;
-  const orders = user.totalOrders || 0;
-  const lastOrderDays = user.lastOrderDate
-    ? Math.floor((Date.now() - new Date(user.lastOrderDate).getTime()) / (1000*60*60*24))
-    : 999;
-
-  if (lastOrderDays > 60) return { label: "Dormant", color: "bg-slate-100 text-slate-600", emoji: "💤" };
-  if (lastOrderDays > 30) return { label: "At Risk", color: "bg-red-100 text-red-700", emoji: "⚠️" };
-  if (spent >= 50000) return { label: "VIP", color: "bg-amber-100 text-amber-700", emoji: "👑" };
-  if (spent >= 25000) return { label: "Gold", color: "bg-yellow-100 text-yellow-700", emoji: "🥇" };
-  if (spent >= 12500) return { label: "Silver", color: "bg-slate-100 text-slate-600", emoji: "🥈" };
-  return { label: "Regular", color: "bg-blue-50 text-blue-600", emoji: "" };
-};
-
-const getWalletLabel = (role: string) => {
-  switch (role) {
-    case "customer": return "Wallet";
-    case "vendor": return "Payout Due";
-    case "rider": return "Earnings";
-    default: return "Balance";
-  }
-};
-
 const formatINR = (amount: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 
@@ -173,6 +161,17 @@ const PUBLIC_AUTH_URL = AUTH_API_URL.replace("/admin/auth", "/auth");
 
 function UsersPageContent() {
   const router = useRouter();
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) return toast.error("Image size must be less than 2MB");
+      const reader = new FileReader();
+      reader.onloadend = () => setNewUser((prev) => ({ ...prev, image: reader.result as string }));
+      reader.readAsDataURL(file);
+    }
+  };
+
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
 
@@ -182,15 +181,46 @@ function UsersPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState(roleParam || "all");
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const limit = 10;
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "Password123!", role: "customer" });
+  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "Password123!", role: "customer", image: "" });
+
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserRecord | null>(null);
+  const [newPassword, setNewPassword] = useState("Password123!");
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser || !newPassword) return;
+    setIsResetting(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/users/${resetPasswordUser.id}/reset-password`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!res.ok) throw new Error("Failed to reset password");
+      toast.success("Password reset successfully");
+      setIsResetModalOpen(false);
+      setNewPassword("Password123!");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const handleExport = () => {
-    if (filteredData.length === 0) return toast.error("No data to export");
+    if (users.length === 0) return toast.error("No data to export");
     const csvHeader = "ID,Name,Email,Phone,Role,Status,Joined\n";
-    const csvContent = filteredData.map(u => `${u.id},"${u.name}",${u.email || ""},${u.phone || ""},${u.role},${getUserStatus(u)},${new Date(u.createdAt).toLocaleDateString()}`).join("\n");
+    const csvContent = users.map(u => `${u.id},"${u.name}",${u.email || ""},${u.phone || ""},${u.role},${getUserStatus(u)},${new Date(u.createdAt).toLocaleDateString()}`).join("\n");
     const blob = new Blob([csvHeader + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -203,22 +233,22 @@ function UsersPageContent() {
     if (!newUser.name || !newUser.phone) return toast.error("Name and Phone are required");
     setIsAdding(true);
     try {
-      const payload: any = { name: newUser.name, phone: newUser.phone, password: newUser.password, role: newUser.role, address: "Added by Admin", lat: 0, lng: 0 };
+      const payload: NewUserPayload = { name: newUser.name, phone: newUser.phone, password: newUser.password, role: newUser.role, address: "Added by Admin", lat: 0, lng: 0 };
       if (newUser.email.trim() !== "") payload.email = newUser.email;
       
       const res = await fetch(`${PUBLIC_AUTH_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, image: newUser.image })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create user");
       toast.success(`${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} added successfully!`);
       setIsAddModalOpen(false);
-      setNewUser({ name: "", email: "", phone: "", password: "Password123!", role: "customer" });
+      setNewUser({ name: "", email: "", phone: "", password: "Password123!", role: "customer", image: "" });
       fetchUsers();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err));
     } finally {
       setIsAdding(false);
     }
@@ -228,41 +258,42 @@ function UsersPageContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`${AUTH_API_URL}/users`, { headers: getAuthHeaders() });
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("search", searchQuery);
+      if (roleFilter !== "all") params.set("role", roleFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      params.set("page", currentPage.toString());
+      params.set("limit", limit.toString());
+
+      const res = await apiFetch(`${AUTH_API_URL}/users?${params.toString()}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load users");
       const data = await res.json();
-      setUsers(Array.isArray(data) ? data : data.users || []);
-    } catch (err: any) {
-      setError(err.message);
+      
+      if (data.users) {
+        setUsers(data.users);
+        setTotalPages(data.pagination.totalPages);
+        setTotalRecords(data.pagination.total);
+      } else {
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchQuery, roleFilter, statusFilter, currentPage]);
 
   useEffect(() => {
-    fetchUsers();
+    const t = setTimeout(fetchUsers, 300);
+    return () => clearTimeout(t);
   }, [fetchUsers]);
 
   useEffect(() => {
-    if (roleParam) setRoleFilter(roleParam);
+    if (roleParam) {
+      setRoleFilter(roleParam);
+      setCurrentPage(1);
+    }
   }, [roleParam]);
-
-  const filteredData = useMemo(() => {
-    return users.filter((user) => {
-      const status = getUserStatus(user);
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery ||
-        user.name?.toLowerCase().includes(searchLower) ||
-        user.email?.toLowerCase().includes(searchLower) ||
-        user.phone?.includes(searchQuery) ||
-        user.id?.toLowerCase().includes(searchLower);
-
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus = statusFilter === "all" || status === statusFilter;
-
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-  }, [users, searchQuery, roleFilter, statusFilter]);
 
   const handleBlockUser = async (userId: string, currentBlocked: boolean) => {
     try {
@@ -274,8 +305,8 @@ function UsersPageContent() {
       if (!res.ok) throw new Error("Failed to update user status");
       toast.success(currentBlocked ? "User unblocked" : "User blocked");
       fetchUsers();
-    } catch (err: any) {
-      toast.error("Failed", { description: err.message });
+    } catch (err: unknown) {
+      toast.error("Failed", { description: getErrorMessage(err) });
     }
   };
 
@@ -286,15 +317,6 @@ function UsersPageContent() {
       router.push(`/users/${user.id}`);
     }
   };
-
-  // Summary stats
-  const totalCustomers = users.filter((u) => u.role === "customer").length;
-  const totalVendors = users.filter((u) => u.role === "vendor").length;
-  const totalRiders = users.filter((u) => u.role === "rider").length;
-  const totalAdmins = users.filter((u) => u.role === "admin").length;
-  const blockedUsers = users.filter((u) => u.status === 'blocked').length;
-  const totalWalletLiability = users.filter(u => u.role === "customer").reduce((s, u) => s + (u.walletBalance || 0), 0);
-  const totalVendorPayoutDue = users.filter(u => u.role === "vendor").reduce((s, u) => s + (u.walletBalance || 0), 0);
 
   const pageTitle = roleFilter !== "all"
     ? `${roleFilter.charAt(0).toUpperCase() + roleFilter.slice(1)}s`
@@ -343,63 +365,6 @@ function UsersPageContent() {
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500">Total {pageTitle}</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{roleFilter === "customer" ? totalCustomers : roleFilter === "vendor" ? totalVendors : users.length}</h3>
-            {roleFilter === "customer" && (
-              <div className="mt-2 flex items-center text-xs text-green-600 font-medium">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                <span>+180 this month</span>
-              </div>
-            )}
-          </div>
-          <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-            <UsersIcon className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500">Active Users</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{users.filter(u => !u.isBlocked).length}</h3>
-            <div className="mt-2 text-xs text-slate-400">
-              {Math.round((users.filter(u => !u.isBlocked).length / Math.max(users.length, 1)) * 100)}% of total base
-            </div>
-          </div>
-          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-            <User className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500">Total Orders</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">15.2K</h3>
-            <div className="mt-2 flex items-center text-xs text-green-600 font-medium">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              <span>+12% vs last month</span>
-            </div>
-          </div>
-          <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-            <ShoppingBag className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500">New Signups</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{users.filter(u => new Date(u.createdAt).getMonth() === new Date().getMonth()).length}</h3>
-            <div className="mt-2 text-xs text-slate-400">Past 30 days</div>
-          </div>
-          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-            <UserPlus className="h-6 w-6" />
-          </div>
-        </div>
-      </div>
-
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between bg-white p-4 rounded-xl border shadow-sm">
         <div className="relative flex-1 max-w-md group">
@@ -408,11 +373,11 @@ function UsersPageContent() {
             placeholder="Search by name, email, phone, or ID..."
             className="pl-10 bg-slate-50/50 border-slate-200 focus:bg-white transition-all rounded-xl"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
           />
         </div>
         <div className="flex items-center gap-3">
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <Select value={roleFilter} onValueChange={(val) => { setRoleFilter(val); setCurrentPage(1); }}>
             <SelectTrigger className="w-[140px] bg-white rounded-xl">
               <UsersIcon className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Role" />
@@ -425,7 +390,7 @@ function UsersPageContent() {
               <SelectItem value="admin">Admins</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
             <SelectTrigger className="w-[140px] bg-white rounded-xl">
               <Filter className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Status" />
@@ -437,7 +402,7 @@ function UsersPageContent() {
             </SelectContent>
           </Select>
           {(roleFilter !== "all" || statusFilter !== "all" || searchQuery) && (
-            <Button variant="ghost" size="sm" onClick={() => { setRoleFilter("all"); setStatusFilter("all"); setSearchQuery(""); }} className="text-red-500 hover:bg-red-50 font-bold text-xs">
+            <Button variant="ghost" size="sm" onClick={() => { setRoleFilter("all"); setStatusFilter("all"); setSearchQuery(""); setCurrentPage(1); }} className="text-red-500 hover:bg-red-50 font-bold text-xs">
               Clear
             </Button>
           )}
@@ -455,6 +420,7 @@ function UsersPageContent() {
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
               <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400">Customer</TableHead>
               <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Contact Info</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Role</TableHead>
               <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Status</TableHead>
               <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Orders</TableHead>
               <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Total Spent</TableHead>
@@ -463,12 +429,10 @@ function UsersPageContent() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.length > 0 ? (
-              filteredData.map((user) => {
+            {users.length > 0 ? (
+              users.map((user) => {
                 const displayName = user.vendorProfile?.businessName || user.name || "Unknown";
                 const status = getUserStatus(user);
-                const segment = getSegmentTag(user);
-                const walletLabel = getWalletLabel(user.role);
                 const totalSpent = user.totalSpent || 0;
                 const orders = user.totalOrders || 0;
                 return (
@@ -476,6 +440,7 @@ function UsersPageContent() {
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 border shadow-sm">
+                          <AvatarImage src={(user as any).image} className="object-cover" />
                           <AvatarFallback className={`font-bold ${
                             user.role === "vendor" ? "bg-orange-50 text-orange-600" :
                             user.role === "rider" ? "bg-purple-50 text-purple-600" :
@@ -503,6 +468,9 @@ function UsersPageContent() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      {getRoleBadge(user.role)}
+                    </TableCell>
+                    <TableCell>
                       <Badge className={`${getStatusColor(status)} border font-bold text-[10px] shadow-none rounded-full px-3`}>{status}</Badge>
                     </TableCell>
                     <TableCell className="font-medium text-slate-700">{orders}</TableCell>
@@ -519,8 +487,11 @@ function UsersPageContent() {
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(user); }} className="gap-2">
                             <Eye className="h-4 w-4" /> View Details
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setResetPasswordUser(user); setIsResetModalOpen(true); }} className="gap-2 text-amber-600 font-medium">
+                            <RefreshCw className="h-4 w-4" /> Reset Password
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockUser(user.id, user.isBlocked); }} className={`gap-2 ${user.isBlocked ? "text-emerald-600" : "text-red-600"}`}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockUser(user.id, Boolean(user.isBlocked)); }} className={`gap-2 ${user.isBlocked ? "text-emerald-600" : "text-red-600"}`}>
                             <Ban className="h-4 w-4" /> {user.isBlocked ? "Unblock" : "Block"} Access
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -537,10 +508,93 @@ function UsersPageContent() {
           </TableBody>
         </Table>
         </div>
+        
+        {/* Pagination UI */}
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50">
-          <p className="text-sm text-slate-500">Showing {filteredData.length} of {users.length} records</p>
+          <p className="text-sm text-slate-500">
+            Showing <span className="font-bold text-slate-700">{(currentPage - 1) * limit + 1}</span> to <span className="font-bold text-slate-700">{Math.min(currentPage * limit, totalRecords)}</span> of <span className="font-bold text-slate-700">{totalRecords}</span> users
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || isLoading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum = currentPage;
+                if (totalPages <= 5) pageNum = i + 1;
+                else if (currentPage <= 3) pageNum = i + 1;
+                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                else pageNum = currentPage - 2 + i;
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    disabled={isLoading}
+                    className={cn(
+                      "h-8 w-8 p-0 rounded-lg text-xs font-bold",
+                      currentPage === pageNum ? "bg-[#3E8940] hover:bg-[#3E8940]/90" : ""
+                    )}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || isLoading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Reset Password Modal */}
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-500">
+              Resetting password for <span className="font-bold text-slate-900">{resetPasswordUser?.name}</span>.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsResetModalOpen(false)} className="rounded-xl">Cancel</Button>
+            <Button className="bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl" onClick={handleResetPassword} disabled={isResetting}>
+              {isResetting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add User Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
@@ -548,22 +602,53 @@ function UsersPageContent() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="John Doe" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="rounded-xl" autoComplete="off" />
+              <Label>Profile Picture</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 border-2 border-slate-100 shadow-sm">
+                  <AvatarImage src={newUser.image} className="object-cover" />
+                  <AvatarFallback className="bg-slate-50 text-slate-400">
+                    <User className="h-8 w-8" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleImageChange}
+                  />
+                  <Button variant="outline" size="sm" className="rounded-xl gap-2 hover:bg-slate-50">
+                    <Camera className="h-4 w-4" /> Choose Photo
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="add-name">Full Name</Label>
+              <Input id="add-name" placeholder="John Doe" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="rounded-xl" autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" placeholder="+91 9876543210" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} className="rounded-xl" autoComplete="off" />
+              <Label htmlFor="add-phone">Phone Number</Label>
+              <Input id="add-phone" placeholder="+91 9876543210" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} className="rounded-xl" autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address (Optional)</Label>
-              <Input id="email" placeholder="john@example.com" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="rounded-xl" autoComplete="off" />
+              <Label htmlFor="add-email">Email Address (Optional)</Label>
+              <Input id="add-email" placeholder="john@example.com" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="rounded-xl" autoComplete="off" />
             </div>
             <div className="space-y-2">
               <Label>Assigned Role</Label>
-              <div className="p-2 bg-slate-50 rounded-xl border text-sm text-slate-600 font-medium">
-                {newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)}
-              </div>
+              <Select value={newUser.role} onValueChange={(val) => setNewUser({ ...newUser, role: val })}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="vendor">Vendor</SelectItem>
+                  <SelectItem value="rider">Rider</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
               <p className="text-[10px] text-amber-700 leading-relaxed font-medium">

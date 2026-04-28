@@ -1,18 +1,31 @@
 "use client";
 
 import {
-  ImageIcon,
+  type LucideIcon,
   LayoutGrid,
-  Video,
   Gift,
-  Megaphone,
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-const appSections = [
+type AppSectionItem = {
+  name: string;
+  href: string;
+  description: string;
+  disabled?: boolean;
+  disabledLabel?: string;
+};
+
+type AppSection = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  items: AppSectionItem[];
+};
+
+const appSections: AppSection[] = [
   {
     title: "Home Screen",
     description: "Control banners, services grid, and home content",

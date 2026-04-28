@@ -3,8 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect, useCallback } from "react";
@@ -73,6 +73,30 @@ export default function VendorDetailPage() {
 
   useEffect(() => { fetchVendor(); }, [fetchVendor]);
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) return toast.error("Image size must be less than 2MB");
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        try {
+          const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ ...vendor, image: base64 }),
+          });
+          if (!res.ok) throw new Error("Failed to update profile picture");
+          toast.success("Profile picture updated");
+          fetchVendor();
+        } catch (err: any) {
+          toast.error(err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleApprove = async () => {
     try {
       const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}/approve`, { method: "PATCH", headers: getAuthHeaders(), body: JSON.stringify({ isApproved: true }) });
@@ -130,9 +154,16 @@ export default function VendorDetailPage() {
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
             <div className="h-24 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50" />
             <div className="px-6 pb-6 -mt-10 relative z-10">
-              <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
-                <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">{displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
+              <div className="relative group w-20 h-20">
+                <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
+                  <AvatarImage src={vendor.image} className="object-cover" />
+                  <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">{displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <label className="absolute -bottom-1 -right-1 h-8 w-8 bg-[#3E8940] text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform opacity-0 group-hover:opacity-100">
+                  <Camera className="h-4 w-4" />
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                </label>
+              </div>
               <div className="mt-3 mb-5">
                 <h2 className="text-xl font-bold text-slate-900">{displayName}</h2>
                 <p className="text-xs text-slate-500">{ownerName}</p>

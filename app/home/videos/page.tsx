@@ -131,7 +131,7 @@ export default function VideosPage() {
       return;
     }
 
-    if (!form.videoUrl) {
+    if (!form.videoUrl && !editingId) {
       toast.error("Video file is required", {
         description: "Please upload a video file before saving.",
       });

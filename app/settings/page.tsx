@@ -22,7 +22,14 @@ import {
   MapPin,
   IndianRupee,
   CheckCircle,
+  ShieldCheck,
+  User,
+  Camera,
+  Mail,
+  Smartphone,
+  Lock,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -77,6 +84,244 @@ const DEFAULT_CONFIG: PlatformConfig = {
   minOrderAmount: 99,
   maxOrderAmount: 25000,
 };
+
+function AccountSecurityCard() {
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) {
+      return toast.error("New passwords do not match");
+    }
+    if (passwords.new.length < 6) {
+      return toast.error("Password must be at least 6 characters");
+    }
+
+    setIsUpdating(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/auth/change-password`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update password");
+      
+      toast.success("Password updated successfully");
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+      <CardHeader className="border-b bg-slate-50/50 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-amber-100/50 rounded-xl border border-amber-100">
+            <Lock className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-xl">Account Security</CardTitle>
+            <CardDescription>Update your administrator account password</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Current Password</Label>
+            <Input
+              id="current-password"
+              type="password"
+              value={passwords.current}
+              onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+              className="rounded-xl"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={passwords.new}
+              onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+              className="rounded-xl"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={passwords.confirm}
+              onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+              className="rounded-xl"
+              required
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={isUpdating}
+            className="bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl mt-2"
+          >
+            {isUpdating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+            Update Password
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileDetailsCard() {
+  const [user, setUser] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", image: "" });
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("admin_user");
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser);
+      setUser(parsed);
+      setFormData({
+        name: parsed.name || "",
+        email: parsed.email || "",
+        phone: parsed.phone || "",
+        image: parsed.image || "",
+      });
+    }
+  }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) return toast.error("Image size must be less than 2MB");
+      const reader = new FileReader();
+      reader.onloadend = () => setFormData({ ...formData, image: reader.result as string });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/auth/update-profile`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update profile");
+      
+      localStorage.setItem("admin_user", JSON.stringify(data.user));
+      setUser(data.user);
+      toast.success("Profile updated successfully");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+      <CardHeader className="border-b bg-slate-50/50 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-indigo-100/50 rounded-xl border border-indigo-100">
+            <User className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-xl">Profile Details</CardTitle>
+            <CardDescription>Manage your administrator public identity</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative group">
+              <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
+                <AvatarImage src={formData.image} className="object-cover" />
+                <AvatarFallback className="bg-slate-100 text-slate-400 text-3xl font-bold">
+                  {formData.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <label className="absolute bottom-1 right-1 h-9 w-9 bg-[#3E8940] text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform">
+                <Camera className="h-4 w-4" />
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+              </label>
+            </div>
+            <div className="text-center">
+              <Badge variant="outline" className="rounded-full px-4 py-1 font-bold text-slate-500 bg-slate-50 border-slate-200">
+                {user.adminRole || "Administrator"}
+              </Badge>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex-1 space-y-4 max-w-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="rounded-xl"
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="rounded-xl"
+                  placeholder="john@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="rounded-xl"
+                  placeholder="+91 9876543210"
+                />
+              </div>
+            </div>
+            <div className="flex pt-2">
+              <Button
+                type="submit"
+                disabled={isUpdating}
+                className="bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl px-8"
+              >
+                {isUpdating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Save Profile
+              </Button>
+            </div>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<PlatformConfig>(DEFAULT_CONFIG);
@@ -178,6 +423,9 @@ export default function SettingsPage() {
       )}
 
       <div className="grid gap-8">
+        {/* Profile Details */}
+        <ProfileDetailsCard />
+
         {/* Notifications */}
         <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
           <CardHeader className="border-b bg-slate-50/50 pb-4">
@@ -317,7 +565,7 @@ export default function SettingsPage() {
                 <Shield className="h-5 w-5 text-red-600" />
               </div>
               <div className="space-y-1">
-                <CardTitle className="text-xl">Security</CardTitle>
+                <CardTitle className="text-xl">Platform Security</CardTitle>
                 <CardDescription>Login protection and access control settings</CardDescription>
               </div>
             </div>
@@ -351,6 +599,9 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Account Security (Password Reset) */}
+        <AccountSecurityCard />
 
         {/* Multi-City Configuration */}
         <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">

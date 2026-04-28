@@ -28,6 +28,7 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from "lucide-react";
 import {
   Dialog,
@@ -56,6 +57,7 @@ import {
 } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import React from "react";
 import {
   dashboardApi,
@@ -64,6 +66,7 @@ import {
   type DashboardSettlementRow,
   type DashboardIssueDigest,
 } from "@/lib/dashboard-api";
+import { exportToCSV } from "@/lib/csv-export";
 
 // Role-specific dashboard sections
 import {
@@ -240,9 +243,23 @@ export default function AdminDashboardPage() {
   };
 
   const handleGenerateReport = () => {
-    toast.success("Report generation started", {
-      description: "You will receive an email once the report is ready.",
-    });
+    if (!data) return;
+    
+    try {
+      const reportData = data.primaryTable.rows;
+      const reportType = data.primaryTable.type;
+      const filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}`;
+      
+      exportToCSV(reportData, filename);
+      
+      toast.success("Report generated", {
+        description: `Downloading ${reportType} report...`,
+      });
+    } catch (err: any) {
+      toast.error("Export failed", {
+        description: err.message || "Could not generate report",
+      });
+    }
   };
 
   const orders = data?.primaryTable.type === "orders" ? (data.primaryTable.rows as DashboardOrderRow[]) : [];
@@ -334,8 +351,16 @@ export default function AdminDashboardPage() {
             className="h-10 gap-2 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
             onClick={handleGenerateReport}
           >
-            <Filter className="h-4 w-4" />
+            <Download className="h-4 w-4" />
             Generate Report
+          </Button>
+          <Button
+            variant="outline"
+            className="h-10 w-10 p-0 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
+            onClick={fetchDashboard}
+            disabled={isLoading}
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
           <Button
             className="h-10 gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 text-white shadow-sm rounded-xl"

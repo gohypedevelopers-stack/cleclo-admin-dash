@@ -35,14 +35,18 @@ const formatDate = (dateStr: string | null) => {
 const formatStatusLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case "PROCESSING": return "bg-amber-100 text-amber-700";
-    case "PENDING": return "bg-yellow-100 text-yellow-700";
-    case "PICKED_UP": return "bg-blue-100 text-blue-700";
-    case "RECEIVED_BY_VENDOR": return "bg-purple-100 text-purple-700";
-    case "DELIVERED": return "bg-green-100 text-green-700";
-    case "CANCELLED": return "bg-slate-100 text-slate-600";
-    case "ISSUE_REPORTED": return "bg-red-100 text-red-700";
+  const s = status?.toLowerCase();
+  switch (s) {
+    case "processing": return "bg-amber-100 text-amber-700";
+    case "pending": return "bg-yellow-100 text-yellow-700";
+    case "pickup_assigned": return "bg-orange-100 text-orange-700";
+    case "picked_up": return "bg-blue-100 text-blue-700";
+    case "received_by_vendor": return "bg-purple-100 text-purple-700";
+    case "ready_for_delivery": return "bg-indigo-100 text-indigo-700";
+    case "out_for_delivery": return "bg-blue-100 text-blue-700";
+    case "delivered": return "bg-green-100 text-green-700";
+    case "cancelled": return "bg-slate-100 text-slate-600";
+    case "issue_reported": return "bg-red-100 text-red-700";
     default: return "bg-gray-100 text-gray-700";
   }
 };
@@ -132,23 +136,24 @@ export default function AdminOrderDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {order.status?.toLowerCase() !== "delivered" && order.status?.toLowerCase() !== "cancelled" && (
-            <Button className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl" onClick={() => {
-              const next: Record<string, string> = { 
-                pending: "pickup_assigned", 
-                pickup_assigned: "picked_up", 
-                picked_up: "received_by_vendor", 
-                received_by_vendor: "processing", 
-                processing: "ready_for_delivery", 
-                ready_for_delivery: "out_for_delivery", 
-                out_for_delivery: "delivered" 
-              };
-              const ns = next[order.status?.toLowerCase() || ""];
-              if (ns) handleUpdateStatus(ns);
-            }}>
-              Advance Status
-            </Button>
-          )}
+          {order.status?.toLowerCase() !== "delivered" && order.status?.toLowerCase() !== "cancelled" && (() => {
+            const next: Record<string, string> = { 
+              pending: "pickup_assigned", 
+              pickup_assigned: "picked_up", 
+              picked_up: "received_by_vendor", 
+              received_by_vendor: "processing", 
+              processing: "ready_for_delivery", 
+              ready_for_delivery: "out_for_delivery", 
+              out_for_delivery: "delivered" 
+            };
+            const ns = next[order.status?.toLowerCase() || ""];
+            if (!ns) return null;
+            return (
+              <Button className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl" onClick={() => handleUpdateStatus(ns)}>
+                Move to {formatStatusLabel(ns)}
+              </Button>
+            );
+          })()}
         </div>
       </div>
 

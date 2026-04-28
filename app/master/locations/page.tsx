@@ -11,9 +11,7 @@ import {
   Save, 
   ArrowLeft,
   Search,
-  Globe,
-  Settings,
-  AlertCircle
+  Globe
 } from "lucide-react";
 import { adminLocationApi } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
@@ -41,18 +39,20 @@ import { toast } from "sonner";
 
 type City = {
   id: string;
-  name: string;
-  code: string;
-  status: string;
-  surcharge: number;
+  cityName: string;
+  cityCode: string;
+  isEnabled: boolean;
+  displayOrder: number;
+  timezone: string;
 };
 
 type Area = {
   id: string;
-  name: string;
+  areaName: string;
+  areaCode: string;
   cityCode: string;
-  status: string;
-  surcharge: number;
+  isEnabled: boolean;
+  surgePercent: number;
 };
 
 type TimeSlot = {
@@ -61,9 +61,12 @@ type TimeSlot = {
   endTime: string;
   cityCode: string;
   slotType: string;
-  surcharge: number;
+  dayOfWeek: number;
+  capacityLimit: number | null;
   isActive: boolean;
 };
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function LocationsPage() {
   const [cities, setCities] = useState<City[]>([]);
@@ -79,9 +82,9 @@ export default function LocationsPage() {
   const [isSlotDialogOpen, setIsSlotDialogOpen] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [cityForm, setCityForm] = useState({ name: "", code: "", surcharge: 0, status: "active" });
-  const [areaForm, setAreaForm] = useState({ name: "", cityCode: "", surcharge: 0, status: "active" });
-  const [slotForm, setSlotForm] = useState({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "regular", surcharge: 0, isActive: true });
+  const [cityForm, setCityForm] = useState({ cityName: "", cityCode: "", isEnabled: true, displayOrder: 0, timezone: "Asia/Kolkata" });
+  const [areaForm, setAreaForm] = useState({ areaName: "", areaCode: "", cityCode: "", surgePercent: 0, isEnabled: true });
+  const [slotForm, setSlotForm] = useState({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "pickup", dayOfWeek: 1, capacityLimit: 50, isActive: true });
 
   const loadData = async () => {
     try {
@@ -109,13 +112,19 @@ export default function LocationsPage() {
   // --- City Handlers ---
   const openAddCity = () => {
     setEditingId(null);
-    setCityForm({ name: "", code: "", surcharge: 0, status: "active" });
+    setCityForm({ cityName: "", cityCode: "", isEnabled: true, displayOrder: 0, timezone: "Asia/Kolkata" });
     setIsCityDialogOpen(true);
   };
 
   const openEditCity = (city: City) => {
     setEditingId(city.id);
-    setCityForm({ name: city.name, code: city.code, surcharge: city.surcharge, status: city.status });
+    setCityForm({
+      cityName: city.cityName,
+      cityCode: city.cityCode,
+      isEnabled: city.isEnabled,
+      displayOrder: city.displayOrder,
+      timezone: city.timezone,
+    });
     setIsCityDialogOpen(true);
   };
 
@@ -149,13 +158,19 @@ export default function LocationsPage() {
   // --- Area Handlers ---
   const openAddArea = () => {
     setEditingId(null);
-    setAreaForm({ name: "", cityCode: cities[0]?.code || "", surcharge: 0, status: "active" });
+    setAreaForm({ areaName: "", areaCode: "", cityCode: cities[0]?.cityCode || "", surgePercent: 0, isEnabled: true });
     setIsAreaDialogOpen(true);
   };
 
   const openEditArea = (area: Area) => {
     setEditingId(area.id);
-    setAreaForm({ name: area.name, cityCode: area.cityCode, surcharge: area.surcharge, status: area.status });
+    setAreaForm({
+      areaName: area.areaName,
+      areaCode: area.areaCode,
+      cityCode: area.cityCode,
+      surgePercent: area.surgePercent,
+      isEnabled: area.isEnabled,
+    });
     setIsAreaDialogOpen(true);
   };
 
@@ -188,7 +203,7 @@ export default function LocationsPage() {
   // --- Slot Handlers ---
   const openAddSlot = () => {
     setEditingId(null);
-    setSlotForm({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "regular", surcharge: 0, isActive: true });
+    setSlotForm({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "pickup", dayOfWeek: 1, capacityLimit: 50, isActive: true });
     setIsSlotDialogOpen(true);
   };
 
@@ -199,7 +214,8 @@ export default function LocationsPage() {
       endTime: slot.endTime, 
       cityCode: slot.cityCode, 
       slotType: slot.slotType, 
-      surcharge: slot.surcharge, 
+      dayOfWeek: slot.dayOfWeek,
+      capacityLimit: slot.capacityLimit ?? 0,
       isActive: slot.isActive 
     });
     setIsSlotDialogOpen(true);
@@ -232,12 +248,13 @@ export default function LocationsPage() {
   };
 
   const filteredCities = cities.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.code.toLowerCase().includes(searchQuery.toLowerCase())
+    c.cityName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.cityCode.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredAreas = areas.filter(a => 
-    a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    a.areaName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    a.areaCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
     a.cityCode.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -326,23 +343,23 @@ export default function LocationsPage() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-black">{city.name}</h3>
-                  <p className="text-sm text-slate-500 font-mono">{city.code}</p>
+                  <h3 className="text-lg font-bold text-black">{city.cityName}</h3>
+                  <p className="text-sm text-slate-500 font-mono">{city.cityCode}</p>
                 </div>
                 <div className="mt-4 flex items-center justify-between">
-                  <Badge className={`${city.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
-                    {city.status}
+                  <Badge className={`${city.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
+                    {city.isEnabled ? "enabled" : "disabled"}
                   </Badge>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Surcharge</p>
-                    <p className="font-bold text-black">₹{city.surcharge}</p>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Order</p>
+                    <p className="font-bold text-black">{city.displayOrder}</p>
                   </div>
                 </div>
               </div>
             ))}
             {filteredCities.length === 0 && !loading && (
                <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed">
-                <p className="text-slate-500">No cities found. Click "Add City" to get started.</p>
+                <p className="text-slate-500">No cities found. Use Add City to get started.</p>
               </div>
             )}
             {loading && <div className="col-span-full text-center py-12 text-slate-400">Loading cities...</div>}
@@ -356,9 +373,10 @@ export default function LocationsPage() {
               <thead>
                 <tr className="bg-slate-50 border-b">
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Area Name</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Area Code</th>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">City Code</th>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Surcharge</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Surge</th>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
@@ -370,19 +388,22 @@ export default function LocationsPage() {
                         <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
                           <MapPin className="h-4 w-4" />
                         </div>
-                        <span className="font-semibold text-black">{area.name}</span>
+                        <span className="font-semibold text-black">{area.areaName}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge variant="outline" className="font-mono">{area.areaCode}</Badge>
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant="outline" className="font-mono">{area.cityCode}</Badge>
                     </td>
                     <td className="px-6 py-4">
-                       <Badge className={`${area.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
-                        {area.status}
+                       <Badge className={`${area.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
+                        {area.isEnabled ? "enabled" : "disabled"}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-bold text-black">₹{area.surcharge}</span>
+                      <span className="font-bold text-black">{area.surgePercent}%</span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
@@ -410,7 +431,7 @@ export default function LocationsPage() {
             {filteredSlots.map((slot) => (
               <div key={slot.id} className={`bg-white rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md ${!slot.isActive ? 'opacity-60' : ''}`}>
                 <div className="flex justify-between items-start mb-4">
-                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${slot.slotType === 'express' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${slot.slotType === 'delivery' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
                     <Clock className="h-5 w-5" />
                   </div>
                    <div className="flex gap-1">
@@ -424,7 +445,7 @@ export default function LocationsPage() {
                 </div>
                 <div className="mb-4">
                   <p className="text-lg font-bold text-black">{slot.startTime} - {slot.endTime}</p>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{slot.slotType} slot</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{DAYS[slot.dayOfWeek]} {slot.slotType}</p>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t">
                   <div>
@@ -432,8 +453,8 @@ export default function LocationsPage() {
                     <Badge variant="outline" className="text-[10px] py-0">{slot.cityCode}</Badge>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tight">Surcharge</p>
-                    <p className="font-bold text-green-600">₹{slot.surcharge}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-tight">Capacity</p>
+                    <p className="font-bold text-green-600">{slot.capacityLimit ?? "Open"}</p>
                   </div>
                 </div>
               </div>
@@ -452,34 +473,32 @@ export default function LocationsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit City" : "Add New City"}</DialogTitle>
-            <DialogDescription>Configure base service city and default surcharge.</DialogDescription>
+            <DialogDescription>Configure an enabled service city for catalog availability.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>City Name</Label>
-                <Input placeholder="e.g. Bangalore" value={cityForm.name} onChange={e => setCityForm({...cityForm, name: e.target.value})} />
+                <Input placeholder="e.g. Bangalore" value={cityForm.cityName} onChange={e => setCityForm({...cityForm, cityName: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>City Code</Label>
-                <Input placeholder="e.g. BLR" value={cityForm.code} onChange={e => setCityForm({...cityForm, code: e.target.value.toUpperCase()})} disabled={!!editingId} />
+                <Input placeholder="e.g. BLR" value={cityForm.cityCode} onChange={e => setCityForm({...cityForm, cityCode: e.target.value.toUpperCase()})} disabled={!!editingId} />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Base Surcharge (₹)</Label>
-              <Input type="number" value={cityForm.surcharge} onChange={e => setCityForm({...cityForm, surcharge: Number(e.target.value)})} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Display Order</Label>
+                <Input type="number" value={cityForm.displayOrder} onChange={e => setCityForm({...cityForm, displayOrder: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Timezone</Label>
+                <Input value={cityForm.timezone} onChange={e => setCityForm({...cityForm, timezone: e.target.value})} />
+              </div>
             </div>
              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <Label>Service Status</Label>
-                <Select value={cityForm.status} onValueChange={v => setCityForm({...cityForm, status: v})}>
-                  <SelectTrigger className="w-[120px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Service Enabled</Label>
+                <Switch checked={cityForm.isEnabled} onCheckedChange={v => setCityForm({...cityForm, isEnabled: v})} />
              </div>
           </div>
           <DialogFooter>
@@ -507,18 +526,28 @@ export default function LocationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {cities.map(c => (
-                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                      <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName} ({c.cityCode})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Area Name</Label>
-                <Input placeholder="e.g. Indiranagar" value={areaForm.name} onChange={e => setAreaForm({...areaForm, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Area Name</Label>
+                  <Input placeholder="e.g. Indiranagar" value={areaForm.areaName} onChange={e => setAreaForm({...areaForm, areaName: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Area Code</Label>
+                  <Input placeholder="e.g. BLR-IND" value={areaForm.areaCode} onChange={e => setAreaForm({...areaForm, areaCode: e.target.value.toUpperCase()})} disabled={!!editingId} />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Area Specific Surcharge (₹)</Label>
-                <Input type="number" value={areaForm.surcharge} onChange={e => setAreaForm({...areaForm, surcharge: Number(e.target.value)})} />
+                <Label>Surge Percent</Label>
+                <Input type="number" value={areaForm.surgePercent} onChange={e => setAreaForm({...areaForm, surgePercent: Number(e.target.value)})} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <Label>Area Enabled</Label>
+                <Switch checked={areaForm.isEnabled} onCheckedChange={v => setAreaForm({...areaForm, isEnabled: v})} />
               </div>
           </div>
           <DialogFooter>
@@ -557,7 +586,7 @@ export default function LocationsPage() {
                     <SelectContent>
                       <SelectItem value="all">All Cities</SelectItem>
                       {cities.map(c => (
-                        <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                        <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -569,15 +598,30 @@ export default function LocationsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="regular">Regular</SelectItem>
-                      <SelectItem value="express">Express</SelectItem>
+                      <SelectItem value="pickup">Pickup</SelectItem>
+                      <SelectItem value="delivery">Delivery</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
              </div>
-             <div className="space-y-2">
-                <Label>Slot Surcharge (₹)</Label>
-                <Input type="number" value={slotForm.surcharge} onChange={e => setSlotForm({...slotForm, surcharge: Number(e.target.value)})} />
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Day</Label>
+                  <Select value={String(slotForm.dayOfWeek)} onValueChange={v => setSlotForm({...slotForm, dayOfWeek: Number(v)})}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAYS.map((day, index) => (
+                        <SelectItem key={day} value={String(index)}>{day}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Capacity Limit</Label>
+                  <Input type="number" value={slotForm.capacityLimit} onChange={e => setSlotForm({...slotForm, capacityLimit: Number(e.target.value)})} />
+                </div>
              </div>
              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                 <Label>Active Status</Label>

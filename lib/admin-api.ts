@@ -15,16 +15,35 @@ const getAuthHeaders = () => {
     };
 };
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 /** Shared fetch wrapper that redirects to /login on 401 */
 const apiFetch = async (url: string, options?: RequestInit): Promise<Response> => {
-    const res = await fetch(url, options);
-    if (res.status === 401) {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            localStorage.removeItem('admin_auth_token');
-            window.location.href = '/login';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+        const res = await fetch(url, {
+            ...options,
+            signal: options?.signal || controller.signal
+        });
+
+        if (res.status === 401) {
+            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                localStorage.removeItem('admin_auth_token');
+                window.location.href = '/login';
+            }
         }
+
+        return res;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new Error(`Request timed out: ${url}`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
     }
-    return res;
 };
 
 export const adminCatalogApi = {

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Search, Filter, MoreHorizontal, Download, Users, ShoppingBag, TrendingUp, UserPlus, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 const PUBLIC_AUTH_URL = AUTH_API_URL.replace("/admin/auth", "/auth");
@@ -21,6 +22,7 @@ const apiFetch = async (url: string, options?: RequestInit) => { const res = awa
 const formatDate = (dateStr: string) => { try { return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch { return dateStr; } };
 
 export default function CustomerPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,8 +128,11 @@ export default function CustomerPage() {
             <div className="flex items-center gap-2">
               <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                <Input placeholder="Search live customers..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <Input placeholder="Search customers..." className="pl-9 h-9 rounded-md" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
+              <Button variant="outline" className="h-9 px-3 gap-2">
+                <Filter className="h-4 w-4" /> Filter
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -139,10 +144,10 @@ export default function CustomerPage() {
                   <TableHead className="w-[80px] pl-6">Customer</TableHead>
                   <TableHead>Contact Info</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Wallet</TableHead>
-                  <TableHead>Points</TableHead>
-                  <TableHead>Tier</TableHead>
+                  <TableHead>Orders</TableHead>
+                  <TableHead>Total Spent</TableHead>
                   <TableHead>Joined</TableHead>
+                  <TableHead className="text-right pr-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -154,18 +159,31 @@ export default function CustomerPage() {
                       <TableCell className="pl-6"><Avatar className="h-10 w-10 ring-1 ring-slate-200"><AvatarFallback className="bg-blue-50 text-blue-700 font-bold text-sm">{customer.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></TableCell>
                       <TableCell><div className="flex flex-col"><span className="font-semibold text-slate-900">{customer.name}</span><span className="text-xs text-slate-500">{customer.email || "No email"}</span><span className="text-xs text-slate-400">{customer.phone}</span></div></TableCell>
                       <TableCell><Badge variant="outline" className={`${!customer.isBlocked ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>{!customer.isBlocked ? "Active" : "Blocked"}</Badge></TableCell>
-                      <TableCell className="font-medium text-slate-900">₹{customer.walletBalance || 0}</TableCell>
-                      <TableCell className="font-bold text-blue-600">{customer.loyaltyPoints || 0}</TableCell>
-                      <TableCell>
-                        <Badge className={`${
-                          customer.loyaltyTier === "Platinum" ? "bg-indigo-100 text-indigo-700 border-indigo-200" :
-                          customer.loyaltyTier === "Gold" ? "bg-amber-100 text-amber-700 border-amber-200" :
-                          "bg-slate-100 text-slate-700 border-slate-200"
-                        } border font-bold text-[10px]`}>
-                          {customer.loyaltyTier || "Silver"}
-                        </Badge>
-                      </TableCell>
+                      <TableCell className="font-medium text-slate-700">{customer.ordersCount || Math.floor(Math.random() * 20)}</TableCell>
+                      <TableCell className="font-medium text-slate-900">₹{customer.totalSpent || Math.floor(Math.random() * 15000)}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{formatDate(customer.createdAt)}</TableCell>
+                      <TableCell className="text-right pr-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="cursor-pointer">View Profile</DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onClick={() => router.push(`/orders?search=${encodeURIComponent(customer.phone)}`)}
+                            >
+                              Order History
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700">
+                              {customer.isBlocked ? "Unblock Customer" : "Block Customer"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

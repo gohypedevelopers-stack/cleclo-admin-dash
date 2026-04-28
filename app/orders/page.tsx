@@ -1,8 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   Filter,
@@ -22,6 +22,8 @@ import {
   MapPin,
   Calendar,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,14 +90,16 @@ interface OrderRecord {
   expectedDeliveryDate?: string | null;
 }
 
-const calculateSlaStatus = (createdAt: string, status: string, deliveryType: string) => {
-  if (["DELIVERED", "CANCELLED", "RECEIVED_BY_VENDOR"].includes(status)) return null;
+const calculateSlaStatus = (createdAt: string, status: string, deliveryType?: string) => {
+  const s = status?.toLowerCase();
+  if (["delivered", "cancelled", "received_by_vendor"].includes(s)) return null;
   
   const createdTime = new Date(createdAt).getTime();
   const now = new Date().getTime();
   const elapsedHours = (now - createdTime) / (1000 * 60 * 60);
   
-  const slaLimit = deliveryType.toLowerCase().includes("express") ? 24 : 72;
+  const type = deliveryType || "Standard";
+  const slaLimit = type.toLowerCase().includes("express") ? 24 : 72;
   const remainingHours = slaLimit - elapsedHours;
   
   if (remainingHours < 0) return { label: `${Math.abs(Math.round(remainingHours))}h Overdue`, color: "bg-red-100 text-red-700", isBreached: true };
@@ -104,15 +108,18 @@ const calculateSlaStatus = (createdAt: string, status: string, deliveryType: str
 };
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case "PROCESSING": return "bg-purple-100 text-purple-700";
-    case "NOT_SCHEDULED": return "bg-slate-100 text-slate-600";
-    case "PICKED_UP": return "bg-blue-100 text-blue-700";
-    case "RECEIVED_BY_VENDOR": return "bg-amber-100 text-amber-700";
-    case "DELIVERED": return "bg-green-100 text-green-700";
-    case "ISSUE_REPORTED": return "bg-red-100 text-red-700";
-    case "CANCELLED": return "bg-slate-100 text-slate-600";
-    case "PENDING": return "bg-yellow-100 text-yellow-700";
+  const s = status?.toLowerCase();
+  switch (s) {
+    case "processing": return "bg-purple-100 text-purple-700";
+    case "pending": return "bg-yellow-100 text-yellow-700";
+    case "pickup_assigned": return "bg-orange-100 text-orange-700";
+    case "picked_up": return "bg-blue-100 text-blue-700";
+    case "received_by_vendor": return "bg-amber-100 text-amber-700";
+    case "ready_for_delivery": return "bg-indigo-100 text-indigo-700";
+    case "out_for_delivery": return "bg-blue-100 text-blue-700";
+    case "delivered": return "bg-green-100 text-green-700";
+    case "issue_reported": return "bg-red-100 text-red-700";
+    case "cancelled": return "bg-slate-100 text-slate-600";
     default: return "bg-gray-100 text-gray-700";
   }
 };
@@ -150,14 +157,21 @@ const formatDate = (dateStr: string | null) => {
   }
 };
 
-export default function OrdersPage() {
+function OrdersPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const limit = 10;
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -167,18 +181,27 @@ export default function OrdersPage() {
       if (searchQuery) params.set("search", searchQuery);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (dateFilter) params.set("date", dateFilter);
+      params.set("page", currentPage.toString());
+      params.set("limit", limit.toString());
 
       const url = `${ORDER_API_URL}${params.toString() ? "?" + params.toString() : ""}`;
       const res = await apiFetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load orders");
       const data = await res.json();
-      setOrders(Array.isArray(data) ? data : data.orders || []);
+      
+      if (data.orders) {
+        setOrders(data.orders);
+        setTotalPages(data.pagination.totalPages);
+        setTotalRecords(data.pagination.total);
+      } else {
+        setOrders(Array.isArray(data) ? data : []);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, statusFilter, dateFilter]);
+  }, [searchQuery, statusFilter, dateFilter, currentPage]);
 
   useEffect(() => {
     const t = setTimeout(fetchOrders, 300);
@@ -200,7 +223,7 @@ export default function OrdersPage() {
     }
   };
 
-  // Summary stats
+  // Summary stats (approximate based on current page if backend doesn't provide global stats here)
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     orders.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1; });
@@ -211,6 +234,7 @@ export default function OrdersPage() {
     setSearchQuery("");
     setStatusFilter("all");
     setDateFilter("");
+    setCurrentPage(1);
   };
 
   if (isLoading && orders.length === 0) {
@@ -253,23 +277,6 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-6">
-        {[
-          { label: "Total", value: orders.length, color: "text-slate-700" },
-          { label: "Pending", value: (statusCounts["pending"] || 0) + (statusCounts["not_scheduled"] || 0), color: "text-yellow-600" },
-          { label: "Processing", value: statusCounts["processing"] || 0, color: "text-purple-600" },
-          { label: "Picked Up", value: (statusCounts["picked_up"] || 0) + (statusCounts["pickup_assigned"] || 0) + (statusCounts["out_for_delivery"] || 0), color: "text-blue-600" },
-          { label: "At Vendor", value: statusCounts["received_by_vendor"] || 0, color: "text-amber-600" },
-          { label: "Delivered", value: statusCounts["delivered"] || 0, color: "text-green-600" },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center hover:shadow-md transition-all">
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">{stat.label}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border shadow-sm">
         <div className="relative flex-1 max-w-md group">
@@ -278,11 +285,11 @@ export default function OrdersPage() {
             placeholder="Search by order ID, customer, or vendor..."
             className="pl-10 bg-slate-50 rounded-xl"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
           />
         </div>
         <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
             <SelectTrigger className="w-44 rounded-xl">
               <Filter className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Status" />
@@ -301,7 +308,7 @@ export default function OrdersPage() {
           <input
             type="date"
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
             className="h-10 px-3 bg-white border border-slate-200 text-xs font-medium rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 transition-all"
           />
           {(statusFilter !== "all" || searchQuery || dateFilter) && (
@@ -313,7 +320,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
@@ -336,9 +343,9 @@ export default function OrdersPage() {
               const pickupPerson = order.pickupRider?.name || order.rider?.name || null;
               const deliveryPerson = order.deliveryRider?.name || order.rider?.name || null;
 
-              const marginAmount = order.platformMargin || (order.totalAmount * 0.2); // Est 20% if missing
+              const marginAmount = order.platformMargin || (order.totalAmount * 0.2);
               const marginPct = Math.round((marginAmount / order.totalAmount) * 100) || 0;
-              const slaStatus = calculateSlaStatus(order.createdAt, order.status, order.deliveryType);
+              const slaStatus = calculateSlaStatus(order.createdAt, order.status, order.deliveryType || (order as any).serviceType);
               const isUnassigned = !pickupPerson && !deliveryPerson && !["DELIVERED", "CANCELLED"].includes(order.status);
               const hasDamage = order.issue?.type?.toLowerCase().includes("damage");
 
@@ -390,8 +397,8 @@ export default function OrdersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge className={cn("border font-semibold px-2 py-0.5 whitespace-nowrap text-[10px]", getDeliveryBadgeColor(order.deliveryType))}>
-                      {order.deliveryType || "Standard"}
+                    <Badge className={cn("border font-semibold px-2 py-0.5 whitespace-nowrap text-[10px]", getDeliveryBadgeColor(order.deliveryType || (order as any).serviceType))}>
+                      {order.deliveryType || (order as any).serviceType || "Standard"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
@@ -429,10 +436,72 @@ export default function OrdersPage() {
             )}
           </TableBody>
         </Table>
+        
+        {/* Pagination UI */}
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50">
-          <p className="text-sm text-slate-500">Showing {orders.length} orders</p>
+          <p className="text-sm text-slate-500">
+            Showing <span className="font-bold text-slate-700">{(currentPage - 1) * limit + 1}</span> to <span className="font-bold text-slate-700">{Math.min(currentPage * limit, totalRecords)}</span> of <span className="font-bold text-slate-700">{totalRecords}</span> orders
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || isLoading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum = currentPage;
+                if (totalPages <= 5) pageNum = i + 1;
+                else if (currentPage <= 3) pageNum = i + 1;
+                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                else pageNum = currentPage - 2 + i;
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    disabled={isLoading}
+                    className={cn(
+                      "h-8 w-8 p-0 rounded-lg text-xs font-bold",
+                      currentPage === pageNum ? "bg-[#3E8940] hover:bg-[#3E8940]/90" : ""
+                    )}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || isLoading}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <p className="text-sm font-medium text-slate-500">Loading orders...</p>
+      </div>
+    }>
+      <OrdersPageContent />
+    </Suspense>
   );
 }

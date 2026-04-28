@@ -34,6 +34,7 @@ import {
   BarChart3,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -177,6 +178,14 @@ const getAccentColor = (accent: string) => {
 
 const formatINR = (amount: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+
+const getFilterStyles = (isActive: boolean, activeColor: string = "bg-[#3E8940]/10 text-[#3E8940] ring-1 ring-[#3E8940]/20") => 
+  cn(
+    "w-fit min-w-[130px] h-8 border-none rounded-full text-[10px] font-bold uppercase tracking-wider transition-all px-4",
+    isActive 
+      ? activeColor 
+      : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+  );
 
 export default function IssuesPage() {
   const router = useRouter();
@@ -459,11 +468,11 @@ export default function IssuesPage() {
           </Select>
         </div>
 
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+        <div className="flex items-center gap-3 pt-5 border-t border-slate-100 overflow-x-auto scrollbar-hide pb-1">
           <Select value={severityFilter} onValueChange={setSeverityFilter}>
-            <SelectTrigger className="w-[140px] h-8 bg-slate-50 border-none rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <SelectTrigger className={getFilterStyles(severityFilter !== "all", "bg-red-50 text-red-600 ring-1 ring-red-200")}>
               <div className="flex items-center gap-2">
-                <Filter className="h-3 w-3 text-slate-400 shrink-0" />
+                <Filter className="h-3 w-3 shrink-0" />
                 <SelectValue placeholder="Severity" />
               </div>
             </SelectTrigger>
@@ -472,11 +481,11 @@ export default function IssuesPage() {
               {data.filters.severities.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
-
+ 
           <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
-            <SelectTrigger className="w-[160px] h-8 bg-slate-50 border-none rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <SelectTrigger className={getFilterStyles(assignedToFilter !== "all")}>
               <div className="flex items-center gap-2">
-                <UserPlus className="h-3 w-3 text-slate-400 shrink-0" />
+                <UserPlus className="h-3 w-3 shrink-0" />
                 <SelectValue placeholder="Assigned To" />
               </div>
             </SelectTrigger>
@@ -485,11 +494,11 @@ export default function IssuesPage() {
               {data.filters.teamMembers.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
-
+ 
           <Select value={refundStatusFilter} onValueChange={setRefundStatusFilter}>
-            <SelectTrigger className="w-[160px] h-8 bg-slate-50 border-none rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <SelectTrigger className={getFilterStyles(refundStatusFilter !== "all")}>
               <div className="flex items-center gap-2">
-                <IndianRupee className="h-3 w-3 text-slate-400 shrink-0" />
+                <IndianRupee className="h-3 w-3 shrink-0" />
                 <SelectValue placeholder="Refund Status" />
               </div>
             </SelectTrigger>

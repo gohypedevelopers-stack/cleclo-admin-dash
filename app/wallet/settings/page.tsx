@@ -10,23 +10,46 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { adminWalletApi } from "@/lib/admin-api";
 
+type WalletReward = {
+  id: string;
+  ruleType?: string;
+  rewardMode: string;
+  rewardValue: number;
+  minRechargeValue?: number;
+  isActive: boolean;
+};
+
+type LiabilitySummary = {
+  totalLiability: number;
+  promotionalLiability: number;
+  cashLiability: number;
+};
+
+const formatMoney = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString("en-IN")}`;
+
 export default function WalletSettingsPage() {
   const isWalletSectionEnabled = true;
 
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [liability, setLiability] = useState<LiabilitySummary>({
+    totalLiability: 0,
+    promotionalLiability: 0,
+    cashLiability: 0,
+  });
   const [settings, setSettings] = useState({
     minAddAmount: 100,
     maxAddAmount: 10000,
     bonusEnabled: true,
-    bonuses: [] as any[],
+    bonuses: [] as WalletReward[],
   });
   const loadBackend = async () => {
     try {
       setLoading(true);
-      const [config, rewards] = await Promise.all([
+      const [config, rewards, liabilitySummary] = await Promise.all([
         adminWalletApi.getConfig(),
-        adminWalletApi.getRewards()
+        adminWalletApi.getRewards(),
+        adminWalletApi.getLiabilitySummary()
       ]);
       
       setSettings({
@@ -34,6 +57,11 @@ export default function WalletSettingsPage() {
         maxAddAmount: config?.maxAddAmount || 10000,
         bonusEnabled: config?.bonusEnabled ?? true,
         bonuses: rewards || [],
+      });
+      setLiability({
+        totalLiability: liabilitySummary?.totalLiability || 0,
+        promotionalLiability: liabilitySummary?.promotionalLiability || 0,
+        cashLiability: liabilitySummary?.cashLiability || 0,
       });
     } catch (e) {
       console.error("Failed to load wallet config", e);
@@ -90,7 +118,7 @@ export default function WalletSettingsPage() {
   };
 
   const activeBonuses = settings.bonuses.filter((b) => b.isActive);
-  const totalPotentialBonus = settings.bonuses.reduce(
+  const totalRewardValue = settings.bonuses.reduce(
     (sum, b) => sum + (b.rewardValue || 0),
     0
   );
@@ -164,13 +192,13 @@ export default function WalletSettingsPage() {
         ) : (
             <>
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="bg-white rounded-2xl border p-5 text-center">
                     <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-2">
                     <Wallet className="h-5 w-5 text-blue-600" />
                     </div>
                     <p className="text-2xl font-bold text-primary">
-                    ₹{settings.minAddAmount}
+                    {formatMoney(settings.minAddAmount)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Min Amount</p>
                 </div>
@@ -179,7 +207,7 @@ export default function WalletSettingsPage() {
                     <TrendingUp className="h-5 w-5 text-green-600" />
                     </div>
                     <p className="text-2xl font-bold text-green-600">
-                    ₹{settings.maxAddAmount}
+                    {formatMoney(settings.maxAddAmount)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Max Amount</p>
                 </div>
@@ -191,6 +219,41 @@ export default function WalletSettingsPage() {
                     {activeBonuses.length}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Active Bonuses</p>
+                </div>
+                <div className="bg-white rounded-2xl border p-5 text-center">
+                    <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-2">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                    {totalRewardValue}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Reward Value</p>
+                </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-slate-900">
+                    <Wallet className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                    <h2 className="text-lg font-bold text-black">Wallet Liability</h2>
+                    <p className="text-sm text-slate-500">Outstanding cash and promotional balances</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Total</p>
+                    <p className="mt-1 text-xl font-bold text-slate-950">{formatMoney(liability.totalLiability)}</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Cash</p>
+                    <p className="mt-1 text-xl font-bold text-slate-950">{formatMoney(liability.cashLiability)}</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Promotional</p>
+                    <p className="mt-1 text-xl font-bold text-slate-950">{formatMoney(liability.promotionalLiability)}</p>
+                    </div>
                 </div>
                 </div>
 
@@ -210,10 +273,10 @@ export default function WalletSettingsPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
-                    <Label className="text-slate-600">Minimum Amount (₹)</Label>
+                    <Label className="text-slate-600">Minimum Amount (Rs.)</Label>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-                        ₹
+                        Rs.
                         </span>
                         <Input
                         type="number"
@@ -224,16 +287,16 @@ export default function WalletSettingsPage() {
                             minAddAmount: parseInt(e.target.value) || 0,
                             }))
                         }
-                        className="pl-8 h-12 text-lg font-semibold"
+                        className="pl-12 h-12 text-lg font-semibold"
                         />
                     </div>
                     </div>
 
                     <div className="space-y-2">
-                    <Label className="text-slate-600">Maximum Amount (₹)</Label>
+                    <Label className="text-slate-600">Maximum Amount (Rs.)</Label>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-                        ₹
+                        Rs.
                         </span>
                         <Input
                         type="number"
@@ -244,7 +307,7 @@ export default function WalletSettingsPage() {
                             maxAddAmount: parseInt(e.target.value) || 0,
                             }))
                         }
-                        className="pl-8 h-12 text-lg font-semibold"
+                        className="pl-12 h-12 text-lg font-semibold"
                         />
                     </div>
                     </div>
@@ -292,16 +355,16 @@ export default function WalletSettingsPage() {
                                 Add
                             </p>
                             <p className="text-xl font-bold text-black">
-                                ₹{bonus.minRechargeValue}+
+                                {formatMoney(bonus.minRechargeValue || 0)}+
                             </p>
                             </div>
-                            <div className="text-3xl text-slate-300">→</div>
+                            <div className="text-3xl text-slate-300">{"->"}</div>
                             <div className="text-center min-w-[80px]">
                             <p className="text-xs text-slate-500 uppercase tracking-wide">
                                 Get
                             </p>
                             <p className="text-xl font-bold text-green-600">
-                                {bonus.rewardMode === 'percentage' ? `${bonus.rewardValue}%` : `+₹${bonus.rewardValue}`}
+                                {bonus.rewardMode === 'percentage' ? `${bonus.rewardValue}%` : `+${formatMoney(bonus.rewardValue)}`}
                             </p>
                             </div>
                             <Badge
@@ -333,9 +396,6 @@ export default function WalletSettingsPage() {
                 )}
                 </div>
 
-                </div>
-                </div>
-
                 {/* Preview */}
                 <div className="relative overflow-hidden bg-gradient-to-br from-[#3E8940] via-[#4A9F4D] to-[#5FAD61] rounded-2xl p-6 text-white shadow-xl shadow-green-200/50">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -355,11 +415,11 @@ export default function WalletSettingsPage() {
                                 <Gift className="h-4 w-4" />
                             </div>
                             <span className="font-medium">
-                                Add ₹{bonus.minRechargeValue}+
+                                Add {formatMoney(bonus.minRechargeValue || 0)}+
                             </span>
                             </div>
                             <Badge className="bg-white/25 text-white border-none font-bold">
-                            {bonus.rewardMode === 'percentage' ? `+${bonus.rewardValue}% Extra` : `+₹${bonus.rewardValue} Extra`}
+                            {bonus.rewardMode === 'percentage' ? `+${bonus.rewardValue}% Extra` : `+${formatMoney(bonus.rewardValue)} Extra`}
                             </Badge>
                         </div>
                         ))}

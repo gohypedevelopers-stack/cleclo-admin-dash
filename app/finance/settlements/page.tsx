@@ -85,6 +85,12 @@ interface SettlementRecord {
   vendorName: string;
   vendorPhone: string;
   period: string;
+  settlementCycle?: string;
+  daysPending: number;
+  paymentMode: string;
+  isAutoReconciled: boolean;
+  taxDeducted: number;
+  hasRisk: boolean;
   orderCount: number;
   grossAmount: number;
   commissionRate: number;
@@ -100,13 +106,30 @@ interface SettlementRecord {
   createdAt: string;
 }
 
+type RawSettlementRecord = SettlementRecord & {
+  amount?: number;
+  penalties?: number;
+  refundAdjustments?: number;
+  vendor?: {
+    vendorProfile?: {
+      businessName?: string;
+    };
+    name?: string;
+    phone?: string;
+  };
+};
+
 interface SettlementStats {
   totalPending: number;
   totalPaid: number;
   totalCommission: number;
   avgCommissionRate: number;
   settlementCount: number;
+  upcomingForecast: number;
+  failedCount: number;
 }
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Unexpected error";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -153,8 +176,8 @@ export default function SettlementsPage() {
       ]);
       if (!settRes.ok) throw new Error("Failed to load settlements");
       const settData = await settRes.json();
-      const rawArray = Array.isArray(settData) ? settData : settData.settlements || [];
-      const mappedArray = rawArray.map((s: any) => ({
+      const rawArray = (Array.isArray(settData) ? settData : settData.settlements || []) as RawSettlementRecord[];
+      const mappedArray = rawArray.map((s) => ({
         ...s,
         netPayout: s.amount ?? s.netPayout ?? 0,
         commissionRate: s.commissionRate ?? (s.grossAmount ? Math.round((s.commissionAmount / s.grossAmount) * 100) : 0),
@@ -172,8 +195,8 @@ export default function SettlementsPage() {
       if (statsRes.ok) {
         setStats(await statsRes.json());
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -218,8 +241,8 @@ export default function SettlementsPage() {
       toast.success("Settlement marked as paid");
       setConfirmPayId(null);
       fetchSettlements();
-    } catch (err: any) {
-      toast.error("Failed", { description: err.message });
+    } catch (err: unknown) {
+      toast.error("Failed", { description: getErrorMessage(err) });
     } finally {
       setActionLoading(null);
     }
@@ -370,7 +393,7 @@ export default function SettlementsPage() {
                 <TableCell className="w-10 pl-4"><input type="checkbox" className="rounded border-slate-300" /></TableCell>
                 <TableCell className="py-4">
                   <p className="font-bold text-slate-900 text-xs">{s.transactionId || s.id.slice(0, 8).toUpperCase()}</p>
-                  <p className="text-[9px] text-slate-400 capitalize">{s.settlementCycle} Cycle</p>
+                  <p className="text-[9px] text-slate-400 capitalize">{s.settlementCycle || "standard"} Cycle</p>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -382,8 +405,8 @@ export default function SettlementsPage() {
                 <TableCell>
                   <p className="text-slate-600 text-xs">{s.period || formatDate(s.createdAt)}</p>
                   {s.status.toLowerCase() === "pending" && (
-                    <p className={`text-[9px] font-bold mt-0.5 ${s.daysPending > 7 ? 'text-red-500' : s.daysPending > 3 ? 'text-orange-500' : 'text-slate-400'}`}>
-                      {s.daysPending > 0 ? `Pending ${s.daysPending} days` : 'Added today'}
+                    <p className={`text-[9px] font-bold mt-0.5 ${(s.daysPending ?? 0) > 7 ? 'text-red-500' : (s.daysPending ?? 0) > 3 ? 'text-orange-500' : 'text-slate-400'}`}>
+                      {(s.daysPending ?? 0) > 0 ? `Pending ${s.daysPending ?? 0} days` : 'Added today'}
                       {s.daysPending > 7 && ' ⚠️'}
                     </p>
                   )}
