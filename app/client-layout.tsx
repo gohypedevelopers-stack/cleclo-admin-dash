@@ -86,7 +86,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           )}
         >
           <AdminHeader />
-          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5">{children}</main>
         </div>
       </div>
     </AuthGate>

@@ -19,11 +19,12 @@ const formatINR = (a: number) => new Intl.NumberFormat("en-IN", { style: "curren
 const formatDate = (d: string) => { try { return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch { return d; } };
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "PAID": case "Completed": return <Badge className="bg-green-100 text-green-700 border-none font-medium gap-1.5 hover:bg-green-100 text-xs"><CheckCircle className="h-3 w-3" />Completed</Badge>;
-    case "PENDING": case "Processing": return <Badge className="bg-amber-100 text-amber-700 border-none font-medium gap-1.5 hover:bg-amber-100 text-xs"><Clock className="h-3 w-3" />Pending</Badge>;
-    case "FAILED": case "Failed": return <Badge className="bg-red-100 text-red-700 border-none font-medium gap-1.5 hover:bg-red-100 text-xs"><XCircle className="h-3 w-3" />Failed</Badge>;
-    default: return <Badge variant="secondary" className="text-xs">{status}</Badge>;
+  const s = String(status || "").toLowerCase();
+  switch (s) {
+    case "paid": case "completed": return <Badge className="bg-green-100 text-green-700 border-none font-medium gap-1.5 hover:bg-green-100 text-xs"><CheckCircle className="h-3 w-3" />Completed</Badge>;
+    case "pending": case "processing": return <Badge className="bg-amber-100 text-amber-700 border-none font-medium gap-1.5 hover:bg-amber-100 text-xs"><Clock className="h-3 w-3" />Pending</Badge>;
+    case "failed": return <Badge className="bg-red-100 text-red-700 border-none font-medium gap-1.5 hover:bg-red-100 text-xs"><XCircle className="h-3 w-3" />Failed</Badge>;
+    default: return <Badge variant="secondary" className="text-xs uppercase">{status}</Badge>;
   }
 };
 
@@ -52,12 +53,12 @@ export default function VendorPaymentsPage() {
     const vendor = p.vendor?.vendorProfile?.businessName || p.vendor?.name || "";
     const match = !searchQuery || vendor.toLowerCase().includes(q) || p.id?.toLowerCase().includes(q);
     if (statusFilter === "all") return match;
-    return match && p.status === statusFilter;
+    return match && String(p.status).toLowerCase() === statusFilter.toLowerCase();
   }), [payments, searchQuery, statusFilter]);
 
-  const totalPaid = payments.filter(p => p.status === "PAID").reduce((s, p) => s + (p.amount || 0), 0);
-  const totalPending = payments.filter(p => p.status === "PENDING").reduce((s, p) => s + (p.amount || 0), 0);
-  const failedCount = payments.filter(p => p.status === "FAILED").length;
+  const totalPaid = payments.filter(p => String(p.status).toLowerCase() === "paid").reduce((s, p) => s + (p.amount || 0), 0);
+  const totalPending = payments.filter(p => ["pending", "processing"].includes(String(p.status).toLowerCase())).reduce((s, p) => s + (p.amount || 0), 0);
+  const failedCount = payments.filter(p => String(p.status).toLowerCase() === "failed").length;
 
   if (isLoading && payments.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading payments...</p></div>;
 

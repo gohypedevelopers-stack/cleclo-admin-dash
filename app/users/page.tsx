@@ -414,18 +414,18 @@ function UsersPageContent() {
         <div className="px-6 py-4 border-b bg-slate-50/30 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{roleFilter === "customer" ? "Customer" : "User"} List</h2>
         </div>
-        <div className="overflow-x-auto">
-          <Table className="min-w-[1000px]">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+          <Table className="min-w-[1000px] w-full table-fixed">
           <TableHeader>
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400">Customer</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Contact Info</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Role</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Status</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Orders</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Total Spent</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400">Joined</TableHead>
-              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400">Actions</TableHead>
+              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[20%]">Customer</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[18%]">Contact Info</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Role</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Status</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Orders</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Total Spent</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Joined</TableHead>
+              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -440,7 +440,7 @@ function UsersPageContent() {
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 border shadow-sm">
-                          <AvatarImage src={(user as any).image} className="object-cover" />
+                          <AvatarImage src={(user as any).image || null} className="object-cover" />
                           <AvatarFallback className={`font-bold ${
                             user.role === "vendor" ? "bg-orange-50 text-orange-600" :
                             user.role === "rider" ? "bg-purple-50 text-purple-600" :
@@ -605,7 +605,7 @@ function UsersPageContent() {
               <Label>Profile Picture</Label>
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-slate-100 shadow-sm">
-                  <AvatarImage src={newUser.image} className="object-cover" />
+                  <AvatarImage src={newUser.image || null} className="object-cover" />
                   <AvatarFallback className="bg-slate-50 text-slate-400">
                     <User className="h-8 w-8" />
                   </AvatarFallback>

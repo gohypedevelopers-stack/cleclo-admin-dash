@@ -387,11 +387,34 @@ export default function AdminDashboardPage() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {data.kpis.map((kpi) => {
           const accent = ACCENT_COLORS[kpi.accent] || ACCENT_COLORS.slate;
-          const IconComponent = KPI_ICONS[kpi.key] || Activity;
+          // Mapping KPI keys to application routes with optional status filtering
+          const getRedirectUrl = (key: string) => {
+            const k = key.toLowerCase();
+            if (k.includes("order")) {
+              if (k.includes("pending")) return "/orders?status=pending";
+              if (k.includes("delay")) return "/orders?status=delayed";
+              return "/orders";
+            }
+            if (k.includes("issue")) return "/issues?status=open";
+            if (k.includes("vendor")) {
+              if (k.includes("active")) return "/vendors?status=active";
+              if (k.includes("pending")) return "/vendors?status=pending";
+              return "/vendors";
+            }
+            if (k.includes("customer")) return "/users?role=customer";
+            if (k.includes("rider")) return "/riders";
+            if (k.includes("revenue") || k.includes("payout") || k.includes("commission")) return "/finance/settlements";
+            if (k.includes("aov") || k.includes("average")) return "/analytics";
+            return null;
+          };
+
+          const redirectUrl = getRedirectUrl(kpi.key);
+
           return (
             <div
               key={kpi.key}
-              className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group"
+              className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group ${redirectUrl ? "cursor-pointer" : ""}`}
+              onClick={() => redirectUrl && router.push(redirectUrl)}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className={`p-2.5 rounded-xl ${accent.bg} group-hover:scale-110 transition-transform duration-300`}>
@@ -403,9 +426,14 @@ export default function AdminDashboardPage() {
                 <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
                   {kpi.value}
                 </h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
-                  {kpi.title}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
+                    {kpi.title}
+                  </p>
+                  {redirectUrl && (
+                    <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-[#3E8940] transition-colors" />
+                  )}
+                </div>
                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">{kpi.note}</p>
               </div>
             </div>

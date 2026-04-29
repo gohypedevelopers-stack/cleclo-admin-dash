@@ -156,7 +156,7 @@ export default function VendorDetailPage() {
             <div className="px-6 pb-6 -mt-10 relative z-10">
               <div className="relative group w-20 h-20">
                 <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
-                  <AvatarImage src={vendor.image} className="object-cover" />
+                  <AvatarImage src={vendor.image || null} className="object-cover" />
                   <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">{displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <label className="absolute -bottom-1 -right-1 h-8 w-8 bg-[#3E8940] text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform opacity-0 group-hover:opacity-100">

@@ -253,7 +253,7 @@ function ProfileDetailsCard() {
           <div className="flex flex-col items-center gap-4">
             <div className="relative group">
               <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
-                <AvatarImage src={formData.image} className="object-cover" />
+                <AvatarImage src={formData.image || null} className="object-cover" />
                 <AvatarFallback className="bg-slate-100 text-slate-400 text-3xl font-bold">
                   {formData.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>

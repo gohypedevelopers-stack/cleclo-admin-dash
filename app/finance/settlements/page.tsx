@@ -249,7 +249,61 @@ export default function SettlementsPage() {
   };
 
   const handleExport = () => {
+    if (settlements.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+    
     toast.success("Export started", { description: "Settlement report will be downloaded shortly." });
+    
+    const csvHeader = [
+      "Settlement ID",
+      "Vendor Name",
+      "Vendor Phone",
+      "Period",
+      "Cycle",
+      "Gross Amount",
+      "Commission Amount",
+      "Commission Rate",
+      "Tax Deducted",
+      "Deductions/Penalties",
+      "Net Payout",
+      "Status",
+      "Payment Mode",
+      "Transaction ID",
+      "Created At"
+    ].join(",");
+
+    const csvRows = settlements.map(s => {
+      return [
+        s.id,
+        `"${s.vendorName.replace(/"/g, '""')}"`,
+        s.vendorPhone,
+        `"${(s.period || "").replace(/"/g, '""')}"`,
+        s.settlementCycle || "Weekly",
+        s.grossAmount,
+        s.commissionAmount,
+        `${s.commissionRate}%`,
+        s.taxDeducted,
+        s.deductions,
+        s.netPayout,
+        s.status,
+        s.paymentMode,
+        s.transactionId || "—",
+        new Date(s.createdAt).toLocaleString()
+      ].join(",");
+    });
+
+    const csvContent = [csvHeader, ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `settlements_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Compute stats dynamically from the mapped data to ensure accuracy
@@ -474,7 +528,33 @@ export default function SettlementsPage() {
                         <Eye className="mr-2 h-4 w-4 text-slate-400" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-xs cursor-pointer font-medium text-blue-600">
+                      <DropdownMenuItem 
+                        className="text-xs cursor-pointer font-medium text-blue-600"
+                        onClick={() => {
+                          const csvHeader = "Field,Value\n";
+                          const data = [
+                            ["Settlement ID", s.id],
+                            ["Vendor", s.vendorName],
+                            ["Phone", s.vendorPhone],
+                            ["Period", s.period || "—"],
+                            ["Cycle", s.settlementCycle || "Weekly"],
+                            ["Gross Amount", s.grossAmount],
+                            ["Commission Amount", s.commissionAmount],
+                            ["Tax (GST/TDS)", s.taxDeducted],
+                            ["Penalties", s.deductions],
+                            ["Net Payout", s.netPayout],
+                            ["Status", s.status],
+                            ["Date", new Date(s.createdAt).toLocaleString()]
+                          ].map(row => row.join(",")).join("\n");
+                          
+                          const blob = new Blob([csvHeader + data], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `invoice_${s.id.slice(0, 8)}.csv`;
+                          link.click();
+                        }}
+                      >
                         <FileText className="mr-2 h-4 w-4" />
                         Download Invoice
                       </DropdownMenuItem>

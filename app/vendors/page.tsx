@@ -59,6 +59,8 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 
+import { useSearchParams } from "next/navigation";
+
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 
@@ -126,11 +128,17 @@ const formatDate = (dateStr: string) => {
 
 export default function VendorsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status) setStatusFilter(status);
+  }, [searchParams]);
 
   const fetchVendors = useCallback(async () => {
     setIsLoading(true);
@@ -266,19 +274,35 @@ export default function VendorsPage() {
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "Total Vendors", value: vendors.length, color: "text-slate-700", bg: "bg-slate-50", icon: Store },
-          { label: "Active", value: totalActive, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
-          { label: "Pending Approval", value: totalPending, color: "text-amber-600", bg: "bg-amber-50", icon: Clock },
-          { label: "Suspended", value: totalSuspended, color: "text-red-600", bg: "bg-red-50", icon: Ban },
+          { label: "Total Vendors", value: vendors.length, filter: "all", color: "bg-[#2170FF]", icon: Store, note: "From live database" },
+          { label: "Active Vendors", value: totalActive, filter: "active", color: "bg-[#00B633]", icon: CheckCircle, note: "Approved & unblocked" },
+          { label: "Pending Review", value: totalPending, filter: "pending", color: "bg-[#FF8A00]", icon: Clock, note: "Needs attention" },
+          { label: "Blocked", value: totalSuspended, filter: "suspended", color: "bg-[#FF002E]", icon: Ban, note: "Suspended" },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <div className={`p-2 rounded-xl ${stat.bg}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+          <div 
+            key={stat.label} 
+            className={`${stat.color} rounded-2xl shadow-lg p-6 hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden text-white`}
+            onClick={() => setStatusFilter(stat.filter)}
+          >
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">{stat.label}</p>
+                <div className="bg-white/20 p-2 rounded-full backdrop-blur-md">
+                  <stat.icon className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <p className="text-4xl font-bold mb-2">{stat.value}</p>
+              <div className="flex items-center gap-1.5 opacity-80">
+                {stat.label === "Active Vendors" ? <Zap className="h-3 w-3" /> : stat.label === "Pending Review" ? <Clock className="h-3 w-3" /> : stat.label === "Blocked" ? <Ban className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
+                <p className="text-[10px] font-medium">{stat.note}</p>
               </div>
             </div>
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">{stat.label}</p>
+            {/* Glossy overlay effect */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+            
+            {statusFilter === stat.filter && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/40" />
+            )}
           </div>
         ))}
       </div>

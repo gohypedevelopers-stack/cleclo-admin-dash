@@ -103,7 +103,10 @@ export default function RidersAllPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border p-4">
+        <div 
+          className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${filterType === "all" ? "ring-2 ring-[#3E8940]" : ""}`}
+          onClick={() => setFilterType("all")}
+        >
           <p className="text-2xl font-bold text-slate-700">{riders.length}</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Fleet</p>
           <p className="text-xs text-slate-500 mt-0.5">{activeCount} active</p>
@@ -116,7 +119,10 @@ export default function RidersAllPage() {
           <p className="text-2xl font-bold text-emerald-600">{avgHealth}/100</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Avg Fleet Health</p>
         </div>
-        <div className={`rounded-xl border p-4 ${highRisk > 0 ? "bg-red-50 border-red-200" : "bg-white"}`}>
+        <div 
+          className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${highRisk > 0 ? (filterType === "blocked" ? "ring-2 ring-red-500 bg-red-50 border-red-200" : "bg-red-50 border-red-200") : "bg-white"}`}
+          onClick={() => setFilterType("blocked")}
+        >
           <p className={`text-2xl font-bold ${highRisk > 0 ? "text-red-600" : "text-emerald-600"}`}>{highRisk}</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">At-Risk Riders</p>
           {highRisk > 0 && <p className="text-[10px] text-red-500 font-bold mt-0.5">⚠️ Needs attention</p>}
@@ -129,26 +135,26 @@ export default function RidersAllPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[1200px]">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+          <Table className="min-w-[850px] w-full table-fixed">
             <TableHeader><TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Rider</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">City/Zone</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Deliveries</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Earnings</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">On-Time %</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Cancel %</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Rating</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Health Score</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Actions</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-4 tracking-wider w-[18%]">Rider</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider w-[12%]">City/Zone</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[10%]">Deliveries</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[10%]">Earnings</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[9%]">On-Time</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[9%]">Cancel</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[8%]">Rating</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[11%]">Health</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center w-[9%]">Status</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-4 tracking-wider w-[4%]"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {filtered.length > 0 ? filtered.map((r) => {
               const health = getRiderHealth(r);
               return (
               <TableRow key={r.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/rider/${r.id}`)}>
-                <TableCell className="py-4 pl-6">
+                <TableCell className="py-4 pl-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-purple-100 text-purple-700 font-bold text-xs">{(r.name || "?").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
                     <div>
@@ -184,13 +190,13 @@ export default function RidersAllPage() {
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge className={`${health.color} border-none font-bold text-[10px] px-2 py-0.5`}>
-                    {health.emoji} {health.score}/100
+                    {health.score}/100
                   </Badge>
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge variant="outline" className={`border-none font-bold text-[10px] ${r.isBlocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>{r.isBlocked ? "Blocked" : "Active"}</Badge>
                 </TableCell>
-                <TableCell className="text-right pr-6">
+                <TableCell className="text-right pr-4">
                   <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="rounded-xl">
                       <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/rider/${r.id}`); }}><Eye className="h-4 w-4" /> View Details</DropdownMenuItem>
