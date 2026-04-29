@@ -160,7 +160,7 @@ export default function RiderDashboardPage() {
 
       {/* Quick Stats Row */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer" onClick={() => router.push("/rider/all")}>
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer" onClick={() => router.push("/riders")}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -295,7 +295,7 @@ export default function RiderDashboardPage() {
               </div>
               <CardTitle className="text-sm font-bold text-slate-800">Recent Joiners</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" className="text-xs text-[#3E8940] hover:bg-green-50" onClick={() => router.push("/rider/all")}>
+            <Button variant="ghost" size="sm" className="text-xs text-[#3E8940] hover:bg-green-50" onClick={() => router.push("/riders")}>
               View All <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </CardHeader>

@@ -30,6 +30,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Download, CreditCard, ArrowUpRight, ArrowDownLeft, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Eye, Loader2, AlertTriangle, RefreshCw, IndianRupee } from "lucide-react";
+import { Search, Filter, Download, CreditCard, ArrowUpRight, ArrowDownLeft, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Eye, Loader2, AlertTriangle, RefreshCw, IndianRupee, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,10 @@ export default function VendorPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const fetchPayments = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
@@ -55,6 +59,17 @@ export default function VendorPaymentsPage() {
     if (statusFilter === "all") return match;
     return match && String(p.status).toLowerCase() === statusFilter.toLowerCase();
   }), [payments, searchQuery, statusFilter]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
 
   const totalPaid = payments.filter(p => String(p.status).toLowerCase() === "paid").reduce((s, p) => s + (p.amount || 0), 0);
   const totalPending = payments.filter(p => ["pending", "processing"].includes(String(p.status).toLowerCase())).reduce((s, p) => s + (p.amount || 0), 0);
@@ -95,7 +110,7 @@ export default function VendorPaymentsPage() {
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 text-right pr-6">Action</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length > 0 ? filtered.map((p) => {
+            {paginated.length > 0 ? paginated.map((p) => {
               const vendor = p.vendor?.vendorProfile?.businessName || p.vendor?.name || "Unknown";
               return (
                 <TableRow key={p.id} className="hover:bg-slate-50">
@@ -110,7 +125,57 @@ export default function VendorPaymentsPage() {
             }) : <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">{error || "No payments found."}</TableCell></TableRow>}
           </TableBody>
         </Table>
-        <div className="flex items-center justify-between p-4 border-t"><p className="text-sm text-slate-500">Showing {filtered.length} of {payments.length}</p></div>
+        <div className="flex items-center justify-between p-4 border-t bg-[#fbfbfb]/50">
+          <p className="text-sm text-slate-500">
+            Showing <span className="font-bold text-slate-700">{filtered.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to <span className="font-bold text-slate-700">{Math.min(currentPage * itemsPerPage, filtered.length)}</span> of <span className="font-bold text-slate-700">{filtered.length}</span> payments
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 rounded-lg"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    className={`h-8 w-8 p-0 rounded-lg text-xs font-bold ${currentPage === pageNum ? "bg-[#3E8940] hover:bg-[#3E8940]/90" : ""}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 rounded-lg"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

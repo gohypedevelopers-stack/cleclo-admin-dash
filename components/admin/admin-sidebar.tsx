@@ -22,6 +22,9 @@ import {
   Bike,
   User,
   AlertTriangle,
+  BarChart3,
+  ShieldCheck,
+  MapPin,
 } from "lucide-react";
 
 interface NavItem {
@@ -88,29 +91,29 @@ const managementItems: NavItem[] = [
     icon: Store,
     subItems: [
       {
-        title: "All",
+        title: "Overview",
         href: "/vendor",
-        icon: Users,
+        icon: LayoutDashboard,
       },
       {
-        title: "Vendors",
+        title: "Vendor Performance",
         href: "/vendor/all",
-        icon: Users,
+        icon: BarChart3,
       },
       {
         title: "New verification",
         href: "/vendor/verification",
-        icon: Store,
+        icon: ShieldCheck,
       },
       {
         title: "Outlets",
         href: "/vendor/outlets",
-        icon: Bike,
+        icon: MapPin,
       },
       {
         title: "Vendor analytics",
         href: "/vendor/analytics",
-        icon: Bike,
+        icon: BarChart3,
       },
       {
         title: "Payments",
@@ -120,7 +123,7 @@ const managementItems: NavItem[] = [
       {
         title: "Support",
         href: "/vendor/support",
-        icon: Bike,
+        icon: Headphones,
       },
     ],
   },
@@ -130,25 +133,24 @@ const managementItems: NavItem[] = [
     icon: Bike,
     subItems: [
       {
-        title: "All",
+        title: "Overview",
         href: "/rider",
-        icon: Users,
+        icon: LayoutDashboard,
       },
       {
-        title: "Riders",
-        href: "/rider/all",
+        title: "Fleet Intelligence",
+        href: "/riders",
         icon: Users,
       },
       {
         title: "New verification",
         href: "/rider/verification",
-        icon: Store,
+        icon: ShieldCheck,
       },
-
       {
         title: "Rider analytics",
         href: "/rider/analytics",
-        icon: Bike,
+        icon: BarChart3,
       },
       {
         title: "Payments",
@@ -158,7 +160,7 @@ const managementItems: NavItem[] = [
       {
         title: "Support",
         href: "/rider/support",
-        icon: Bike,
+        icon: Headphones,
       },
     ],
   },
