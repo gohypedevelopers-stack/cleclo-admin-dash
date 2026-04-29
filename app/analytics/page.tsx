@@ -40,8 +40,9 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { dashboardApi, type DashboardOverview } from "@/lib/dashboard-api";
+import { exportToCSV } from "@/lib/csv-export";
 import { toast } from "sonner";
 
 const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
@@ -57,30 +58,80 @@ export default function AnalyticsPage() {
   const [categoryData, setCategoryData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [customerGrowthData, setCustomerGrowthData] = useState<{ name: string; new: number; returning: number }[]>([]);
   const [totalOrders, setTotalOrders] = useState<number | null>(null);
+  const [timeRange, setTimeRange] = useState("this_year");
+
+  const fetchAnalytics = useCallback(async (range: string = "this_year", isPolling = false) => {
+    try {
+      if (!isPolling) setLoading(true);
+
+      // Fetch overview and analytics independently so one failure doesn't break both
+      let overviewRes: DashboardOverview | null = null;
+      let analyticsRes: any = null;
+
+      try {
+        overviewRes = await dashboardApi.getOverview({ period: range });
+      } catch (err) {
+        console.error("Overview fetch error:", err);
+        if (!isPolling) toast.error("Failed to load dashboard overview");
+      }
+
+      try {
+        analyticsRes = await dashboardApi.getAnalytics();
+      } catch (err) {
+        console.error("Analytics fetch error:", err);
+        // Analytics is optional — don't toast on failure
+      }
+
+      if (overviewRes) setData(overviewRes);
+      if (analyticsRes) {
+        setRevenueData(analyticsRes.revenueData || []);
+        setCategoryData(analyticsRes.serviceData || []);
+        setCustomerGrowthData(analyticsRes.customerGrowthData || []);
+        setTotalOrders(analyticsRes.totalOrders ?? null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function loadAll() {
-      try {
-        setLoading(true);
-        const [overviewRes, analyticsRes] = await Promise.all([
-          dashboardApi.getOverview({ period: "this_year" }),
-          fetch(`${ORDER_API_URL}/analytics`, { headers: getAuthHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null),
-        ]);
-        setData(overviewRes);
-        if (analyticsRes) {
-          setRevenueData(analyticsRes.revenueData || []);
-          setCategoryData(analyticsRes.serviceData || []);
-          setCustomerGrowthData(analyticsRes.customerGrowthData || []);
-          setTotalOrders(analyticsRes.totalOrders ?? null);
-        }
-      } catch (err) {
-        toast.error("Failed to load analytics");
-      } finally {
-        setLoading(false);
-      }
+    fetchAnalytics(timeRange, false);
+    
+    const interval = setInterval(() => {
+      fetchAnalytics(timeRange, true);
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [fetchAnalytics, timeRange]);
+
+  const handleExport = () => {
+    if (!data) return;
+    try {
+      const exportData = [
+        ...revenueData.map(r => ({
+          Category: "Revenue Over Time",
+          Label: r.name,
+          Value: r.revenue,
+          Orders: r.orders
+        })),
+        ...categoryData.map(c => ({
+          Category: "Service Distribution",
+          Label: c.name,
+          Value: c.value
+        })),
+        ...data.kpis.map(k => ({
+          Category: "KPI Summary",
+          Label: k.title,
+          Value: k.value,
+          Note: k.note
+        }))
+      ];
+      exportToCSV(exportData, `analytics_report_${timeRange}_${new Date().toISOString().split('T')[0]}`);
+      toast.success("CSV report generated");
+    } catch (err) {
+      toast.error("Failed to generate report");
     }
-    loadAll();
-  }, []);
+  };
 
   const getKpi = (key: string, fallback: string | number) => {
     if (!data) return fallback;
@@ -116,7 +167,7 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select defaultValue="this_year">
+          <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[140px] bg-white border-slate-200">
               <Calendar className="w-4 h-4 mr-2 text-slate-500" />
               <SelectValue placeholder="Select Range" />
@@ -127,7 +178,11 @@ export default function AnalyticsPage() {
               <SelectItem value="this_year">This Year</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="gap-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+          <Button 
+            className="gap-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+            onClick={handleExport}
+            disabled={!data || loading}
+          >
             <Download className="h-4 w-4" /> Export
           </Button>
         </div>
@@ -351,7 +406,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* User Growth Bar Chart */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <Card className="border-slate-100 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-slate-900">
@@ -399,36 +454,6 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#3E8940] text-white border-none shadow-md overflow-hidden relative">
-          <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute -left-10 -bottom-10 w-64 h-64 bg-black/10 rounded-full blur-3xl"></div>
-
-          <CardHeader className="relative z-10">
-            <CardTitle className="text-2xl font-bold">
-              Premium Plan Insights
-            </CardTitle>
-            <CardDescription className="text-green-100">
-              Upgrade to view predictive analytics and AI-driven
-              recommendations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="relative z-10 mt-8">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-white/10 rounded-xl backdrop-blur-sm">
-                <span>Predicted 30-Day Revenue</span>
-                <span className="font-bold text-xl">₹9.2L</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-white/10 rounded-xl backdrop-blur-sm">
-                <span>Customer Retention Score</span>
-                <span className="font-bold text-xl">94/100</span>
-              </div>
-            </div>
-            <Button className="w-full mt-8 bg-white text-[#3E8940] hover:bg-slate-100 font-bold shadow-lg">
-              Upgrade to Pro
-            </Button>
           </CardContent>
         </Card>
       </div>

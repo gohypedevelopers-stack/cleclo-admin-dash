@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -11,6 +11,8 @@ import {
   Percent,
   Plus,
   Search,
+  Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -827,11 +829,24 @@ export default function MasterItemsPage() {
                 Item Image
               </Label>
               <div 
-                className="mt-1 border-2 border-dashed rounded-lg p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50"
+                className="mt-1 border-2 border-dashed rounded-lg p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 relative group"
                 onClick={() => fileInputRef.current?.click()}
               >
                 {formData.imageUrl ? (
-                    <img src={formData.imageUrl} alt="Preview" className="h-24 object-contain rounded" />
+                    <div className="relative">
+                        <img src={formData.imageUrl} alt="Preview" className="h-24 object-contain rounded shadow-sm border bg-white" />
+                        <button
+                          type="button"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFormData(prev => ({ ...prev, imageUrl: "" }));
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                    </div>
                 ) : (
                     <>
                         <ImageIcon className="h-5 w-5 text-slate-400" />
@@ -988,7 +1003,7 @@ export default function MasterItemsPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex items-center gap-3 sm:justify-end">
             <Button
               variant="ghost"
               className="text-slate-500"

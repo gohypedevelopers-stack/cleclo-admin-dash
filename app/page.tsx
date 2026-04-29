@@ -232,6 +232,13 @@ export default function AdminDashboardPage() {
   React.useEffect(() => {
     fetchDashboard();
     setCurrentPage(1);
+
+    // Add polling interval for dynamic updates
+    const interval = setInterval(() => {
+      fetchDashboard();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
   }, [fetchDashboard]);
 
   const handleClearFilters = () => {
@@ -339,7 +346,7 @@ export default function AdminDashboardPage() {
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4} className="w-[180px] rounded-xl border-slate-200 shadow-xl">
               {data.filters.timeRangeOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value === "this_week" ? "week" : opt.value === "this_month" ? "month" : opt.value} className="rounded-lg">
+                <SelectItem key={opt.value} value={opt.value} className="rounded-lg">
                   {opt.label}
                 </SelectItem>
               ))}

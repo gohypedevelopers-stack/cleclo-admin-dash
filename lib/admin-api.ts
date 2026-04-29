@@ -15,7 +15,7 @@ const getAuthHeaders = () => {
     };
 };
 
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 30000;
 
 /** Shared fetch wrapper that redirects to /login on 401 */
 const apiFetch = async (url: string, options?: RequestInit): Promise<Response> => {
@@ -25,6 +25,7 @@ const apiFetch = async (url: string, options?: RequestInit): Promise<Response> =
     try {
         const res = await fetch(url, {
             ...options,
+            cache: 'no-store',
             signal: options?.signal || controller.signal
         });
 

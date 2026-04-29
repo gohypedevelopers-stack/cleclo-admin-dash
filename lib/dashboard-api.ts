@@ -1,4 +1,5 @@
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'http://localhost:3000/api/admin/auth';
+const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || 'http://localhost:3000/api/admin/orders';
 
 const getAuthToken = (): string => {
     if (typeof window === 'undefined') return '';
@@ -10,15 +11,34 @@ const getAuthHeaders = () => ({
     'Authorization': `Bearer ${getAuthToken()}`
 });
 
+const REQUEST_TIMEOUT_MS = 30000;
+
 const apiFetch = async (url: string, options?: RequestInit): Promise<Response> => {
-    const res = await fetch(url, options);
-    if (res.status === 401) {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            localStorage.removeItem('admin_auth_token');
-            window.location.href = '/login';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+        const res = await fetch(url, {
+            ...options,
+            cache: 'no-store',
+            signal: options?.signal || controller.signal
+        });
+
+        if (res.status === 401) {
+            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                localStorage.removeItem('admin_auth_token');
+                window.location.href = '/login';
+            }
         }
+        return res;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new Error(`Request timed out: ${url}`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
     }
-    return res;
 };
 
 export interface DashboardKpi {
@@ -160,7 +180,12 @@ export const dashboardApi = {
 
         const url = `${AUTH_API_URL}/dashboard/overview${query.toString() ? '?' + query.toString() : ''}`;
         const res = await apiFetch(url, { headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to load dashboard data');
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            const msg = errorBody?.error || errorBody?.message || `HTTP ${res.status}`;
+            console.error('[Dashboard getOverview] Error:', res.status, msg);
+            throw new Error(`Dashboard load failed: ${msg}`);
+        }
         return res.json();
     },
 
@@ -169,4 +194,10 @@ export const dashboardApi = {
         if (!res.ok) throw new Error('Failed to load dashboard stats');
         return res.json();
     },
+
+    getAnalytics: async () => {
+        const res = await apiFetch(`${ORDER_API_URL}/analytics`, { headers: getAuthHeaders() });
+        if (!res.ok) return null;
+        return res.json();
+    }
 };

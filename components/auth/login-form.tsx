@@ -71,15 +71,18 @@ export function LoginForm() {
   const [maskedTarget, setMaskedTarget] = React.useState("");
   const [debugOtp, setDebugOtp] = React.useState<string | undefined>(undefined);
   const [resendCooldown, setResendCooldown] = React.useState(0);
-
-  // Last login info
   const [lastLogin, setLastLogin] = React.useState<{
     locationLabel?: string;
     createdAt?: string;
     ipAddress?: string;
   } | null>(null);
 
+  const [mounted, setMounted] = React.useState(false);
   const roleDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close role dropdown when clicking outside
   React.useEffect(() => {
@@ -277,6 +280,8 @@ export function LoginForm() {
       else handleVerifyOtp();
     }
   };
+
+  if (!mounted) return null;
 
   return (
     <motion.div
