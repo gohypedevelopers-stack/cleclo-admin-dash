@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Archive,
@@ -168,12 +169,14 @@ const getSubCategoryName = (item: CatalogItem) =>
   item.subCategory?.name || "No subcategory";
 
 export default function MasterItemsPage() {
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [formData, setFormData] = useState<ItemForm>(emptyForm);
@@ -215,6 +218,10 @@ export default function MasterItemsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   useEffect(() => {
     fetchData();

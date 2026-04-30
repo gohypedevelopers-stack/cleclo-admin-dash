@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { 
   MapPin, 
@@ -69,13 +70,15 @@ type TimeSlot = {
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function LocationsPage() {
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [cities, setCities] = useState<City[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState("cities");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
 
   const [isCityDialogOpen, setIsCityDialogOpen] = useState(false);
   const [isAreaDialogOpen, setIsAreaDialogOpen] = useState(false);
@@ -108,6 +111,10 @@ export default function LocationsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   // --- City Handlers ---
   const openAddCity = () => {

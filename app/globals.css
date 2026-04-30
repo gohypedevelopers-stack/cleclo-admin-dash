@@ -318,6 +318,18 @@
   }
 }
 
+@keyframes admin-search-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-55%);
+  }
+}
+
 /* Animation utility classes */
 .animate-float {
   animation: float 6s ease-in-out infinite;
@@ -338,4 +350,13 @@
 
 .animate-spin-slow {
   animation: spin-slow 20s linear infinite;
+}
+
+.admin-search-marquee {
+  min-width: 100%;
+  animation: admin-search-marquee 14s linear infinite;
+}
+
+.group:focus-within .admin-search-marquee {
+  animation-play-state: paused;
 }

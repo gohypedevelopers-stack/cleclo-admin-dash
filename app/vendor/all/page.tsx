@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, Filter, Users, Star, MapPin, CheckCircle, Clock, Ban, Loader2, AlertTriangle, RefreshCw, Phone, TrendingUp, IndianRupee, ShieldAlert, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,12 @@ const getVendorTier = (v: any) => {
 
 export default function AllVendorsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [vendors, setVendors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
 
   const fetchVendors = useCallback(async () => {
@@ -46,6 +48,10 @@ export default function AllVendorsPage() {
   }, []);
 
   useEffect(() => { fetchVendors(); }, [fetchVendors]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const filtered = useMemo(() => vendors.filter((v) => {
     const name = v.vendorProfile?.businessName || v.name;

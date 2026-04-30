@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   MessageSquare,
   Star,
@@ -95,8 +96,14 @@ const getTypeColor = (type: string) => {
 };
 
 export default function FeedbackPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const filteredFeedbacks = feedbacks.filter((f) => {
     const matchesSearch =

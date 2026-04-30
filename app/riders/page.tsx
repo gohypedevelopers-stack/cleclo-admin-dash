@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,12 @@ const getRiderHealth = (r: any) => {
 
 export default function RidersAllPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [riders, setRiders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [filterType, setFilterType] = useState("all");
 
   const fetchRiders = useCallback(async () => {
@@ -66,6 +68,10 @@ export default function RidersAllPage() {
   }, []);
 
   useEffect(() => { fetchRiders(); }, [fetchRiders]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleBlock = async (rider: any) => {
     try {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -42,7 +43,9 @@ const getAuthHeaders = () => ({
 });
 
 export default function RiderSupportPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
+  const [searchTerm, setSearchTerm] = useState(urlSearchQuery);
   const [activeTab, setActiveTab] = useState("all");
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +98,10 @@ export default function RiderSupportPage() {
     }
     loadTickets();
   }, []);
+
+  useEffect(() => {
+    setSearchTerm(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const filteredTickets = tickets.filter((ticket) => {
     const matchesSearch =

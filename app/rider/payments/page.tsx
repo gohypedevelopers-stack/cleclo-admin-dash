@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   Filter,
@@ -124,12 +124,18 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RiderPaymentsPage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleViewDetails = (payment: (typeof PAYMENTS)[0]) => {
     router.push(`/rider/payments/${payment.id}`);

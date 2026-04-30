@@ -26,7 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -156,11 +156,13 @@ const formatDate = (dateStr: string | null) => {
 
 export default function SettlementsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
   const [stats, setStats] = useState<SettlementStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; // Increased density
@@ -208,6 +210,10 @@ export default function SettlementsPage() {
   useEffect(() => {
     fetchSettlements();
   }, [fetchSettlements]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const filteredSettlements = useMemo(() => {
     return settlements.filter((s) => {

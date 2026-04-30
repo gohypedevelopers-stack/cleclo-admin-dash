@@ -6,6 +6,7 @@ import {
   User,
   Settings,
   LogOut,
+  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +23,24 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
-import { Switch } from "@/components/ui/switch";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { getAdminSearchResults, getAdminSearchTarget } from "@/lib/admin-search";
 
 type AdminUser = {
+  id?: string;
   name: string;
   email: string;
   role: string;
   adminRole: string;
+};
+
+type AdminNotification = {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  link: string;
 };
 
 function getInitials(name: string): string {
@@ -45,18 +55,19 @@ function getInitials(name: string): string {
 export function AdminHeader() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const router = useRouter();
-  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
+  const [adminUser] = useState<AdminUser | null>(() => {
     try {
       const raw = localStorage.getItem("admin_user");
-      if (raw) setAdminUser(JSON.parse(raw));
+      return raw ? JSON.parse(raw) : null;
     } catch {
-      // ignore parse errors
+      return null;
     }
-  }, []);
+  });
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLFormElement>(null);
 
   const fetchNotifications = async () => {
     try {
@@ -80,9 +91,23 @@ export function AdminHeader() {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    const initialFetch = window.setTimeout(fetchNotifications, 0);
     const interval = setInterval(fetchNotifications, 120000); // Poll every 2 min
-    return () => clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialFetch);
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!searchRef.current?.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
   const displayName = adminUser?.name || "Admin";
@@ -90,10 +115,33 @@ export function AdminHeader() {
     ? adminUser.adminRole.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "Super Admin";
   const initials = getInitials(displayName);
+  const adminRole = adminUser?.adminRole || "super_admin";
+  const searchResults = useMemo(
+    () => getAdminSearchResults(searchQuery, adminRole),
+    [adminRole, searchQuery],
+  );
+
+  const navigateToSearchTarget = (href: string) => {
+    setSearchQuery("");
+    setIsSearchOpen(false);
+    router.push(href);
+  };
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const target = getAdminSearchTarget(searchQuery, adminRole);
+
+    if (!target) {
+      toast.error("No matching dashboard page found");
+      return;
+    }
+
+    navigateToSearchTarget(target);
+  };
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <button
           onClick={toggleSidebar}
           aria-label={isCollapsed ? "Open sidebar" : "Close sidebar"}
@@ -128,16 +176,72 @@ export function AdminHeader() {
           </svg>
         </button>
 
-        <div className="relative hidden md:block">
+        <form
+          ref={searchRef}
+          onSubmit={handleSearchSubmit}
+          className="group relative hidden w-full max-w-md md:block"
+        >
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          {!searchQuery && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute left-10 right-4 top-1/2 z-10 -translate-y-1/2 overflow-hidden text-sm font-medium text-slate-400"
+            >
+              <span className="admin-search-marquee inline-block whitespace-nowrap">
+                Search orders by ID or phone, vendors by city, users, riders, issues, settlements, reports...
+              </span>
+            </div>
+          )}
           <Input
-            placeholder="Search by ID, Phone, Vendor, City..."
-            className="w-80 pl-10 bg-slate-50 border-slate-200"
+            value={searchQuery}
+            placeholder=""
+            onFocus={() => setIsSearchOpen(true)}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setIsSearchOpen(true);
+            }}
+            className="h-11 w-full bg-slate-50 pl-10 pr-4 font-medium text-slate-800 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#3E8940]"
           />
-        </div>
+          {isSearchOpen && (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+              <div className="border-b bg-slate-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Dashboard Search
+              </div>
+              <div className="max-h-80 overflow-y-auto p-1.5">
+                {searchResults.length > 0 ? (
+                  searchResults.map((result) => (
+                    <button
+                      type="button"
+                      key={`${result.href}-${result.title}`}
+                      onClick={() => navigateToSearchTarget(result.hrefWithQuery)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-primary/5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-slate-800">
+                          {result.title}
+                        </span>
+                        <span className="block truncate text-xs font-medium text-slate-500">
+                          {result.section} · {result.matchedKeyword || result.description}
+                        </span>
+                      </span>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300" />
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-8 text-center text-sm font-medium text-slate-400">
+                    No dashboard page matches this search.
+                  </div>
+                )}
+              </div>
+              <div className="border-t bg-white px-4 py-2 text-[11px] font-semibold text-slate-400">
+                Press Enter to open the best match.
+              </div>
+            </div>
+          )}
+        </form>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative group transition-all duration-200">

@@ -71,7 +71,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 
@@ -189,11 +189,13 @@ const getFilterStyles = (isActive: boolean, activeColor: string = "bg-[#3E8940]/
 
 export default function IssuesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [data, setData] = React.useState<IssuesData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState(urlSearchQuery);
   const [severityFilter, setSeverityFilter] = React.useState("all");
   const [cityFilter, setCityFilter] = React.useState("all");
   const [vendorFilter, setVendorFilter] = React.useState("all");
@@ -246,6 +248,10 @@ export default function IssuesPage() {
     const t = setTimeout(fetchIssues, 300);
     return () => clearTimeout(t);
   }, [fetchIssues]);
+
+  React.useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleIssueAction = async (issueId: string, payload: any, successMsg: string) => {
     setActionLoading(true);

@@ -2,7 +2,7 @@
 
 import { Search, Filter, MessageSquare, CheckCircle, Clock, MoreVertical, Send, User, Loader2, AlertTriangle, RefreshCw, AlertCircle, XCircle, ChevronLeft, ChevronRight, BarChart3, ShieldAlert, Calendar } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
 const getAuthHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}` });
@@ -52,10 +52,12 @@ const formatDate = (d: string) => {
 };
 
 export default function VendorSupportPage() {
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [tickets, setTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [replyText, setReplyText] = useState("");
@@ -95,6 +97,10 @@ export default function VendorSupportPage() {
   }, []);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleStatusUpdate = async (ticketId: string, status: string) => {
     try {

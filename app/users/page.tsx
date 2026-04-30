@@ -174,11 +174,12 @@ function UsersPageContent() {
 
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
+  const urlSearchQuery = searchParams.get("search") || "";
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState(roleParam || "all");
   
@@ -294,6 +295,11 @@ function UsersPageContent() {
       setCurrentPage(1);
     }
   }, [roleParam]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+    setCurrentPage(1);
+  }, [urlSearchQuery]);
 
   const handleBlockUser = async (userId: string, currentBlocked: boolean) => {
     try {

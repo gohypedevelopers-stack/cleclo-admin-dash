@@ -17,7 +17,6 @@ import {
   MessageSquare,
   ShieldAlert,
   X,
-  Search,
   Store,
   Wallet,
   Loader2,
@@ -39,7 +38,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -173,7 +171,6 @@ export default function AdminDashboardPage() {
   const [vendorFilter, setVendorFilter] = React.useState("all");
   const [cityFilter, setCityFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("");
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 5;
 
@@ -190,16 +187,6 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Debounced search
-  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = React.useState("");
-
-  React.useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [searchQuery]);
-
   const fetchDashboard = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -214,7 +201,6 @@ export default function AdminDashboardPage() {
 
       const result = await dashboardApi.getOverview({
         period: periodMap[timeRange] || "today",
-        search: debouncedSearch || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         vendor: vendorFilter !== "all" ? vendorFilter : undefined,
         city: cityFilter !== "all" ? cityFilter : undefined,
@@ -227,7 +213,7 @@ export default function AdminDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, debouncedSearch, statusFilter, vendorFilter, cityFilter, dateFilter]);
+  }, [timeRange, statusFilter, vendorFilter, cityFilter, dateFilter]);
 
   React.useEffect(() => {
     fetchDashboard();
@@ -246,7 +232,6 @@ export default function AdminDashboardPage() {
     setVendorFilter("all");
     setCityFilter("all");
     setDateFilter("");
-    setSearchQuery("");
   };
 
   const handleGenerateReport = () => {
@@ -325,20 +310,9 @@ export default function AdminDashboardPage() {
             {data.subtitle}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Top-level Search */}
-          <div className="relative group w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-[#3E8940] transition-colors" />
-            <Input
-              placeholder={data.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 pl-10 bg-white border-slate-200 text-sm rounded-xl focus-visible:ring-1 focus-visible:ring-[#3E8940] transition-all"
-            />
-          </div>
-
+        <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto pb-1 md:w-auto md:justify-end md:overflow-visible md:pb-0">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[180px] h-10 bg-white border-slate-200 text-slate-700 font-medium rounded-xl">
+            <SelectTrigger className="h-10 w-[180px] shrink-0 bg-white border-slate-200 text-slate-700 font-medium rounded-xl">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-[#3E8940]" />
                 <SelectValue placeholder="Select period" />
@@ -355,22 +329,14 @@ export default function AdminDashboardPage() {
 
           <Button
             variant="outline"
-            className="h-10 gap-2 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
+            className="h-10 shrink-0 gap-2 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
             onClick={handleGenerateReport}
           >
             <Download className="h-4 w-4" />
             Generate Report
           </Button>
           <Button
-            variant="outline"
-            className="h-10 w-10 p-0 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
-            onClick={fetchDashboard}
-            disabled={isLoading}
-          >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-          </Button>
-          <Button
-            className="h-10 gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 text-white shadow-sm rounded-xl"
+            className="h-10 shrink-0 gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 text-white shadow-sm rounded-xl"
             onClick={() => router.push("/analytics")}
           >
             <Activity className="h-4 w-4" />
@@ -596,7 +562,7 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {(statusFilter !== "all" || vendorFilter !== "all" || cityFilter !== "all" || dateFilter !== "" || searchQuery !== "") && (
+              {(statusFilter !== "all" || vendorFilter !== "all" || cityFilter !== "all" || dateFilter !== "") && (
                 <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3 text-xs font-semibold text-red-500 hover:text-red-600 hover:bg-red-50 gap-1.5">
                   <X className="h-3.5 w-3.5" />
                   Clear

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, CheckCircle, XCircle, Eye, FileText, MapPin, Phone, Store, Loader2, AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,12 @@ const apiFetch = async (url: string, options?: RequestInit) => { const res = awa
 
 export default function VendorVerificationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [vendors, setVendors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchVendors = useCallback(async () => {
@@ -33,6 +35,10 @@ export default function VendorVerificationPage() {
   }, []);
 
   useEffect(() => { fetchVendors(); }, [fetchVendors]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const handleApprove = async (id: string) => {
     setActionLoading(id);

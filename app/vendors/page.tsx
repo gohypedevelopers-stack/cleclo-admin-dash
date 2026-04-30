@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   FileText,
   IndianRupee,
+  Zap,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,15 +131,17 @@ const formatDate = (dateStr: string) => {
 export default function VendorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
 
   useEffect(() => {
     const status = searchParams.get("status");
     if (status) setStatusFilter(status);
+    setSearchQuery(searchParams.get("search") || "");
   }, [searchParams]);
 
   const fetchVendors = useCallback(async () => {

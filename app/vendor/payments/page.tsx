@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Filter, Download, CreditCard, ArrowUpRight, ArrowDownLeft, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Eye, Loader2, AlertTriangle, RefreshCw, IndianRupee, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,10 +30,12 @@ const getStatusBadge = (status: string) => {
 
 export default function VendorPaymentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") || "";
   const [payments, setPayments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Pagination State
@@ -51,6 +53,10 @@ export default function VendorPaymentsPage() {
   }, []);
 
   useEffect(() => { fetchPayments(); }, [fetchPayments]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const filtered = useMemo(() => payments.filter((p) => {
     const q = searchQuery.toLowerCase();

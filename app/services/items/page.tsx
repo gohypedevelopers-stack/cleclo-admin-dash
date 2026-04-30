@@ -105,11 +105,12 @@ function ItemsPageContent() {
   const categoryFromUrl = searchParams.get("category");
   const serviceIdFromUrl = searchParams.get("serviceId");
   const serviceFromUrl = searchParams.get("service");
+  const urlSearchQuery = searchParams.get("search") || "";
 
   const [itemList, setItemList] = useState<ItemRecord[]>([]);
   const [subCategoryList, setSubCategoryList] = useState<SubCategoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState("all");
   const [saved, setSaved] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -123,6 +124,10 @@ function ItemsPageContent() {
     () => new Map(subCategoryList.map((subCategory) => [subCategory.id, subCategory])),
     [subCategoryList],
   );
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+  }, [urlSearchQuery]);
 
   const resolveServiceType = (subCategoryId: string) => {
     const subCategory = subCategoryById.get(subCategoryId);
