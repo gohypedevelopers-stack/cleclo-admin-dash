@@ -94,7 +94,10 @@ interface UserRecord {
   walletBalance?: number;
   totalOrders?: number;
   totalSpent?: number;
+  avgOrderValue?: number;
   lastOrderDate?: string;
+  refundCount?: number;
+  complaintCount?: number;
   vendorProfile?: {
     businessName?: string;
     isApproved?: boolean;
@@ -149,12 +152,26 @@ const getRoleBadge = (role: string) => {
 const formatINR = (amount: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 
-const formatDate = (dateStr: string) => {
-  try {
-    return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  } catch {
-    return dateStr;
-  }
+const formatDate = (date: string | Date) => {
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatRelativeDate = (dateString: string | Date | undefined) => {
+  if (!dateString) return "Never";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return formatDate(dateString);
 };
 
 const PUBLIC_AUTH_URL = AUTH_API_URL.replace("/admin/auth", "/auth");
@@ -421,17 +438,27 @@ function UsersPageContent() {
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{roleFilter === "customer" ? "Customer" : "User"} List</h2>
         </div>
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-          <Table className="min-w-[1000px] w-full table-fixed">
+          <Table className="min-w-[1200px] w-full table-fixed">
           <TableHeader>
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[20%]">Customer</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[18%]">Contact Info</TableHead>
+              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">Customer</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">Contact Info</TableHead>
               <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Role</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Status</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Orders</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Total Spent</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Joined</TableHead>
-              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Actions</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Status</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">Orders</TableHead>
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Total Spent</TableHead>
+              {roleFilter === "customer" && (
+                <>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Avg Value</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Last Order</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">Refunds</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">Complaints</TableHead>
+                </>
+              )}
+              {roleFilter !== "customer" && (
+                <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Joined</TableHead>
+              )}
+              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -441,13 +468,27 @@ function UsersPageContent() {
                 const status = getUserStatus(user);
                 const totalSpent = user.totalSpent || 0;
                 const orders = user.totalOrders || 0;
+                const avgValue = user.avgOrderValue || 0;
+                const lastOrder = user.lastOrderDate ? formatRelativeDate(user.lastOrderDate) : "Never";
+                const refunds = user.refundCount || 0;
+                const complaints = user.complaintCount || 0;
+
+                // Semantic logic
+                const isVIP = user.role === "customer" && totalSpent > 10000;
+                const isFraudProne = user.role === "customer" && refunds >= 2;
+                
+                const lastOrderDays = user.lastOrderDate 
+                  ? Math.floor((new Date().getTime() - new Date(user.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
+                  : null;
+                const isDormant = user.role === "customer" && lastOrderDays !== null && lastOrderDays > 30;
+
                 return (
                   <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => handleViewDetails(user)}>
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border shadow-sm">
+                        <Avatar className="h-9 w-9 border shadow-sm">
                           <AvatarImage src={(user as any).image || null} className="object-cover" />
-                          <AvatarFallback className={`font-bold ${
+                          <AvatarFallback className={`font-bold text-xs ${
                             user.role === "vendor" ? "bg-orange-50 text-orange-600" :
                             user.role === "rider" ? "bg-purple-50 text-purple-600" :
                             "bg-blue-50 text-blue-600"
@@ -455,20 +496,31 @@ function UsersPageContent() {
                             {displayName.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm">{displayName}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">ID: {user.id.slice(-6).toUpperCase()}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <p className="font-semibold text-gray-900 text-xs truncate">{displayName}</p>
+                            {isVIP && (
+                              <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[8px] h-3 px-1 font-black leading-none">VIP</Badge>
+                            )}
+                            {isFraudProne && (
+                              <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">RISK</Badge>
+                            )}
+                            {isDormant && (
+                              <Badge className="bg-slate-100 text-slate-500 border-slate-200 text-[8px] h-3 px-1 font-black leading-none uppercase">Dormant</Badge>
+                            )}
+                          </div>
+                          <p className="text-[9px] text-slate-400 font-medium">ID: {user.id.slice(-6).toUpperCase()}</p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
                         {user.email && (
-                          <p className="text-xs text-slate-600 truncate max-w-[200px]">
+                          <p className="text-[11px] text-slate-600 truncate max-w-[150px]">
                             {user.email}
                           </p>
                         )}
-                        <p className="text-xs text-slate-500 font-medium">
+                        <p className="text-[11px] text-slate-500 font-medium">
                           {user.phone}
                         </p>
                       </div>
@@ -477,11 +529,32 @@ function UsersPageContent() {
                       {getRoleBadge(user.role)}
                     </TableCell>
                     <TableCell>
-                      <Badge className={`${getStatusColor(status)} border font-bold text-[10px] shadow-none rounded-full px-3`}>{status}</Badge>
+                      <Badge className={`${getStatusColor(status)} border font-bold text-[9px] shadow-none rounded-full px-2`}>{status}</Badge>
                     </TableCell>
-                    <TableCell className="font-medium text-slate-700">{orders}</TableCell>
-                    <TableCell className="font-bold text-slate-900">{formatINR(totalSpent)}</TableCell>
-                    <TableCell className="text-sm text-slate-500">{formatDate(user.createdAt)}</TableCell>
+                    <TableCell className="font-medium text-slate-700 text-center text-xs">{orders}</TableCell>
+                    <TableCell className="font-bold text-slate-900 text-xs">{formatINR(totalSpent)}</TableCell>
+                    
+                    {roleFilter === "customer" && (
+                      <>
+                        <TableCell className="font-medium text-slate-600 text-xs">{formatINR(avgValue)}</TableCell>
+                        <TableCell className="text-[11px] text-slate-500">{lastOrder}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn("font-bold text-[10px]", refunds > 0 ? "text-red-600 border-red-200 bg-red-50" : "text-slate-400 border-slate-100")}>
+                            {refunds}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn("font-bold text-[10px]", complaints > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-slate-400 border-slate-100")}>
+                            {complaints}
+                          </Badge>
+                        </TableCell>
+                      </>
+                    )}
+                    
+                    {roleFilter !== "customer" && (
+                      <TableCell className="text-xs text-slate-500">{formatDate(user.createdAt)}</TableCell>
+                    )}
+
                     <TableCell className="pr-6 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -508,7 +581,7 @@ function UsersPageContent() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-slate-500">No results found.</TableCell>
+                <TableCell colSpan={roleFilter === "customer" ? 11 : 8} className="h-32 text-center text-slate-500">No results found.</TableCell>
               </TableRow>
             )}
           </TableBody>
