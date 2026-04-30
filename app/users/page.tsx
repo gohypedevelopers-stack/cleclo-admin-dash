@@ -486,9 +486,15 @@ function UsersPageContent() {
                   <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => handleViewDetails(user)}>
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
+<<<<<<< HEAD
                         <Avatar className="h-9 w-9 border shadow-sm">
                           <AvatarImage src={(user as any).image || null} className="object-cover" />
                           <AvatarFallback className={`font-bold text-xs ${
+=======
+                        <Avatar className="h-10 w-10 border shadow-sm">
+                          <AvatarImage src={(user as any).image || undefined} className="object-cover" />
+                          <AvatarFallback className={`font-bold ${
+>>>>>>> dc8fdb602e3587daa882882e5202406000b2b3a0
                             user.role === "vendor" ? "bg-orange-50 text-orange-600" :
                             user.role === "rider" ? "bg-purple-50 text-purple-600" :
                             "bg-blue-50 text-blue-600"
@@ -684,7 +690,7 @@ function UsersPageContent() {
               <Label>Profile Picture</Label>
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-slate-100 shadow-sm">
-                  <AvatarImage src={newUser.image || null} className="object-cover" />
+                  <AvatarImage src={newUser.image || undefined} className="object-cover" />
                   <AvatarFallback className="bg-slate-50 text-slate-400">
                     <User className="h-8 w-8" />
                   </AvatarFallback>

@@ -1,6 +1,7 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { Poppins, Quicksand } from "next/font/google";
+import { Suspense } from "react";
 import ClientLayout from "./client-layout";
 import "./globals.css";
 
@@ -49,7 +50,9 @@ export default function RootLayout({
       <body
         className={`${quicksand.variable} ${poppins.variable} font-sans antialiased`}
       >
-        <ClientLayout>{children}</ClientLayout>
+        <Suspense fallback={null}>
+          <ClientLayout>{children}</ClientLayout>
+        </Suspense>
       </body>
     </html>
   );

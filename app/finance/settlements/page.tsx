@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import {
   CreditCard,
   Check,
@@ -154,7 +154,7 @@ const formatDate = (dateStr: string | null) => {
   }
 };
 
-export default function SettlementsPage() {
+function SettlementsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
@@ -654,5 +654,18 @@ export default function SettlementsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SettlementsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <p className="text-sm font-medium text-slate-500">Loading settlements...</p>
+      </div>
+    }>
+      <SettlementsContent />
+    </Suspense>
   );
 }

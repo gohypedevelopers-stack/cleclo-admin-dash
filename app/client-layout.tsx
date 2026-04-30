@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Toaster } from "sonner";
 import dynamic from "next/dynamic";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
@@ -86,7 +86,16 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           )}
         >
           <AdminHeader />
-          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5">
+            <Suspense fallback={
+              <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3E8940] border-t-transparent"></div>
+                <h3 className="font-semibold text-slate-700">Loading Dashboard...</h3>
+              </div>
+            }>
+              {children}
+            </Suspense>
+          </main>
         </div>
       </div>
     </AuthGate>

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import {
   AlertTriangle,
   Search,
@@ -187,7 +187,7 @@ const getFilterStyles = (isActive: boolean, activeColor: string = "bg-[#3E8940]/
       : "bg-slate-50 text-slate-500 hover:bg-slate-100"
   );
 
-export default function IssuesPage() {
+function IssuesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
@@ -839,5 +839,18 @@ export default function IssuesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function IssuesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <p className="text-sm font-medium text-slate-500">Loading issue alerts...</p>
+      </div>
+    }>
+      <IssuesContent />
+    </Suspense>
   );
 }
