@@ -206,6 +206,25 @@ export const adminCatalogApi = {
         });
         if (!res.ok) throw new Error('Price preview failed');
         return res.json();
+    },
+    getItemPriceOverrides: async (cityCode?: string, vendorId?: string) => {
+        const params = new URLSearchParams();
+        if (cityCode) params.append('cityCode', cityCode);
+        if (vendorId) params.append('vendorId', vendorId);
+        const query = params.toString();
+        const url = `${CATALOG_API_URL}/items/price-overrides${query ? '?' + query : ''}`;
+        const res = await apiFetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch price overrides');
+        return res.json();
+    },
+    saveItemPriceOverrides: async (overrides: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/price-overrides`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ overrides })
+        });
+        if (!res.ok) throw new Error('Failed to save price overrides');
+        return res.json();
     }
 };
 
