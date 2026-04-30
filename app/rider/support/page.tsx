@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Card,
@@ -42,7 +42,7 @@ const getAuthHeaders = () => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
 });
 
-export default function RiderSupportPage() {
+function RiderSupportContent() {
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
   const [searchTerm, setSearchTerm] = useState(urlSearchQuery);
@@ -377,5 +377,18 @@ export default function RiderSupportPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function RiderSupportPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <h3 className="font-semibold text-slate-700">Loading Support Dashboard...</h3>
+      </div>
+    }>
+      <RiderSupportContent />
+    </Suspense>
   );
 }

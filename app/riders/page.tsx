@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ const getRiderHealth = (r: any) => {
   return { label: "At Risk", color: "bg-red-100 text-red-700", emoji: "🚨", score: Math.round(composite) };
 };
 
-export default function RidersAllPage() {
+function RidersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
@@ -219,5 +219,18 @@ export default function RidersAllPage() {
         <div className="flex items-center justify-between p-4 border-t"><p className="text-sm text-slate-500">Showing {filtered.length} of {riders.length} riders</p></div>
       </div>
     </div>
+  );
+}
+
+export default function RidersAllPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <p className="text-sm text-slate-500">Loading riders...</p>
+      </div>
+    }>
+      <RidersContent />
+    </Suspense>
   );
 }

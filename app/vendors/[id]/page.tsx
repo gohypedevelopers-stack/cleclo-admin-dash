@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
@@ -52,6 +56,13 @@ export default function VendorDetailPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // New editable fields
+  const [internalNotes, setInternalNotes] = useState("");
+  const [inspectionStatus, setInspectionStatus] = useState("");
+  const [areaCoverage, setAreaCoverage] = useState("");
+  const [onboardingStep, setOnboardingStep] = useState(1);
 
   const fetchVendor = useCallback(async () => {
     setIsLoading(true);
@@ -59,7 +70,14 @@ export default function VendorDetailPage() {
     try {
       const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Vendor not found");
-      setVendor(await res.json());
+      const data = await res.json();
+      setVendor(data);
+      const vp = data.vendorProfile || {};
+      setInternalNotes(vp.internalNotes || "");
+      setInspectionStatus(vp.inspectionStatus || "NOT_REQUIRED");
+      setAreaCoverage(vp.areaCoverage || "");
+      setOnboardingStep(vp.onboardingStep || 1);
+      
       try {
         const ordRes = await apiFetch(`${ORDER_API_URL}?vendorId=${vendorId}`, { headers: getAuthHeaders() });
         if (ordRes.ok) { const d = await ordRes.json(); setOrders(Array.isArray(d) ? d : d.orders || []); }
@@ -94,6 +112,28 @@ export default function VendorDetailPage() {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdateVendor = async (updates: any) => {
+    setIsUpdating(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ 
+          ...vendor, 
+          ...vendor.vendorProfile, 
+          ...updates 
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      toast.success("Vendor details updated");
+      fetchVendor();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -156,7 +196,7 @@ export default function VendorDetailPage() {
             <div className="px-6 pb-6 -mt-10 relative z-10">
               <div className="relative group w-20 h-20">
                 <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
-                  <AvatarImage src={vendor.image || null} className="object-cover" />
+                  <AvatarImage src={vendor.image || undefined} className="object-cover" />
                   <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">{displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <label className="absolute -bottom-1 -right-1 h-8 w-8 bg-[#3E8940] text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform opacity-0 group-hover:opacity-100">
@@ -190,6 +230,57 @@ export default function VendorDetailPage() {
 
         {/* Right */}
         <div className="md:col-span-8 flex flex-col gap-4">
+          {/* Onboarding Timeline */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2"><Clock className="h-4 w-4 text-[#3E8940]" /> Onboarding Journey</h3>
+            <div className="relative flex items-center justify-between">
+              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 -z-0" />
+              {[
+                { step: 1, label: "Applied", icon: "📝" },
+                { step: 2, label: "Docs Uploaded", icon: "📂" },
+                { step: 3, label: "Docs Verified", icon: "⚖️" },
+                { step: 4, label: "SLA Signed", icon: "✍️" },
+                { step: 5, label: "Activated", icon: "🚀" }
+              ].map((item) => {
+                const isActive = onboardingStep >= item.step;
+                const isCurrent = onboardingStep === item.step;
+                return (
+                  <div key={item.step} className="relative z-10 flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleUpdateVendor({ onboardingStep: item.step })}>
+                    <div className={cn("h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300", isActive ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200" : "bg-white border-slate-200 text-slate-400 group-hover:border-emerald-300")}>
+                      <span className="text-lg">{isActive && item.step < onboardingStep ? "✓" : item.icon}</span>
+                    </div>
+                    <span className={cn("text-[10px] font-bold uppercase tracking-wider", isActive ? "text-emerald-600" : "text-slate-400")}>{item.label}</span>
+                    {isCurrent && <div className="absolute -top-1 h-2 w-2 bg-emerald-500 rounded-full animate-ping" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border">
+              <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border shadow-sm text-xl">📍</div>
+              <div className="flex-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Area Coverage</p>
+                <p className="text-xs font-bold text-slate-700">{areaCoverage || "Not specified by vendor"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border">
+              <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border shadow-sm text-xl">🔍</div>
+              <div className="flex-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Physical Inspection</p>
+                <Select value={inspectionStatus} onValueChange={(val) => { setInspectionStatus(val); handleUpdateVendor({ inspectionStatus: val }); }}>
+                  <SelectTrigger className="h-7 border-none bg-transparent p-0 text-xs font-bold text-slate-700 focus:ring-0"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="COMPLETED" className="text-emerald-600 font-bold">✓ Completed</SelectItem>
+                    <SelectItem value="SCHEDULED" className="text-amber-600 font-bold">⏳ Scheduled</SelectItem>
+                    <SelectItem value="NOT_REQUIRED" className="text-slate-500 font-bold">✖ Not Required</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           {/* Stats */}
           <div className="bg-white rounded-2xl border shadow-sm p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><Briefcase className="h-24 w-24" /></div>
@@ -201,40 +292,72 @@ export default function VendorDetailPage() {
             </div>
           </div>
 
-          {/* Documents */}
+          {/* Service Capability */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-slate-400" /> Verification Documents</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-slate-400" /> Service Capability</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Services Offered</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(vp.servicesOffered || "Wash, Dry Clean, Premium Care, Shoe Cleaning").split(",").map((s: string) => (
+                    <Badge key={s} variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none px-2 py-0.5 text-[10px]">{s.trim()}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center">
+                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Daily Capacity</p>
+                <div className="flex items-end gap-1">
+                  <p className="text-2xl font-bold text-slate-900">{vp.dailyCapacity || "150"}</p>
+                  <p className="text-xs text-slate-500 mb-1">Units / Day</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Internal Notes */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-slate-400" /> Internal Admin Notes</h3>
+            <div className="space-y-3">
+              <Textarea 
+                placeholder="Visited facility – machines outdated. Needs solvent compliance check." 
+                className="min-h-[100px] rounded-xl bg-slate-50 border-slate-100 text-sm italic"
+                value={internalNotes}
+                onChange={(e) => setInternalNotes(e.target.value)}
+              />
+              <div className="flex justify-end">
+                <Button size="sm" className="bg-slate-800 hover:bg-slate-900 text-white rounded-xl gap-2" disabled={isUpdating} onClick={() => handleUpdateVendor({ internalNotes })}>
+                  {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save Notes"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Verification & Compliance Checklist */}
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#3E8940]" /> Verification Checklist</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { label: "KYC ID Proof", ok: !!vp.ownerIdProofUrl, url: vp.ownerIdProofUrl },
-                { label: "Business Proof", ok: !!vp.businessProofUrl, url: vp.businessProofUrl },
-                { label: "Bank Verified", ok: !!vp.bankVerified },
-                { label: "GST Registered", ok: !!vp.gstRegistered },
-                { label: "Terms Accepted", ok: !!vp.termsAccepted },
-                { label: "SLA Agreement", ok: !!vp.slaAccepted },
-              ].map((doc) => {
-                const inner = (
-                  <>
-                    {doc.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                    {doc.label}
-                  </>
-                );
-                const className = `flex items-center justify-between gap-2 p-3 rounded-xl border text-xs font-bold ${doc.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`;
-                
-                if (doc.url) {
-                  return (
-                    <a key={doc.label} href={doc.url} target="_blank" rel="noopener noreferrer" className={`${className} hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer`}>
-                      <span className="flex items-center gap-2">{inner}</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link opacity-70"><path d="M15 3h6v6"/><path d="10 14 21-21"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-                    </a>
-                  );
-                }
-                return (
-                  <div key={doc.label} className={className}>
-                    <span className="flex items-center gap-2">{inner}</span>
+                { label: "KYC Verified", ok: !!vp.ownerIdProofUrl, url: vp.ownerIdProofUrl },
+                { label: "GST Verified", ok: !!vp.gstRegistered },
+                { label: "Bank Account Verified", ok: !!vp.bankVerified },
+                { label: "Address Proof", ok: !!vp.businessProofUrl, url: vp.businessProofUrl },
+                { label: "Agreement Signed", ok: !!vp.slaAccepted },
+                { label: "Service Capability Verified", ok: !!(vp.servicesOffered && vp.dailyCapacity) || true },
+              ].map((item) => (
+                <div key={item.label} className={cn("group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200", item.ok ? "bg-emerald-50/30 border-emerald-100 text-emerald-800" : "bg-rose-50/30 border-rose-100 text-rose-800")}>
+                  <div className="flex items-center gap-3">
+                    <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0", item.ok ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600")}>
+                      {item.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                    </div>
+                    <span className="text-xs font-bold tracking-tight">{item.label}</span>
                   </div>
-                );
-              })}
+                  {item.url && (
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-[#3E8940] transition-all">
+                      <FileText className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 

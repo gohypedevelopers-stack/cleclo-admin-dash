@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   MessageSquare,
@@ -95,7 +95,7 @@ const getTypeColor = (type: string) => {
   }
 };
 
-export default function FeedbackPage() {
+function FeedbackContent() {
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
@@ -251,6 +251,19 @@ export default function FeedbackPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function FeedbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3E8940] border-t-transparent mx-auto"></div>
+        <p className="text-sm font-medium text-slate-500">Loading feedback...</p>
+      </div>
+    }>
+      <FeedbackContent />
+    </Suspense>
   );
 }
 

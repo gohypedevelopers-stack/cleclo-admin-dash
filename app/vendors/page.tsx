@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import {
   Search,
   Filter,
@@ -128,7 +128,7 @@ const formatDate = (dateStr: string) => {
   }
 };
 
-export default function VendorsPage() {
+function VendorsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
@@ -462,5 +462,18 @@ export default function VendorsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VendorsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" />
+        <p className="text-sm font-medium text-slate-500">Loading vendors...</p>
+      </div>
+    }>
+      <VendorsContent />
+    </Suspense>
   );
 }

@@ -91,12 +91,12 @@ const managementItems: NavItem[] = [
     icon: Store,
     subItems: [
       {
-        title: "Overview",
+        title: "All",
         href: "/vendor",
         icon: LayoutDashboard,
       },
       {
-        title: "Vendor Performance",
+        title: "Vendors",
         href: "/vendor/all",
         icon: BarChart3,
       },
@@ -133,7 +133,7 @@ const managementItems: NavItem[] = [
     icon: Bike,
     subItems: [
       {
-        title: "Overview",
+        title: "All",
         href: "/rider",
         icon: LayoutDashboard,
       },

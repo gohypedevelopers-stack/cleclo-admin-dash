@@ -195,7 +195,7 @@ export default function UserDetailPage() {
             <div className="px-6 pb-6 -mt-10 relative z-10">
               <div className="relative group w-20 h-20">
                 <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
-                  <AvatarImage src={user.image || null} className="object-cover" />
+                  <AvatarImage src={user.image || undefined} className="object-cover" />
                   <AvatarFallback className="bg-slate-800 text-white text-xl font-bold">
                     {(user.name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
                   </AvatarFallback>
