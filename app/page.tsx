@@ -409,6 +409,7 @@ export default function AdminDashboardPage() {
           };
 
           const redirectUrl = getRedirectUrl(kpi.key);
+          const IconComponent = KPI_ICONS[kpi.key] || Activity;
 
           return (
             <div
