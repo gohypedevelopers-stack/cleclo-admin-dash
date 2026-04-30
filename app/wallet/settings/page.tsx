@@ -16,6 +16,8 @@ type WalletReward = {
   rewardMode: string;
   rewardValue: number;
   minRechargeValue?: number;
+  minOrderValue?: number;
+  expiryDays?: number;
   isActive: boolean;
 };
 
@@ -102,18 +104,33 @@ export default function WalletSettingsPage() {
     }
   };
 
-  const handleCreateBonus = async () => {
+  const handleCreateRule = async (ruleType: string) => {
       try {
           const newRule = await adminWalletApi.createReward({
-              ruleType: "recharge_bonus",
+              ruleType,
               rewardMode: "percentage",
-              rewardValue: 10,
-              minRechargeValue: 500,
+              rewardValue: ruleType === "order_cashback" ? 5 : 2,
+              minRechargeValue: ruleType === "recharge_bonus" ? 500 : undefined,
+              minOrderValue: ruleType === "order_cashback" ? 2000 : undefined,
+              expiryDays: 30,
               isActive: true
           });
           setSettings(s => ({ ...s, bonuses: [newRule, ...s.bonuses] }));
       } catch (e) {
           console.error(e);
+      }
+  };
+
+  const handleUpdateRule = async (id: string, updates: Partial<WalletReward>) => {
+      try {
+          setSettings((s) => ({
+              ...s,
+              bonuses: s.bonuses.map((b) => b.id === id ? { ...b, ...updates } : b)
+          }));
+          await adminWalletApi.updateReward(id, updates);
+      } catch (error) {
+          console.error(error);
+          loadBackend();
       }
   };
 
@@ -386,7 +403,7 @@ export default function WalletSettingsPage() {
 
                     <Button
                         variant="outline"
-                        onClick={handleCreateBonus}
+                        onClick={() => handleCreateRule("recharge_bonus")}
                         className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary"
                     >
                         <Plus className="h-4 w-4" />
@@ -394,6 +411,142 @@ export default function WalletSettingsPage() {
                     </Button>
                     </div>
                 )}
+                </div>
+                {/* Auto Cashback Rules */}
+                <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-6 mt-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg shadow-green-200/50">
+                        <Sparkles className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-black">
+                        A. Add Auto Cashback Rules
+                        </h2>
+                        <p className="text-sm text-slate-500">
+                        Reward users with cashback on orders
+                        </p>
+                    </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {settings.bonuses.filter(b => b.ruleType === "order_cashback").map((bonus) => (
+                        <div
+                        key={bonus.id}
+                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
+                            bonus.isActive
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
+                        >
+                        <div className="flex items-center gap-6">
+                            <div className="text-center min-w-[80px]">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide">
+                                Orders Above
+                            </p>
+                            <Input 
+                                type="number" 
+                                value={bonus.minOrderValue || 0}
+                                onChange={(e) => handleUpdateRule(bonus.id, { minOrderValue: parseInt(e.target.value) || 0 })}
+                                className="w-24 text-center mt-1"
+                            />
+                            </div>
+                            <div className="text-3xl text-slate-300">{"->"}</div>
+                            <div className="text-center min-w-[80px]">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide">
+                                Cashback
+                            </p>
+                            <div className="flex items-center mt-1">
+                              <Input 
+                                  type="number" 
+                                  value={bonus.rewardValue || 0}
+                                  onChange={(e) => handleUpdateRule(bonus.id, { rewardValue: parseInt(e.target.value) || 0 })}
+                                  className="w-20 text-center text-green-600 font-bold"
+                              />
+                              <span className="ml-1 text-green-600 font-bold">{bonus.rewardMode === 'percentage' ? '%' : 'Rs.'}</span>
+                            </div>
+                            </div>
+                            <Badge
+                            className={`text-xs ${
+                                bonus.isActive
+                                ? "bg-green-100 text-green-700"
+                                : "bg-slate-100 text-slate-500"
+                            } border-none`}
+                            >
+                            Cashback
+                            </Badge>
+                        </div>
+                        <Switch
+                            checked={bonus.isActive}
+                            onCheckedChange={() => toggleBonus(bonus.id, bonus.isActive)}
+                        />
+                        </div>
+                    ))}
+
+                    <Button
+                        variant="outline"
+                        onClick={() => handleCreateRule("order_cashback")}
+                        className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add Cashback Rule
+                    </Button>
+                </div>
+                </div>
+
+                {/* Expiry Rules */}
+                <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-6 mt-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 shadow-lg shadow-red-200/50">
+                        <AlertCircle className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-black">
+                        B. Add Expiry Rules
+                        </h2>
+                        <p className="text-sm text-slate-500">
+                        Set expiry days for wallet bonuses
+                        </p>
+                    </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {settings.bonuses.map((bonus) => (
+                        <div
+                        key={bonus.id}
+                        className={`flex flex-col gap-2 p-5 rounded-2xl border-2 transition-all ${
+                            bonus.isActive
+                            ? "bg-slate-50 border-slate-200"
+                            : "bg-slate-50 border-slate-100 opacity-50"
+                        }`}
+                        >
+                          <div className="flex justify-between items-center w-full">
+                            <div>
+                                <h3 className="font-semibold text-sm">
+                                  {bonus.ruleType === 'order_cashback' ? 'Auto Cashback Rule' : 'Recharge Bonus Rule'}
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                  {bonus.ruleType === 'order_cashback' 
+                                    ? `${bonus.rewardValue}% on orders above Rs. ${bonus.minOrderValue}` 
+                                    : `${bonus.rewardValue}% on recharge > Rs. ${bonus.minRechargeValue}`}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label className="text-sm whitespace-nowrap">Expires in (Days):</Label>
+                                <Input 
+                                  type="number" 
+                                  value={bonus.expiryDays || 0}
+                                  onChange={(e) => handleUpdateRule(bonus.id, { expiryDays: parseInt(e.target.value) || 0 })}
+                                  className="w-24"
+                                />
+                            </div>
+                          </div>
+                        </div>
+                    ))}
+                </div>
                 </div>
 
                 {/* Preview */}
@@ -415,11 +568,15 @@ export default function WalletSettingsPage() {
                                 <Gift className="h-4 w-4" />
                             </div>
                             <span className="font-medium">
-                                Add {formatMoney(bonus.minRechargeValue || 0)}+
+                                {bonus.ruleType === 'order_cashback' 
+                                  ? `Orders > ${formatMoney(bonus.minOrderValue || 0)}` 
+                                  : `Add ${formatMoney(bonus.minRechargeValue || 0)}+`}
                             </span>
                             </div>
                             <Badge className="bg-white/25 text-white border-none font-bold">
-                            {bonus.rewardMode === 'percentage' ? `+${bonus.rewardValue}% Extra` : `+${formatMoney(bonus.rewardValue)} Extra`}
+                            {bonus.rewardMode === 'percentage' 
+                              ? `+${bonus.rewardValue}% ${bonus.ruleType === 'order_cashback' ? 'Cashback' : 'Extra'}` 
+                              : `+${formatMoney(bonus.rewardValue)} ${bonus.ruleType === 'order_cashback' ? 'Cashback' : 'Extra'}`}
                             </Badge>
                         </div>
                         ))}

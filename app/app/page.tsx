@@ -6,6 +6,7 @@ import {
   Gift,
   ChevronRight,
   ArrowLeft,
+  Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -99,19 +100,28 @@ export default function AppContentPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div>
-        <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Link>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+          <h1 className="text-3xl text-black font-bold tracking-tight">
+            Growth & Content Manager
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Control what users see and how the platform grows
+          </p>
+        </div>
+        <Button 
+          className="bg-primary hover:bg-primary/90 text-white shadow-lg gap-2"
+          onClick={() => alert("App Preview modal/link will be configured here!")}
+        >
+          <Smartphone className="h-4 w-4" />
+          App Preview
         </Button>
-        <h1 className="text-3xl text-black font-bold tracking-tight">
-          Growth & Content Manager
-        </h1>
-        <p className="text-slate-500 mt-1">
-          Control what users see and how the platform grows
-        </p>
       </div>
 
       {/* Sections */}

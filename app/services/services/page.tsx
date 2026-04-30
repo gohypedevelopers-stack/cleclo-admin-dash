@@ -11,9 +11,11 @@ import {
   Plus,
   Save,
   Sparkles,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { adminCatalogApi } from "@/lib/admin-api";
+import { adminCatalogApi, adminLocationApi, adminVendorApi } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -26,6 +28,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type CityOption = {
+  cityCode: string;
+  cityName: string;
+  stateCode?: string;
+  stateName?: string;
+};
+
+type StateOption = {
+  code: string;
+  name: string;
+};
+
+type VendorOption = {
+  id: string;
+  label: string;
+  status?: string;
+};
 
 type ItemRecord = {
   id: string;
@@ -57,6 +78,10 @@ type ServiceRecord = {
   updatedByAdminName?: string | null;
   updatedAt?: string | null;
   categories?: CategoryRecord[];
+  targetCityCodes?: string[];
+  targetVendorIds?: string[];
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 type ServiceForm = {
@@ -69,6 +94,10 @@ type ServiceForm = {
   defaultCommissionPercent: string;
   expressOptionAllowed: boolean;
   surgePricingAllowed: boolean;
+  targetCityCodes: string[];
+  targetVendorIds: string[];
+  availableFrom: string;
+  availableUntil: string;
 };
 
 const iconOptions = ["S", "W", "D", "I", "P", "B"];
@@ -93,6 +122,10 @@ const emptyServiceForm: ServiceForm = {
   defaultCommissionPercent: "18",
   expressOptionAllowed: true,
   surgePricingAllowed: true,
+  targetCityCodes: [],
+  targetVendorIds: [],
+  availableFrom: "",
+  availableUntil: "",
 };
 
 const toNumber = (value: string | number | null | undefined, fallback = 0) => {
@@ -127,6 +160,53 @@ const getServiceItemCount = (service: ServiceRecord) => {
   }, 0);
 };
 
+const normalizeCityOptions = (raw: unknown): CityOption[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => item as Partial<CityOption> & { code?: string; name?: string })
+    .map((item) => ({
+      cityCode: String(item.cityCode || item.code || ""),
+      cityName: String(item.cityName || item.name || ""),
+      stateCode: item.stateCode,
+      stateName: item.stateName,
+    }))
+    .filter((item) => item.cityCode && item.cityName);
+};
+
+const normalizeStates = (raw: unknown): StateOption[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => item as Partial<StateOption>)
+    .map((item) => ({
+      code: String(item.code || ""),
+      name: String(item.name || ""),
+    }))
+    .filter((item) => item.code && item.name);
+};
+
+const normalizeVendors = (raw: unknown): VendorOption[] => {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { vendors?: unknown[] }).vendors)
+      ? (raw as { vendors: unknown[] }).vendors
+      : [];
+
+  return list
+    .map((item) => item as Record<string, unknown>)
+    .map((item) => {
+      const profile = (item.vendorProfile || {}) as Record<string, unknown>;
+      const businessName = String(profile.businessName || "");
+      const name = String(item.name || "");
+      const phone = String(item.phone || "");
+      return {
+        id: String(item.id || ""),
+        label: businessName || name || phone || "Unnamed vendor",
+        status: String(item.status || ""),
+      };
+    })
+    .filter((item) => item.id);
+};
+
 export default function ServicesPage() {
   const [serviceList, setServiceList] = useState<ServiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +214,53 @@ export default function ServicesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceForm>(emptyServiceForm);
+
+  // Targeting options state
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [selectedStateCode, setSelectedStateCode] = useState<string>("");
+  const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
+  const [cityLabelByCode, setCityLabelByCode] = useState<Record<string, string>>({});
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+
+  const vendorLabelById = Object.fromEntries(vendors.map((v) => [v.id, v.label]));
+  const selectedCityLabels = serviceForm.targetCityCodes.map((code) => cityLabelByCode[code] || code);
+  const selectedVendorLabels = serviceForm.targetVendorIds.map((id) => vendorLabelById[id] || id);
+
+  const loadTargetingOptions = async () => {
+    try {
+      const [stateData, vendorData] = await Promise.all([
+        adminLocationApi.getStates(),
+        adminVendorApi.getVendors(),
+      ]);
+      const normalizedStates = normalizeStates(stateData);
+      setStates(normalizedStates);
+      setVendors(normalizeVendors(vendorData));
+      setSelectedStateCode((current) => current || normalizedStates[0]?.code || "");
+    } catch (error) {
+      console.error("Failed to load targeting options", error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedStateCode) {
+      adminLocationApi
+        .getCitiesByState(selectedStateCode)
+        .then((data) => {
+          const normalized = normalizeCityOptions(data);
+          setCityOptions(normalized);
+          setCityLabelByCode((prev) => {
+            const updated = { ...prev };
+            normalized.forEach((c) => {
+              updated[c.cityCode] = c.cityName;
+            });
+            return updated;
+          });
+        })
+        .catch((err) => console.error("Failed to load cities for state", err));
+    } else {
+      setCityOptions([]);
+    }
+  }, [selectedStateCode]);
 
   const loadServices = async () => {
     try {
@@ -150,7 +277,18 @@ export default function ServicesPage() {
 
   useEffect(() => {
     loadServices();
+    loadTargetingOptions();
   }, []);
+
+  const updateFormArray = (field: "targetCityCodes" | "targetVendorIds", value: string) => {
+    setServiceForm((prev) => {
+      const list = prev[field];
+      return {
+        ...prev,
+        [field]: list.includes(value) ? list.filter((item) => item !== value) : [...list, value],
+      };
+    });
+  };
 
   const toggleService = async (id: string, current: boolean) => {
     try {
@@ -188,6 +326,10 @@ export default function ServicesPage() {
       defaultCommissionPercent: String(service.defaultCommissionPercent ?? 18),
       expressOptionAllowed: service.expressOptionAllowed !== false,
       surgePricingAllowed: service.surgePricingAllowed !== false,
+      targetCityCodes: service.targetCityCodes || [],
+      targetVendorIds: service.targetVendorIds || [],
+      availableFrom: service.availableFrom ? new Date(service.availableFrom).toISOString().slice(0, 16) : "",
+      availableUntil: service.availableUntil ? new Date(service.availableUntil).toISOString().slice(0, 16) : "",
     });
     setIsDialogOpen(true);
   };
@@ -232,6 +374,10 @@ export default function ServicesPage() {
         ),
         expressOptionAllowed: serviceForm.expressOptionAllowed,
         surgePricingAllowed: serviceForm.surgePricingAllowed,
+        targetCityCodes: serviceForm.targetCityCodes,
+        targetVendorIds: serviceForm.targetVendorIds,
+        availableFrom: serviceForm.availableFrom || null,
+        availableUntil: serviceForm.availableUntil || null,
         isActive: true,
       };
 
@@ -600,6 +746,135 @@ export default function ServicesPage() {
                   })
                 }
               />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4 mt-4">
+            <div className="mb-3 flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+              <h3 className="font-semibold text-slate-800">Targeting & Availability</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>City-based visibility</Label>
+                <div className="mt-2 grid gap-3 md:grid-cols-[220px_1fr]">
+                  <Select value={selectedStateCode || undefined} onValueChange={setSelectedStateCode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {states.map((state) => (
+                        <SelectItem key={state.code} value={state.code}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex flex-col gap-2">
+                    <Select
+                      onValueChange={(value) => {
+                        if (value && !serviceForm.targetCityCodes.includes(value)) {
+                          updateFormArray("targetCityCodes", value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={cityOptions.length ? "Add city..." : "No cities available"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cityOptions.length ? (
+                          cityOptions.map((city) => (
+                            <SelectItem key={city.cityCode} value={city.cityCode}>
+                              <div className="flex items-center gap-2">
+                                {city.cityName}
+                                <span className="text-[10px] uppercase text-slate-400">({city.cityCode})</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-slate-500 text-center">No cities found for this state.</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedCityLabels.length ? (
+                    serviceForm.targetCityCodes.map((code, index) => (
+                      <Badge key={code} variant="outline" className="gap-1">
+                        {selectedCityLabels[index]}
+                        <button type="button" onClick={() => updateFormArray("targetCityCodes", code)}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-500">No city selected. Available in all cities.</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label>Vendor-based availability</Label>
+                <div className="mt-2 flex flex-col gap-2">
+                  <Select
+                    onValueChange={(value) => {
+                      if (value && !serviceForm.targetVendorIds.includes(value)) {
+                        updateFormArray("targetVendorIds", value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={vendors.length ? "Add vendor..." : "No vendors available"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{vendor.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedVendorLabels.length ? (
+                      serviceForm.targetVendorIds.map((id, index) => (
+                        <Badge key={id} variant="outline" className="gap-1 bg-amber-50">
+                          {selectedVendorLabels[index]}
+                          <button type="button" onClick={() => updateFormArray("targetVendorIds", id)}>
+                            <X className="h-3 w-3 text-amber-700" />
+                          </button>
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-500">No vendors selected. Available to all vendors.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Available From</Label>
+                  <Input
+                    type="datetime-local"
+                    value={serviceForm.availableFrom}
+                    onChange={(e) => setServiceForm({ ...serviceForm, availableFrom: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Available Until</Label>
+                  <Input
+                    type="datetime-local"
+                    value={serviceForm.availableUntil}
+                    onChange={(e) => setServiceForm({ ...serviceForm, availableUntil: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
