@@ -481,6 +481,16 @@ export const adminLocationApi = {
         if (!res.ok) throw new Error('Failed to delete city');
         return res.json();
     },
+    getStates: async () => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/states`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch states');
+        return res.json();
+    },
+    getCitiesByState: async (stateCode: string) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/location/states/${encodeURIComponent(stateCode)}/cities`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch state cities');
+        return res.json();
+    },
     getAreas: async (cityCode?: string) => {
         const url = cityCode ? `${CATALOG_API_URL}/location/areas?cityCode=${cityCode}` : `${CATALOG_API_URL}/location/areas`;
         const res = await apiFetch(url, { headers: getAuthHeaders() });
@@ -543,6 +553,14 @@ export const adminLocationApi = {
             headers: getAuthHeaders()
         });
         if (!res.ok) throw new Error('Failed to delete time slot');
+        return res.json();
+    }
+};
+
+export const adminVendorApi = {
+    getVendors: async () => {
+        const res = await apiFetch(`${AUTH_API_URL}/vendors`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch vendors');
         return res.json();
     }
 };
