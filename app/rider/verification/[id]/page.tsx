@@ -11,15 +11,36 @@ import {
   CheckCircle,
   XCircle,
   FileText,
-  Eye,
-  Calendar,
-  AlertCircle,
-  Bike,
-  MapPin,
   Maximize2,
   Loader2,
+  Store,
+  Fuel,
+  Weight,
+  MessageSquare,
+  User,
+  AlertTriangle,
+  Fingerprint,
+  Gavel,
+  History,
+  ShieldAlert,
+  AlertCircle,
+  Clock,
+  MapPin,
+  Bike,
+  Eye,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -48,12 +69,37 @@ export default function VerificationDetailPage() {
     url: string;
   } | null>(null);
 
+  // Verification Form State
+  const [assignment, setAssignment] = useState({
+    zone: "",
+    outlet: "",
+    vendor: ""
+  });
+  const [vehicle, setVehicle] = useState({
+    type: "Bike",
+    capacity: "15",
+    fuelType: "Petrol"
+  });
+  const [internalNotes, setInternalNotes] = useState("");
+
   useEffect(() => {
     async function loadRider() {
       try {
         setLoading(true);
         const res = await fetch(`${AUTH_API_URL}/users/${id}`, { headers: getAuthHeaders() });
-        if (!res.ok) throw new Error("Failed to load rider details");
+        if (!res.ok) {
+          // Check for mock data if API fails or ID is a mock ID
+          const mockRiders: Record<string, any> = {
+            "R-9921": { id: "R-9921", name: "Deepak Sharma", email: "deepak@example.com", phone: "9833333333", createdAt: new Date().toISOString(), status: "pending" },
+            "R-9922": { id: "R-9922", name: "Rahul Verma", email: "rahul@example.com", phone: "9011111111", createdAt: new Date(Date.now() - 86400000).toISOString(), status: "pending" },
+            "R-9923": { id: "R-9923", name: "Arun Kumar", email: "arun@example.com", phone: "9822222222", createdAt: new Date(Date.now() - 172800000).toISOString(), status: "rejected" }
+          };
+          if (mockRiders[id]) {
+            setRider(mockRiders[id]);
+            return;
+          }
+          throw new Error("Failed to load rider details");
+        }
         const data = await res.json();
         setRider(data);
       } catch (err) {
@@ -67,6 +113,13 @@ export default function VerificationDetailPage() {
 
   const handleApprove = async () => {
     try {
+      // Handle mock data
+      if (id.startsWith("R-")) {
+        toast.success(`${rider?.name} has been verified successfully (Demo).`);
+        router.push("/rider/verification");
+        return;
+      }
+
       const res = await fetch(`${AUTH_API_URL}/users/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
@@ -82,17 +135,28 @@ export default function VerificationDetailPage() {
 
   const handleReject = async () => {
     try {
+      // Handle mock data
+      if (id.startsWith("R-")) {
+        toast.error(`${rider?.name}'s application has been rejected (Demo).`);
+        router.push("/rider/verification");
+        return;
+      }
+
       const res = await fetch(`${AUTH_API_URL}/users/${id}/block`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ blocked: true })
+        body: JSON.stringify({ blocked: true, internalNotes })
       });
       if (!res.ok) throw new Error("Rejection failed");
       toast.error(`${rider?.name}'s application has been rejected.`);
-      router.push("/rider");
+      router.push("/rider/verification");
     } catch (err) {
       toast.error("Failed to reject right now.");
     }
+  };
+
+  const handleRequestReupload = () => {
+    toast.warning("Re-upload request sent to rider");
   };
 
   const toggleDocStatus = (index: number) => {
@@ -127,8 +191,27 @@ export default function VerificationDetailPage() {
   
   // Simulated Docs for now as standard Rider schema does not embed explicit documents yet.
   const documents = [
-    { name: "Driving License", status: isPending ? "Pending" : "Verified", type: "Identity", url: "#" },
-    { name: "Vehicle RC", status: isPending ? "Pending" : "Verified", type: "Vehicle", url: "#" }
+    { name: "Driving License", status: isPending ? "Mismatch" : "Verified", type: "Identity", url: "#", expiry: "12 Dec 2028", validation: "Mismatch" },
+    { name: "Vehicle RC", status: isPending ? "Verified" : "Verified", type: "Vehicle", url: "#", expiry: "Valid", validation: "Verified" },
+    { name: "Insurance", status: isPending ? "Expired" : "Verified", type: "Safety", url: "#", expiry: "04 May 2026", validation: "Expired" }
+  ];
+
+  const backgroundChecks = [
+    { name: "Police Verification", status: "Completed", icon: Fingerprint, color: "text-emerald-600" },
+    { name: "Address Verification", status: "Verified", icon: MapPin, color: "text-blue-600" },
+    { name: "Previous Employment", status: "Pending", icon: History, color: "text-amber-600" }
+  ];
+
+  const riskHistory = {
+    isPreviouslyBlocked: true,
+    reason: "High cancellation rate in 2023",
+    date: "15 Jun 2023"
+  };
+
+  const agreements = [
+    { name: "Terms of Service", accepted: true },
+    { name: "Penalty Policy", accepted: true },
+    { name: "Damage Liability", accepted: false }
   ];
 
   return (
@@ -152,6 +235,17 @@ export default function VerificationDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Risk Alert */}
+      {riskHistory.isPreviouslyBlocked && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-red-100 p-2 rounded-lg text-red-600"><ShieldAlert className="h-5 w-5" /></div>
+          <div>
+            <p className="text-sm font-bold text-red-900">Previous Block History Detected</p>
+            <p className="text-xs text-red-700 mt-1">Rider was previously blocked on {riskHistory.date} due to: <span className="font-bold underline">{riskHistory.reason}</span>. Please conduct secondary interview before approval.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-12">
         {/* Left Column - Rider Info & Vehicle (4 cols) */}
@@ -212,22 +306,74 @@ export default function VerificationDetailPage() {
 
           {/* Vehicle Info Card */}
           <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 border-b">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Bike className="h-4 w-4 text-slate-500" /> Vehicle Details
+                <Bike className="h-4 w-4 text-[#3E8940]" /> Vehicle Configuration
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Status</span>
-                  <span className="font-medium">{rider.status}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Wallet</span>
-                  <span className="font-medium text-green-600">Active</span>
+            <CardContent className="pt-4 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase">Vehicle Type</Label>
+                <Select value={vehicle.type} onValueChange={(v) => setVehicle({...vehicle, type: v})}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bike">Bike / Motorcycle</SelectItem>
+                    <SelectItem value="Scooter">Scooter / Moped</SelectItem>
+                    <SelectItem value="EV">Electric Vehicle (EV)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase">Load Capacity (KG)</Label>
+                <div className="relative">
+                  <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input 
+                    type="number" 
+                    className="pl-9 h-9 rounded-lg" 
+                    value={vehicle.capacity} 
+                    onChange={(e) => setVehicle({...vehicle, capacity: e.target.value})}
+                  />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase">Fuel Type</Label>
+                <Select value={vehicle.fuelType} onValueChange={(v) => setVehicle({...vehicle, fuelType: v})}>
+                  <SelectTrigger className="h-9 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Fuel className="h-3.5 w-3.5 text-slate-400" />
+                      <SelectValue placeholder="Select fuel" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Petrol">Petrol / Gasoline</SelectItem>
+                    <SelectItem value="Electric">Electric / Battery</SelectItem>
+                    <SelectItem value="CNG">CNG / Natural Gas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+          {/* Background Checks Card */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-2 border-b">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-[#3E8940]" /> Background Checks
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {backgroundChecks.map((check, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <check.icon className={cn("h-3.5 w-3.5", check.color)} />
+                    <span className="text-xs font-medium text-slate-600">{check.name}</span>
+                  </div>
+                  <Badge variant="outline" className={cn("text-[9px] font-bold py-0 h-5 border-none", 
+                    check.status === "Completed" || check.status === "Verified" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                  )}>
+                    {check.status}
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -248,27 +394,25 @@ export default function VerificationDetailPage() {
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl hover:bg-slate-50 transition-colors group gap-4"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors shrink-0">
+                    <div className="h-12 w-12 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-100 transition-colors shrink-0">
                       <FileText className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-900">{doc.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="text-[10px] h-5">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">{doc.name}</p>
+                        <Badge variant="secondary" className="text-[9px] h-4 font-bold bg-slate-100 text-slate-500 uppercase tracking-tight">
                           {doc.type}
                         </Badge>
-                        <span className="text-xs text-slate-500">
-                          PDF • On File
-                        </span>
                       </div>
+                      <p className="text-[11px] font-bold text-red-500 mt-0.5">Expires: {doc.expiry}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                     <div className="flex items-center">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="h-8 gap-1.5 text-xs"
+                        className="h-8 gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                         onClick={() =>
                           setPreviewDoc({ name: doc.name, url: doc.url })
                         }
@@ -277,48 +421,106 @@ export default function VerificationDetailPage() {
                       </Button>
                     </div>
 
-                    {doc.status === "Verified" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 h-8 px-3"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Verified
-                      </Badge>
-                    )}
-                    {doc.status === "Rejected" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 h-8 px-3"
-                      >
-                        <XCircle className="h-3.5 w-3.5 mr-1.5" /> Rejected
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {doc.validation === "Verified" && <Badge className="bg-emerald-100 text-emerald-700 border-none font-bold text-[10px]"><CheckCircle className="h-3 w-3 mr-1" /> Verified</Badge>}
+                      {doc.validation === "Expired" && <Badge className="bg-red-100 text-red-700 border-none font-bold text-[10px]"><Clock className="h-3 w-3 mr-1" /> Expired</Badge>}
+                      {doc.validation === "Mismatch" && <Badge className="bg-amber-100 text-amber-700 border-none font-bold text-[10px]"><AlertCircle className="h-3 w-3 mr-1" /> Mismatch</Badge>}
+                      {doc.validation === "Blurry" && <Badge className="bg-slate-100 text-slate-700 border-none font-bold text-[10px]"><AlertTriangle className="h-3 w-3 mr-1" /> Blurry</Badge>}
+                    </div>
                   </div>
                 </div>
               ))}
+
+              <div className="pt-4 border-t mt-6">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Gavel className="h-3.5 w-3.5" /> Digital Agreement Acceptance</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {agreements.map((agreement, idx) => (
+                    <div key={idx} className={cn("p-3 rounded-xl border flex items-center justify-between", agreement.accepted ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100")}>
+                      <span className="text-[11px] font-bold text-slate-700">{agreement.name}</span>
+                      {agreement.accepted ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardContent>
             {isPending && (
-                <div className="p-6 border-t bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-b-xl">
-                <div className="text-sm text-slate-500">
-                    <span className="font-medium text-slate-900">Ensure all verification steps</span>{" "}
-                    are complete before approval.
-                </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <Button
-                    variant="outline"
-                    className="flex-1 sm:flex-none border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={handleReject}
-                    >
-                    Reject Application
-                    </Button>
-                    <Button
-                    className="flex-1 sm:flex-none bg-[#3E8940] hover:bg-[#3E8940]/90 px-8"
-                    onClick={handleApprove}
-                    >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve Rider
-                    </Button>
-                </div>
+                <div className="p-6 border-t bg-slate-50/50 space-y-6 rounded-b-xl">
+                  {/* Assignment Section */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><MapPin className="h-3 w-3" /> Assign Zone</Label>
+                      <Select value={assignment.zone} onValueChange={(v) => setAssignment({...assignment, zone: v})}>
+                        <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue placeholder="Select Zone" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gurgaon-29">Gurgaon Sector 29</SelectItem>
+                          <SelectItem value="noida-62">Noida Sector 62</SelectItem>
+                          <SelectItem value="delhi-cp">Delhi CP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Store className="h-3 w-3" /> Assign Outlet</Label>
+                      <Select value={assignment.outlet} onValueChange={(v) => setAssignment({...assignment, outlet: v})}>
+                        <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue placeholder="Select Outlet" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="masterclean-exp">Masterclean Experience</SelectItem>
+                          <SelectItem value="cleclo-hub-s">Cleclo Hub - South</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><User className="h-3 w-3" /> Assign Vendor</Label>
+                      <Select value={assignment.vendor} onValueChange={(v) => setAssignment({...assignment, vendor: v})}>
+                        <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue placeholder="Direct / Vendor" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="direct">Direct Hire</SelectItem>
+                          <SelectItem value="logistics-pro">Logistics Pro Ltd</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Internal Notes */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><MessageSquare className="h-3 w-3" /> Internal Admin Notes</Label>
+                    <Textarea 
+                      placeholder="Add private observations about this application..." 
+                      className="bg-white rounded-xl min-h-[80px]"
+                      value={internalNotes}
+                      onChange={(e) => setInternalNotes(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                    <div className="text-[11px] text-slate-500 max-w-[250px]">
+                        <span className="font-bold text-slate-900 block mb-1">FINAL REVIEW</span>
+                        Ensure Zone and Outlet are assigned before final approval.
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+                        <Button
+                          variant="outline"
+                          className="flex-1 sm:flex-none border-slate-200 text-slate-600 hover:bg-slate-100"
+                          onClick={handleRequestReupload}
+                        >
+                          Request Re-upload
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 sm:flex-none border-red-200 text-red-600 hover:bg-red-50"
+                          onClick={handleReject}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          className="flex-1 sm:flex-none bg-[#3E8940] hover:bg-[#3E8940]/90 px-8 font-bold"
+                          onClick={handleApprove}
+                          disabled={!assignment.zone || !assignment.outlet}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Approve Rider
+                        </Button>
+                    </div>
+                  </div>
                 </div>
             )}
           </Card>

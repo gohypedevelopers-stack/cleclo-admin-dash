@@ -408,6 +408,37 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
+      {/* Revenue Breakdown */}
+      {data.revenueBreakdown && data.revenueBreakdown.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <TrendingUp className="h-32 w-32 text-[#3E8940]" />
+          </div>
+
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Revenue Breakdown</h2>
+              <p className="text-sm font-medium text-slate-500 mt-0.5">Granular split of gross platform revenue and earnings</p>
+            </div>
+            <Badge className="bg-[#3E8940]/10 text-[#3E8940] hover:bg-[#3E8940]/20 border-none font-bold px-3 py-1 rounded-full">
+              Live Breakdown
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {data.revenueBreakdown.map((item) => (
+              <div key={item.key} className="relative p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg hover:border-transparent transition-all duration-300 group/card">
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{item.value}</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.title}</p>
+                  <p className="text-[10px] font-medium text-slate-500 pt-1">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Finance Snapshot */}
       {data.financeSnapshot.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden relative group">

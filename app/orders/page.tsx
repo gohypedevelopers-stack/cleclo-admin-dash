@@ -24,6 +24,17 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  LocateFixed,
+  DollarSign,
+  TrendingUp,
+  Tag,
+  Map,
+  ShieldCheck,
+  Check,
+  Users,
+  Download,
+  Bell,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,7 +103,7 @@ interface OrderRecord {
 
 const calculateSlaStatus = (createdAt: string, status: string, deliveryType?: string) => {
   const s = status?.toLowerCase();
-  if (["delivered", "cancelled", "received_by_vendor"].includes(s)) return null;
+  if (["delivered", "cancelled"].includes(s)) return null;
   
   const createdTime = new Date(createdAt).getTime();
   const now = new Date().getTime();
@@ -102,9 +113,11 @@ const calculateSlaStatus = (createdAt: string, status: string, deliveryType?: st
   const slaLimit = type.toLowerCase().includes("express") ? 24 : 72;
   const remainingHours = slaLimit - elapsedHours;
   
-  if (remainingHours < 0) return { label: `${Math.abs(Math.round(remainingHours))}h Overdue`, color: "bg-red-100 text-red-700", isBreached: true };
-  if (remainingHours <= 12) return { label: `${Math.round(remainingHours)}h Left`, color: "bg-amber-100 text-amber-700", isBreached: false };
-  return { label: `${Math.round(remainingHours)}h Left`, color: "bg-emerald-100 text-emerald-700", isBreached: false };
+  if (remainingHours < 0) return { label: `🔴 Overdue`, color: "bg-red-50 text-red-600 ring-red-200", isBreached: true, icon: "🔴" };
+  if (remainingHours <= 1) return { label: `⚠️ ${Math.round(remainingHours * 60)}m left`, color: "bg-orange-50 text-orange-600 ring-orange-200", isBreached: false, icon: "⚠️" };
+  if (remainingHours <= 6) return { label: `⏳ ${Math.round(remainingHours)}h left`, color: "bg-amber-50 text-amber-600 ring-amber-200", isBreached: false, icon: "⏳" };
+  
+  return { label: `${Math.round(remainingHours)}h left`, color: "bg-emerald-50 text-emerald-600 ring-emerald-200", isBreached: false, icon: "✅" };
 };
 
 const getStatusColor = (status: string) => {
@@ -265,16 +278,62 @@ function OrdersPageContent() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl text-black font-bold tracking-tight">Orders</h1>
-          <p className="text-slate-500 mt-1">View and manage all platform orders</p>
+          <p className="text-slate-500 mt-1">Platform-wide fulfillment monitoring & economics</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 rounded-xl" asChild>
+          <div className="flex bg-slate-100 p-1 rounded-xl border mr-2">
+             <Button variant="ghost" size="sm" className="h-8 rounded-lg bg-white shadow-sm text-xs font-bold text-slate-700">Live Feed</Button>
+             <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs font-bold text-slate-400">Archived</Button>
+          </div>
+          <Button variant="outline" className="gap-2 rounded-xl border-[#3E8940] text-[#3E8940] hover:bg-green-50" asChild>
             <Link href="/orders/settings">
-              <RefreshCcw className="h-4 w-4" /> Allocation Settings
+              <Layers className="h-4 w-4" /> Allocation Rules
             </Link>
           </Button>
           {isLoading && <Loader2 className="h-5 w-5 animate-spin text-[#3E8940]" />}
         </div>
+      </div>
+
+      {/* Bulk Actions & High-Level Filters */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+         <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+               <Check className="h-4 w-4" /> Bulk Assign
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+               <Bell className="h-4 w-4" /> Notify All
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+               <Download className="h-4 w-4" /> Export CSV
+            </Button>
+         </div>
+
+         <div className="flex items-center gap-3">
+            <Select defaultValue="all-cities">
+               <SelectTrigger className="w-32 h-9 rounded-xl border-slate-200 text-[11px] font-bold">
+                  <MapPin className="h-3 w-3 mr-1.5 text-slate-400" />
+                  <SelectValue placeholder="City" />
+               </SelectTrigger>
+               <SelectContent>
+                  <SelectItem value="all-cities">All Cities</SelectItem>
+                  <SelectItem value="mumbai">Mumbai</SelectItem>
+                  <SelectItem value="delhi">Delhi</SelectItem>
+                  <SelectItem value="bangalore">Bangalore</SelectItem>
+               </SelectContent>
+            </Select>
+            <Select defaultValue="all-zones">
+               <SelectTrigger className="w-32 h-9 rounded-xl border-slate-200 text-[11px] font-bold">
+                  <Map className="h-3 w-3 mr-1.5 text-slate-400" />
+                  <SelectValue placeholder="Zone" />
+               </SelectTrigger>
+               <SelectContent>
+                  <SelectItem value="all-zones">All Zones</SelectItem>
+                  <SelectItem value="west">West Zone</SelectItem>
+                  <SelectItem value="east">East Zone</SelectItem>
+                  <SelectItem value="south">South Zone</SelectItem>
+               </SelectContent>
+            </Select>
+         </div>
       </div>
 
       {/* Filters */}
@@ -350,82 +409,155 @@ function OrdersPageContent() {
               const hasDamage = order.issue?.type?.toLowerCase().includes("damage");
 
               return (
-                <TableRow key={order.id} className={`hover:bg-slate-50 cursor-pointer ${isUnassigned ? "bg-red-50/30" : ""}`} onClick={() => router.push(`/orders/${order.id}`)}>
+                <TableRow key={order.id} className={`hover:bg-slate-50 cursor-pointer ${isUnassigned ? "bg-red-50/40" : ""}`} onClick={() => router.push(`/orders/${order.id}`)}>
                   <TableCell className="py-4 pl-6">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-                        {order.status === "DELIVERED" ? <Package className="h-4 w-4 text-purple-600" /> : <Truck className="h-4 w-4 text-purple-600" />}
+                      <div className="h-9 w-9 rounded-lg bg-slate-50 border flex items-center justify-center shrink-0">
+                        {order.status === "DELIVERED" ? <Package className="h-4 w-4 text-slate-400" /> : <Truck className="h-4 w-4 text-[#3E8940]" />}
                       </div>
                       <div>
                         <div className="flex items-center gap-1">
-                          <p className="font-bold text-slate-900 text-xs">#{order.id.slice(0, 8).toUpperCase()}</p>
-                          {hasDamage && <Badge className="bg-red-100 text-red-700 border-none px-1 text-[8px] h-3">DAMAGE</Badge>}
+                          <p className="font-black text-slate-900 text-xs">#{order.id.slice(0, 8).toUpperCase()}</p>
+                          <Badge className="bg-slate-100 text-slate-600 border-none px-1 text-[7px] h-3 font-black">AUTO-ASSIGNED</Badge>
                         </div>
-                        <p className="text-[10px] text-slate-400">{formatDate(order.createdAt)}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                           <p className="text-[10px] font-bold text-slate-500">{formatDate(order.createdAt)}</p>
+                           <Badge className={cn("text-[8px] h-3.5 px-1 font-bold", order.paymentStatus === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100')}>
+                             {order.paymentStatus || 'PENDING'}
+                           </Badge>
+                        </div>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
                       <p className="font-bold text-slate-900 text-xs">{customerName}</p>
-                      <p className="text-[10px] text-slate-400">{order.user?.phone || ""}</p>
+                      <div className="flex items-center gap-1 text-[9px] text-slate-400 font-medium">
+                         <MapPin className="h-2 w-2" /> Mumbai • West Zone
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <p className="text-[10px] text-purple-600 font-bold uppercase">{vendorName}</p>
+                    <div className="flex flex-col">
+                       <p className="text-[10px] text-[#3E8940] font-black uppercase tracking-tight">{vendorName}</p>
+                       <div className="flex items-center gap-1 mt-0.5">
+                          <Badge variant="outline" className="text-[8px] px-1 h-3.5 text-blue-600 bg-blue-50/50 border-blue-100 font-black uppercase">Outlet #24</Badge>
+                       </div>
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="text-[8px] px-1 h-3.5 border-slate-200">P</Badge>
-                        {pickupPerson ? <span className="text-[10px] font-bold text-slate-700">{pickupPerson}</span> : <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1 rounded-sm">Unassigned</span>}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400">P</div>
+                        {pickupPerson ? (
+                           <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-700">{pickupPerson}</span>
+                              <LocateFixed className="h-3 w-3 text-blue-500 hover:scale-110 transition-transform cursor-pointer" />
+                           </div>
+                        ) : (
+                           <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-red-600 bg-red-50 px-1.5 rounded-sm animate-pulse">Unassigned</span>
+                              <span className="text-[8px] text-red-400 font-bold ml-0.5">⚠️ Unallocated {'>'} 2h</span>
+                           </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="text-[8px] px-1 h-3.5 border-slate-200">D</Badge>
-                        {deliveryPerson ? <span className="text-[10px] font-bold text-slate-700">{deliveryPerson}</span> : <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1 rounded-sm">Unassigned</span>}
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400">D</div>
+                        {deliveryPerson ? (
+                           <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-700">{deliveryPerson}</span>
+                              <LocateFixed className="h-3 w-3 text-slate-300" />
+                           </div>
+                        ) : (
+                           <span className="text-[10px] font-black text-slate-300 bg-slate-50 px-1.5 rounded-sm">Waiting</span>
+                        )}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
                     {slaStatus ? (
-                      <Badge className={`${slaStatus.color} border-none font-bold text-[10px]`}>
-                        {slaStatus.isBreached ? <AlertTriangle className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
-                        {slaStatus.label}
-                      </Badge>
+                      <div className="flex flex-col items-center gap-1">
+                        <Badge className={`${slaStatus.color} border-none font-black text-[10px] px-2 py-0.5 rounded-lg shadow-sm`}>
+                          {slaStatus.label}
+                        </Badge>
+                        <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                           <div className={cn("h-full", slaStatus.isBreached ? "bg-red-500" : "bg-emerald-500")} style={{ width: slaStatus.isBreached ? '100%' : '65%' }} />
+                        </div>
+                      </div>
                     ) : (
                       <span className="text-slate-300 text-[10px]">—</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge className={cn("border font-semibold px-2 py-0.5 whitespace-nowrap text-[10px]", getDeliveryBadgeColor(order.deliveryType || (order as any).serviceType))}>
-                      {order.deliveryType || (order as any).serviceType || "Standard"}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                       <Badge className={cn("border font-black px-2 py-0.5 whitespace-nowrap text-[9px] uppercase tracking-tighter", getDeliveryBadgeColor(order.deliveryType || (order as any).serviceType))}>
+                         {order.deliveryType || (order as any).serviceType || "Standard"}
+                       </Badge>
+                       <div className="flex flex-wrap gap-1">
+                          <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 rounded flex items-center gap-0.5">
+                             <Tag className="h-2 w-2" /> Designer
+                          </span>
+                          <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 rounded flex items-center gap-0.5">
+                             <Tag className="h-2 w-2" /> Delicate
+                          </span>
+                       </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <div className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-slate-50 border border-slate-200">
-                      <span className="text-xs font-bold text-slate-700">{order.itemCount}</span>
+                    <div className="flex flex-col items-center">
+                       <div className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-slate-50 border border-slate-200">
+                         <span className="text-xs font-bold text-slate-700">{order.itemCount}</span>
+                       </div>
+                       <p className="text-[8px] text-slate-400 mt-1 font-bold">Premium Silk (2)</p>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <p className="font-bold text-slate-900 text-xs">{formatINR(order.totalAmount)}</p>
-                    {marginAmount > 0 && (
-                      <p className="text-[9px] font-bold text-emerald-600 mt-0.5">+{formatINR(marginAmount)} ({marginPct}%)</p>
-                    )}
+                    <div className="group relative">
+                       <p className="font-black text-slate-900 text-xs">{formatINR(order.totalAmount)}</p>
+                       <div className="flex flex-col items-end mt-0.5">
+                         <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-400">Margin:</span>
+                            <p className="text-[9px] font-black text-violet-600 leading-tight">{marginPct}% ({formatINR(marginAmount)})</p>
+                         </div>
+                         <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[9px] font-bold text-slate-400">Vendor:</span>
+                            <p className="text-[9px] font-black text-[#3E8940] leading-tight">Pay {formatINR(order.totalAmount - marginAmount - 140)}</p>
+                         </div>
+                       </div>
+                       
+                       {/* Hover Profitability Tooltip Mock */}
+                       <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-48 bg-slate-900 text-white p-3 rounded-xl shadow-2xl z-50 text-[10px] space-y-2 border border-white/10 backdrop-blur-md">
+                          <p className="font-black border-b border-white/10 pb-1 uppercase tracking-widest text-[8px] text-slate-400">Order Profitability</p>
+                          <div className="flex justify-between"><span>Order Value:</span><span className="font-bold">{formatINR(order.totalAmount)}</span></div>
+                          <div className="flex justify-between text-red-400"><span>Vendor Cost:</span><span className="font-bold">-{formatINR(order.totalAmount - marginAmount - 140)}</span></div>
+                          <div className="flex justify-between text-red-400"><span>Rider Cost:</span><span className="font-bold">-₹140</span></div>
+                          <div className="flex justify-between text-emerald-400 font-black border-t border-white/10 pt-1"><span>Net Margin:</span><span>{formatINR(marginAmount)}</span></div>
+                       </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge className={`${getStatusColor(order.status)} border-none font-bold gap-1 px-2.5 py-0.5 rounded-full whitespace-nowrap text-[10px]`}>
-                      {getStatusIcon(order.status)}
-                      {formatStatusLabel(order.status)}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                       <Badge className={`${getStatusColor(order.status)} border-none font-black gap-1 px-2.5 py-1 rounded-lg whitespace-nowrap text-[9px] uppercase tracking-tighter shadow-sm`}>
+                         {getStatusIcon(order.status)}
+                         {formatStatusLabel(order.status)}
+                       </Badge>
+                       {order.status === 'PROCESSING' && (
+                          <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold italic">
+                             <Clock className="h-2 w-2" /> Stuck {'>'} 24h: Vendor Delay
+                          </div>
+                       )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right pr-6">
-                    <Button
-                      size="sm"
-                      className="h-7 px-3 bg-[#3E8940] hover:bg-[#3E8940]/90 text-[10px] font-bold gap-1 rounded-lg"
-                      onClick={(e) => { e.stopPropagation(); router.push(`/orders/${order.id}`); }}
-                    >
-                      View <ArrowRight className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                       <Button
+                         size="sm"
+                         className="h-8 px-3 bg-[#3E8940] hover:bg-[#3E8940]/90 text-[10px] font-black gap-1.5 rounded-xl shadow-sm transition-all hover:translate-x-1"
+                         onClick={(e) => { e.stopPropagation(); router.push(`/orders/${order.id}`); }}
+                       >
+                         Control <ArrowRight className="h-3 w-3" />
+                       </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );

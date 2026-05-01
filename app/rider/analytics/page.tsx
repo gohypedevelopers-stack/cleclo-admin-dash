@@ -37,19 +37,51 @@ import {
   Calendar,
   Filter,
   Loader2,
+  AlertTriangle,
+  ShieldCheck,
+  Gavel,
+  Percent,
+  Activity,
+  Flame,
+  Zap,
+  Target,
+  ShieldAlert,
+  ThumbsDown,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // Simulated historical sequence for charts
-const DELIVERY_DATA = [
-  { name: "Mon", deliveries: 145, earnings: 4200 },
-  { name: "Tue", deliveries: 132, earnings: 3800 },
-  { name: "Wed", deliveries: 156, earnings: 4500 },
-  { name: "Thu", deliveries: 165, earnings: 4800 },
-  { name: "Fri", deliveries: 210, earnings: 6200 },
-  { name: "Sat", deliveries: 250, earnings: 7500 },
-  { name: "Sun", deliveries: 230, earnings: 6900 },
+const PERFORMANCE_TRENDS = [
+  { name: "Mon", pickup: 94, delivery: 92, target: 95 },
+  { name: "Tue", pickup: 92, delivery: 88, target: 95 },
+  { name: "Wed", pickup: 96, delivery: 94, target: 95 },
+  { name: "Thu", pickup: 95, delivery: 95, target: 95 },
+  { name: "Fri", pickup: 88, delivery: 85, target: 95 },
+  { name: "Sat", pickup: 85, delivery: 82, target: 95 },
+  { name: "Sun", pickup: 90, delivery: 89, target: 95 },
+];
+
+const PRODUCTIVITY_DATA = [
+  { group: "Top 10% Riders", share: 40, color: "#3E8940" },
+  { group: "Middle 70% Riders", share: 55, color: "#2563eb" },
+  { group: "Bottom 20% Riders", share: 5, color: "#94A3B8" },
+];
+
+const CANCELLATION_ANALYTICS = [
+  { name: "Rider Cancelled", value: 15, color: "#ef4444" },
+  { name: "Customer Cancelled", value: 65, color: "#3b82f6" },
+  { name: "Vendor Delay Impact", value: 20, color: "#f59e0b" },
+];
+
+const RISK_CATEGORIES = [
+  { label: "High Cancellation", count: 12, trend: "up", color: "text-red-600", icon: Flame },
+  { label: "Low Rating ( < 4.2 )", count: 8, trend: "down", color: "text-amber-600", icon: ThumbsDown },
+  { label: "Frequent Complaints", count: 5, trend: "stable", color: "text-red-500", icon: ShieldAlert },
 ];
 
 const HOURLY_ACTIVITY = [
@@ -71,8 +103,10 @@ const getAuthHeaders = () => ({
 });
 
 export default function RiderAnalyticsPage() {
+  const router = useRouter();
   const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -85,7 +119,12 @@ export default function RiderAnalyticsPage() {
 
         if (usersRes.ok) {
           const usersData = await usersRes.json();
-          setRiders(usersData.filter((u: any) => u.role?.toLowerCase() === 'rider' || u.vendorProfile?.businessType === 'rider'));
+          const riderList = usersData.filter((u: any) => u.role?.toLowerCase() === 'rider' || u.vendorProfile?.businessType === 'rider');
+          setRiders(riderList);
+        }
+
+        if (statsRes && statsRes.ok) {
+          setStats(await statsRes.json());
         }
       } catch (err) {
         toast.error("Failed to load generic overview.");
@@ -105,13 +144,30 @@ export default function RiderAnalyticsPage() {
     );
   }
 
-  const activeCount = riders.filter(r => r.status?.toLowerCase() === 'active').length;
-  const offlineCount = riders.filter(r => r.status?.toLowerCase() !== 'active').length;
+  // Dynamic Aggregate Calculations
+  const totalDeliveries = riders.reduce((sum, r) => sum + (r.riderProfile?.totalDeliveries || 0), 0);
+  const totalEarnings = riders.reduce((sum, r) => sum + (r.riderProfile?.totalEarnings || 0), 0);
+  const avgOTP = riders.length > 0 
+    ? riders.reduce((sum, r) => sum + (r.riderProfile?.onTimePct || 0), 0) / riders.length 
+    : 0;
+  const avgRating = riders.length > 0 
+    ? riders.reduce((sum, r) => sum + parseFloat(r.riderProfile?.rating || 0), 0) / riders.length 
+    : 0;
   
+  const costPerDelivery = totalDeliveries > 0 ? (totalEarnings / totalDeliveries) : 113.4;
+  const slaScore = Math.round((avgOTP * 0.7) + (avgRating * 20 * 0.3)); // Weighted SLA score
+
+  const activeCount = riders.filter(r => r.status?.toLowerCase() === 'active').length;
+  const highCancelRiders = riders.filter(r => (r.riderProfile?.cancellationPct || 0) > 10).length;
+  const lowRatingRiders = riders.filter(r => (r.riderProfile?.rating || 0) < 4.2 && (r.riderProfile?.rating || 0) > 0).length;
+  const frequentComplaints = riders.filter(r => (r.riderProfile?.complaintsCount || 0) > 3).length;
+
   const RIDER_STATUS_DATA = [
     { name: "Active", value: activeCount > 0 ? activeCount : 0.1, color: "#3E8940" },
-    { name: "Offline", value: offlineCount, color: "#94A3B8" },
+    { name: "Offline", value: Math.max(0, riders.length - activeCount), color: "#94A3B8" },
   ];
+
+  const formatINR = (a: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(a);
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -141,20 +197,23 @@ export default function RiderAnalyticsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   Total Delivery Volume
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  1,280
+                  {totalDeliveries > 0 ? totalDeliveries.toLocaleString() : "1,280"}
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
                 <Package className="h-5 w-5" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-xs text-green-600 font-medium">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              <span>+8.2% from last week</span>
+            <div className="mt-4 flex items-center justify-between text-xs font-medium">
+              <div className="flex items-center text-emerald-600">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                <span>+8.2%</span>
+              </div>
+              <span className="text-slate-400 font-normal">Last 7 Days</span>
             </div>
           </CardContent>
         </Card>
@@ -163,19 +222,19 @@ export default function RiderAnalyticsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Registered Riders
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Fleet Payouts (Total)
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  {riders.length}
+                  {formatINR(totalEarnings || 145200)}
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <Users className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <DollarSign className="h-5 w-5" />
               </div>
             </div>
             <div className="mt-4 flex items-center text-xs text-slate-500">
-              <span className="text-green-600 font-medium">{activeCount} Currently Active</span>
+              <span className="font-bold text-slate-900 mr-1">{riders.length}</span> Active Fleet Registry
             </div>
           </CardContent>
         </Card>
@@ -184,77 +243,69 @@ export default function RiderAnalyticsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Avg. Delivery Time
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Cost per Delivery
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  24m 30s
+                  ₹{costPerDelivery.toFixed(1)}
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-                <Clock className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                <Zap className="h-5 w-5" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-xs text-green-600 font-medium">
-              <TrendingDown className="h-3 w-3 mr-1" />
-              <span>-1m 15s improvement</span>
+            <div className="mt-4 flex items-center text-xs text-slate-500">
+              <span className="text-amber-600 font-bold">Payout / Deliveries</span>
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow bg-[#3E8940] text-white">
           <CardContent className="p-6 relative overflow-hidden">
-             {/* Decorative Background Assets */}
-            <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-            
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
             <div className="flex items-center justify-between relative z-10">
               <div>
-                <p className="text-sm font-medium text-green-100">
-                  Fleet Utilization
+                <p className="text-[11px] font-bold text-green-100 uppercase tracking-wider">
+                  Fleet SLA Score
                 </p>
                 <h3 className="text-2xl font-bold mt-1">
-                  {Math.round((activeCount / Math.max(riders.length, 1)) * 100)}%
+                  {slaScore > 0 ? slaScore : 88}/100
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Package className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Target className="h-5 w-5" />
               </div>
             </div>
             <div className="mt-4 flex items-center text-xs text-green-100 relative z-10">
-              <span>Optimized Fleet Capacity</span>
+              <ShieldCheck className="h-3 w-3 mr-1" />
+              <span>High Compliance Tier</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-7">
-        {/* Main Chart */}
+        {/* Performance Trends Chart */}
         <Card className="md:col-span-5 shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle>Delivery & Earnings Trends</CardTitle>
-            <CardDescription>
-              Daily performance breakdown for the current week
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>On-Time Performance Trends</CardTitle>
+              <CardDescription>
+                Pickup vs Delivery compliance against 95% SLA target
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-tight">
+                <div className="flex items-center gap-1.5 text-emerald-600"><div className="h-2 w-2 rounded-full bg-emerald-600" /> Pickup</div>
+                <div className="flex items-center gap-1.5 text-blue-600"><div className="h-2 w-2 rounded-full bg-blue-600" /> Delivery</div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={DELIVERY_DATA}
+                <LineChart
+                  data={PERFORMANCE_TRENDS}
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                 >
-                  <defs>
-                    <linearGradient
-                      id="colorEarnings"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#3E8940" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#3E8940" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -264,55 +315,63 @@ export default function RiderAnalyticsPage() {
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "#64748b" }}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
                     dy={10}
                   />
                   <YAxis
+                    domain={[0, 100]}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "#64748b" }}
+                    tick={{ fill: "#64748b", fontSize: 12 }}
                     dx={-10}
                   />
                   <Tooltip
                     contentStyle={{
-                      borderRadius: "8px",
-                      border: "none",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      borderRadius: "12px",
+                      border: "1px solid #f1f5f9",
+                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                     }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="earnings"
-                    stroke="#3E8940"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorEarnings)"
                   />
                   <Line
                     type="monotone"
-                    dataKey="deliveries"
-                    stroke="#2563eb"
+                    dataKey="target"
+                    stroke="#cbd5e1"
                     strokeWidth={2}
-                    dot={{ r: 4, fill: "#2563eb", strokeWidth: 0 }}
+                    strokeDasharray="5 5"
+                    dot={false}
                   />
-                </AreaChart>
+                  <Line
+                    type="monotone"
+                    dataKey="pickup"
+                    stroke="#3E8940"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#3E8940" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="delivery"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#2563eb" }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Status Pie Chart */}
+        {/* Cancellation Analytics */}
         <Card className="md:col-span-2 shadow-sm border-slate-200">
           <CardHeader>
-            <CardTitle>Fleet Status</CardTitle>
-            <CardDescription>Real-time rider availability</CardDescription>
+            <CardTitle>Cancellation Analytics</CardTitle>
+            <CardDescription>Root cause distribution</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center">
             <div className="h-[200px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={RIDER_STATUS_DATA}
+                    data={CANCELLATION_ANALYTICS}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -320,7 +379,7 @@ export default function RiderAnalyticsPage() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {RIDER_STATUS_DATA.map((entry, index) => (
+                    {CANCELLATION_ANALYTICS.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -328,26 +387,163 @@ export default function RiderAnalyticsPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                <span className="text-2xl font-bold text-slate-900">{riders.length}</span>
-                <span className="text-xs text-slate-500 block">Total</span>
+                <span className="text-2xl font-bold text-slate-900">4.2%</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Total Rate</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 w-full mt-4">
-              {RIDER_STATUS_DATA.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <div
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="text-sm font-medium text-slate-700">
-                    {item.name}
-                  </span>
-                  <span className="text-xs text-slate-500 ml-auto">
-                    {item.value >= 1 ? item.value : 0}
+            <div className="space-y-3 w-full mt-4">
+              {CANCELLATION_ANALYTICS.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-2.5 w-2.5 rounded-sm"
+                      style={{ backgroundColor: item.color }}
+                    ></div>
+                    <span className="text-xs font-medium text-slate-600">
+                      {item.name}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-900">
+                    {item.value}%
                   </span>
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Productivity Distribution */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle>Fleet Productivity Distribution</CardTitle>
+            <CardDescription>Delivery share by rider segment</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={PRODUCTIVITY_DATA} margin={{ left: 10, right: 40 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="group" type="category" hide />
+                  <Tooltip cursor={{ fill: 'transparent' }} />
+                  <Bar dataKey="share" radius={[0, 4, 4, 0]} barSize={30}>
+                    {PRODUCTIVITY_DATA.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 space-y-4">
+              {PRODUCTIVITY_DATA.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                   <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-xs font-bold text-slate-700">{item.group}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-xs font-bold text-slate-900">{item.share}% Deliveries</span>
+                   </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Enhanced Utilization Metrics */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle>Fleet Utilization & Efficiency</CardTitle>
+            <CardDescription>Active time and load analysis</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100">
+                <p className="text-[10px] font-bold text-indigo-400 uppercase">Avg Active Hours</p>
+                <p className="text-xl font-bold text-indigo-700 mt-1">6.4 Hrs</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+                <p className="text-[10px] font-bold text-amber-400 uppercase">Idle Time %</p>
+                <p className="text-xl font-bold text-amber-700 mt-1">22%</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">Peak Hour Load</p>
+                <p className="text-xl font-bold text-emerald-700 mt-1">94%</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                <p className="text-[10px] font-bold text-blue-400 uppercase">Incident Rate</p>
+                <p className="text-xl font-bold text-blue-700 mt-1">0.8%</p>
+              </div>
+            </div>
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 flex items-center gap-2"><Gavel className="h-3.5 w-3.5" /> Lost Item Cases</span>
+                <span className="font-bold text-red-600">2 Cases</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 flex items-center gap-2"><Activity className="h-3.5 w-3.5" /> Transit Damage Rate</span>
+                <span className="font-bold text-amber-600">0.8%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Rider Risk Heatmap */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle>Rider Risk Watchlist</CardTitle>
+            <CardDescription>Performance-based risk monitoring</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-xl bg-slate-100 transition-colors group-hover:bg-white shadow-sm text-red-600">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">High Cancellation</p>
+                    <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-tighter">Requires Manager Action</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-red-600">{highCancelRiders}</p>
+                </div>
+             </div>
+
+             <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-xl bg-slate-100 transition-colors group-hover:bg-white shadow-sm text-amber-600">
+                    <ThumbsDown className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Low Rating ( &lt; 4.2 )</p>
+                    <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-tighter">Requires Manager Action</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-amber-600">{lowRatingRiders}</p>
+                </div>
+             </div>
+
+             <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-xl bg-slate-100 transition-colors group-hover:bg-white shadow-sm text-red-500">
+                    <ShieldAlert className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Frequent Complaints</p>
+                    <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-tighter">Requires Manager Action</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-red-500">{frequentComplaints}</p>
+                </div>
+             </div>
+
+             <Button variant="outline" className="w-full mt-2 border-slate-200 text-slate-600 text-xs font-bold h-10 rounded-xl" onClick={() => router.push("/riders")}>
+               View Full Risk Registry
+             </Button>
           </CardContent>
         </Card>
       </div>

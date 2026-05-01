@@ -15,7 +15,26 @@ import {
   MoreVertical,
   Eye,
   Bike,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  AlertTriangle,
+  TrendingUp,
+  Wallet,
+  History,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Fingerprint,
+  FileText,
+  LayoutGrid,
+  Target,
+  AlertCircle,
+  TrendingDown,
+  Briefcase,
+  DollarSign,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -48,51 +67,85 @@ const PAYMENTS = [
     id: "PAY-9021",
     rider: "Rahul Kumar",
     riderId: "RID-104",
-    amount: "₹4,250.00",
+    amount: 4250,
     date: "Oct 24, 2024",
     status: "Completed",
     method: "Bank Transfer",
     reference: "HDFC-11293",
+    revenue: 18000,
+    aging: 12, // hours
+    compliance: { pan: true, tds: false, gst: false },
+    flags: [],
+    breakdown: {
+      base: 3200,
+      distance: 450,
+      peak: 300,
+      incentives: 500,
+      penalty: 200,
+    }
   },
   {
     id: "PAY-9020",
     rider: "Amit Singh",
     riderId: "RID-108",
-    amount: "₹3,100.00",
+    amount: 3100,
     date: "Oct 24, 2024",
     status: "Processing",
     method: "UPI",
     reference: "UPI-44920",
+    revenue: 12500,
+    aging: 36,
+    compliance: { pan: true, tds: true, gst: false },
+    flags: ["High Cancellation"],
+    breakdown: {
+      base: 2400,
+      distance: 300,
+      peak: 200,
+      incentives: 400,
+      penalty: 200,
+    }
   },
   {
     id: "PAY-9019",
     rider: "Vikram Malhotra",
     riderId: "RID-102",
-    amount: "₹5,600.00",
+    amount: 5600,
     date: "Oct 23, 2024",
     status: "Completed",
     method: "Bank Transfer",
     reference: "ICICI-99201",
+    revenue: 22400,
+    aging: 48,
+    compliance: { pan: true, tds: true, gst: true },
+    flags: ["Unusual Spike"],
+    breakdown: {
+      base: 4200,
+      distance: 800,
+      peak: 400,
+      incentives: 600,
+      penalty: 400,
+    }
   },
   {
     id: "PAY-9018",
     rider: "Suresh Patel",
     riderId: "RID-111",
-    amount: "₹2,890.00",
+    amount: 2890,
     date: "Oct 22, 2024",
     status: "Failed",
     method: "Bank Transfer",
     reference: "SBI-77281",
-  },
-  {
-    id: "PAY-9017",
-    rider: "Rahul Kumar",
-    riderId: "RID-104",
-    amount: "₹3,800.00",
-    date: "Oct 20, 2024",
-    status: "Completed",
-    method: "Bank Transfer",
-    reference: "HDFC-22910",
+    revenue: 9800,
+    aging: 72,
+    compliance: { pan: false, tds: false, gst: false },
+    flags: ["Duplicate Bank"],
+    breakdown: {
+      base: 2100,
+      distance: 300,
+      peak: 200,
+      incentives: 300,
+      penalty: 10,
+    }
   },
 ];
 
@@ -137,13 +190,10 @@ export default function RiderPaymentsPage() {
     setSearchQuery(urlSearchQuery);
   }, [urlSearchQuery]);
 
-  const handleViewDetails = (payment: (typeof PAYMENTS)[0]) => {
-    router.push(`/rider/payments/${payment.id}`);
-  };
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [payoutCycle, setPayoutCycle] = useState("Weekly");
 
-  const handleDownloadReceipt = (id: string) => {
-    alert(`Downloading receipt for transaction ${id}...`);
-  };
+  const formatINR = (a: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(a);
 
   const filteredPayments = PAYMENTS.filter((payment) => {
     const matchesSearch =
@@ -155,84 +205,111 @@ export default function RiderPaymentsPage() {
     return matchesSearch && payment.status === statusFilter;
   });
 
+  const stats = {
+    totalPayouts: PAYMENTS.reduce((sum, p) => sum + p.amount, 0),
+    pendingAmount: PAYMENTS.filter(p => p.status !== 'Completed').reduce((sum, p) => sum + p.amount, 0),
+    pendingCount: PAYMENTS.filter(p => p.status !== 'Completed').length,
+    aging24: PAYMENTS.filter(p => p.status !== 'Completed' && p.aging < 24).length,
+    aging48: PAYMENTS.filter(p => p.status !== 'Completed' && p.aging >= 24 && p.aging < 48).length,
+    agingOver48: PAYMENTS.filter(p => p.status !== 'Completed' && p.aging >= 48).length,
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl text-black font-bold tracking-tight">
-            Rider Payments
-          </h1>
-          <p className="text-slate-500 mt-1">
-            Track and manage payouts to delivery partners
-          </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl text-black font-bold tracking-tight">Rider Payments</h1>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold py-1">
+              Per Delivery + Incentive Model
+            </Badge>
+          </div>
+          <p className="text-slate-500">Track, manage and audit payouts to delivery partners</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export Report
-          </Button>
-          <Button className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/80">
-            <CreditCard className="h-4 w-4" />
-            Process Payout
-          </Button>
+        <div className="flex items-center gap-4">
+           <Card className="flex items-center px-4 py-2 gap-3 border-slate-200 bg-white shadow-sm">
+             <div className="p-2 rounded-lg bg-slate-100"><Settings className="h-4 w-4 text-slate-600" /></div>
+             <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight">Payout Cycle</p>
+                <div className="flex items-center gap-2">
+                   <span className="text-sm font-bold text-slate-900">Weekly (Mon)</span>
+                   <Button variant="link" className="h-auto p-0 text-[10px] text-emerald-600 font-bold underline decoration-emerald-200 underline-offset-4">Change</Button>
+                </div>
+             </div>
+           </Card>
+           <div className="flex gap-2">
+            <Button variant="outline" className="gap-2 border-slate-200 h-11">
+              <Download className="h-4 w-4" /> Export Report
+            </Button>
+            <Button className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 h-11 px-6 shadow-lg shadow-emerald-900/10">
+              <CreditCard className="h-4 w-4" /> Process Payout
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">
+            <CardTitle className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
               Total Payouts (Oct)
             </CardTitle>
             <CreditCard className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹28,450.00</div>
-            <p className="text-xs text-green-600 flex items-center mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              +8.2% from last month
+            <div className="text-2xl font-bold text-slate-900">{formatINR(stats.totalPayouts)}</div>
+            <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-tighter">
+              Per Delivery + Incentive Model
             </p>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">
-              Pending Payouts
+            <CardTitle className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Pending Payout Aging
             </CardTitle>
             <Clock className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹3,100.00</div>
-            <p className="text-xs text-slate-500 mt-1">1 rider pending</p>
+            <div className="text-2xl font-bold text-slate-900">{formatINR(stats.pendingAmount)}</div>
+            <div className="flex items-center gap-3 mt-1.5">
+               <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> <span className="text-[10px] font-bold text-slate-500">{stats.aging24}</span></div>
+               <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> <span className="text-[10px] font-bold text-slate-500">{stats.aging48}</span></div>
+               <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-red-500" /> <span className="text-[10px] font-bold text-slate-500">{stats.agingOver48}</span></div>
+               <span className="text-[10px] text-slate-400 italic">Aging Trend</span>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">
-              Active Riders
+            <CardTitle className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Avg Payout per Delivery
             </CardTitle>
-            <Bike className="h-4 w-4 text-slate-400" />
+            <Zap className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-green-600 flex items-center mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              +2 new this week
-            </p>
+            <div className="text-2xl font-bold text-slate-900">₹62.4</div>
+            <p className="text-[10px] text-emerald-600 font-bold mt-1 uppercase">Total Payout / Deliveries</p>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="shadow-sm border-slate-200 bg-slate-900 text-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">
-              Failed/Returned
+            <CardTitle className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Compliance & Fraud Flags
             </CardTitle>
-            <XCircle className="h-4 w-4 text-slate-400" />
+            <ShieldAlert className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">1</div>
-            <p className="text-xs text-slate-500 mt-1">Requires attention</p>
+            <div className="text-2xl font-bold">4 <span className="text-xs font-normal text-slate-400">Issues</span></div>
+            <div className="flex items-center gap-2 mt-1">
+               <Badge variant="outline" className="bg-red-900/30 text-red-400 border-red-900/50 text-[9px] px-1 py-0 font-bold">Duplicate Bank</Badge>
+               <Badge variant="outline" className="bg-amber-900/30 text-amber-400 border-amber-900/50 text-[9px] px-1 py-0 font-bold">Spike</Badge>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -273,21 +350,12 @@ export default function RiderPaymentsPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-[#fbfbfb] hover:bg-[#fbfbfb]">
-              <TableHead className="font-semibold text-slate-600 pl-6 py-4">
-                Transaction Details
-              </TableHead>
-              <TableHead className="font-semibold text-slate-600 py-4">
-                Rider
-              </TableHead>
-              <TableHead className="font-semibold text-slate-600 py-4">
-                Amount
-              </TableHead>
-              <TableHead className="font-semibold text-slate-600 py-4">
-                Date
-              </TableHead>
-              <TableHead className="font-semibold text-slate-600 py-4">
-                Status
-              </TableHead>
+              <TableHead className="w-10"></TableHead>
+              <TableHead className="font-semibold text-slate-600 py-4">Transaction Details</TableHead>
+              <TableHead className="font-semibold text-slate-600 py-4">Rider</TableHead>
+              <TableHead className="font-semibold text-slate-600 py-4">Net Payout</TableHead>
+              <TableHead className="font-semibold text-slate-600 py-4">Profitability (Net Margin)</TableHead>
+              <TableHead className="font-semibold text-slate-600 py-4">Status & Compliance</TableHead>
               <TableHead className="font-semibold text-slate-600 py-4 text-right pr-6">
                 Action
               </TableHead>
@@ -295,64 +363,145 @@ export default function RiderPaymentsPage() {
           </TableHeader>
           <TableBody>
             {filteredPayments.map((payment) => (
-              <TableRow key={payment.id} className="hover:bg-slate-50">
-                <TableCell className="pl-6 py-4">
-                  <div className="flex flex-col">
-                    <span className="font-medium text-slate-900">
-                      {payment.id}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Ref: {payment.reference}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-4">
-                  <div className="flex flex-col">
-                    <span className="font-medium text-black">
-                      {payment.rider}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {payment.riderId}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="font-bold text-slate-900 py-4">
-                  {payment.amount}
-                </TableCell>
-                <TableCell className="text-slate-600 py-4">
-                  {payment.date}
-                </TableCell>
-                <TableCell className="py-4">
-                  {getStatusBadge(payment.status)}
-                </TableCell>
-                <TableCell className="text-right pr-6 py-4">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => handleViewDetails(payment)}
-                      >
-                        <Eye className="h-4 w-4" /> View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => handleDownloadReceipt(payment.id)}
-                      >
-                        <Download className="h-4 w-4" /> Download Receipt
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow key={payment.id} className={cn("hover:bg-slate-50 cursor-pointer transition-colors", expandedRow === payment.id && "bg-slate-50/80")}>
+                  <TableCell className="pl-6">
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExpandedRow(expandedRow === payment.id ? null : payment.id)}>
+                        {expandedRow === payment.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                     </Button>
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-900">{payment.id}</span>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">{payment.date}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-black">{payment.rider}</span>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">{payment.riderId}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-4">
+                     <div className="flex flex-col">
+                        <span className="font-black text-slate-900 text-base">{formatINR(payment.amount)}</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">Net Payout</span>
+                     </div>
+                  </TableCell>
+                  <TableCell className="py-4">
+                     <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                           <span className="font-bold text-emerald-600">{formatINR(payment.revenue - payment.amount)}</span>
+                           <Badge className="bg-emerald-50 text-emerald-700 border-none text-[8px] px-1 h-3 font-black">
+                             {Math.round(((payment.revenue - payment.amount)/payment.revenue)*100)}% Margin
+                           </Badge>
+                        </div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Revenue: {formatINR(payment.revenue)}</span>
+                     </div>
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <div className="flex items-center gap-3">
+                       {getStatusBadge(payment.status)}
+                       <div className="flex items-center gap-1">
+                          {payment.compliance.pan ? <Fingerprint className="h-3.5 w-3.5 text-emerald-500" /> : <ShieldAlert className="h-3.5 w-3.5 text-red-500" />}
+                          {payment.compliance.tds && <span title="TDS Applicable"><FileText className="h-3.5 w-3.5 text-blue-500" /></span>}
+                          {payment.flags.length > 0 && <span title={payment.flags[0]}><AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse" /></span>}
+                       </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right pr-6 py-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500"><MoreVertical className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> View Details</DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2"><Download className="h-4 w-4" /> Download Receipt</DropdownMenuItem>
+                        {payment.status === 'Failed' && <DropdownMenuItem className="gap-2 text-emerald-600"><History className="h-4 w-4" /> Retry Payout</DropdownMenuItem>}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+                
+                {/* Expandable Breakdown Row */}
+                {expandedRow === payment.id && (
+                  <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-x border-slate-100">
+                    <TableCell colSpan={7} className="p-6">
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          {/* Payment Breakdown */}
+                          <div className="space-y-4">
+                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><LayoutGrid className="h-3 w-3" /> Payout Components</h4>
+                             <div className="space-y-2.5">
+                                {[
+                                  { label: "Base Delivery Pay", value: payment.breakdown.base },
+                                  { label: "Distance Bonus", value: payment.breakdown.distance },
+                                  { label: "Peak Hour Bonus", value: payment.breakdown.peak },
+                                  { label: "Incentives", value: payment.breakdown.incentives },
+                                ].map((item, i) => (
+                                  <div key={i} className="flex justify-between text-xs font-bold">
+                                    <span className="text-slate-500">{item.label}</span>
+                                    <span className="text-slate-900">{formatINR(item.value)}</span>
+                                  </div>
+                                ))}
+                                <div className="pt-2 mt-2 border-t border-slate-200 border-dashed flex justify-between text-xs font-black">
+                                  <span className="text-red-600 uppercase">Penalty Deduction</span>
+                                  <span className="text-red-600">-{formatINR(payment.breakdown.penalty)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm font-black pt-1">
+                                  <span className="text-slate-900">Net Payout</span>
+                                  <span className="text-slate-900">{formatINR(payment.amount)}</span>
+                                </div>
+                             </div>
+                          </div>
+
+                          {/* Compliance & Fraud Analysis */}
+                          <div className="space-y-4">
+                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Target className="h-3 w-3" /> Audit & Fraud Logs</h4>
+                             <div className="space-y-3">
+                                <div className={cn("p-3 rounded-xl border flex items-center justify-between", payment.flags.length > 0 ? "bg-amber-50 border-amber-100" : "bg-emerald-50 border-emerald-100")}>
+                                   <div className="flex items-center gap-2.5">
+                                      {payment.flags.length > 0 ? <AlertTriangle className="h-4 w-4 text-amber-600" /> : <ShieldCheck className="h-4 w-4 text-emerald-600" />}
+                                      <div>
+                                         <p className="text-[10px] font-black text-slate-900 uppercase">Fraud Status</p>
+                                         <p className="text-[9px] text-slate-500">{payment.flags.length > 0 ? payment.flags.join(", ") : "Clear / No Issues"}</p>
+                                      </div>
+                                   </div>
+                                </div>
+                                <div className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
+                                   <p className="text-[10px] font-black text-slate-900 uppercase">Compliance Thresholds</p>
+                                   <div className="flex flex-wrap gap-2">
+                                      <Badge className={cn("text-[8px] font-black uppercase", payment.compliance.pan ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>PAN {payment.compliance.pan ? 'Verified' : 'Missing'}</Badge>
+                                      <Badge className={cn("text-[8px] font-black uppercase", payment.compliance.tds ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500")}>TDS {payment.compliance.tds ? 'Active' : 'N/A'}</Badge>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+
+                          {/* Profitability Index */}
+                          <div className="space-y-4">
+                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><TrendingUp className="h-3 w-3" /> Performance Economics</h4>
+                             <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-4">
+                                <div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Margin</p>
+                                   <p className="text-2xl font-black text-emerald-400">{formatINR(payment.revenue - payment.amount)}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                   <div>
+                                      <p className="text-[8px] font-bold text-slate-500 uppercase">Revenue Contrib.</p>
+                                      <p className="text-xs font-bold">{formatINR(payment.revenue)}</p>
+                                   </div>
+                                   <div>
+                                      <p className="text-[8px] font-bold text-slate-500 uppercase">Payout Ratio</p>
+                                      <p className="text-xs font-bold">{Math.round((payment.amount/payment.revenue)*100)}%</p>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
             ))}
           </TableBody>
         </Table>

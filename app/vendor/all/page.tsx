@@ -187,13 +187,13 @@ export default function AllVendorsPage() {
         <Table>
           <TableHeader><TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b">
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Vendor</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Revenue (Month / Total)</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Commission %</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Commission Earned</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Pending Payout</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Revenue This Month</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Avg Order Value</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Refund Amount</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Commission Earned</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Performance Index</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Tier</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Type</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Capacity / Load</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
@@ -234,15 +234,25 @@ export default function AllVendorsPage() {
                   <TableCell>
                     <div className="text-center">
                       <p className="text-sm font-bold text-emerald-700">{formatINR(v.vendorProfile?.revenueThisMonth || 0)}</p>
-                      <p className="text-[10px] text-slate-400">{v.vendorProfile?.ordersThisMonth || 0} orders this month</p>
-                      <div className="h-px bg-slate-100 my-1 w-1/2 mx-auto" />
-                      <p className="text-[10px] font-medium text-slate-500">Total: {formatINR(revenue)} ({totalOrders})</p>
+                      <p className="text-[10px] text-slate-400">Total: {formatINR(revenue)}</p>
                     </div>
                   </TableCell>
-                  <TableCell><p className="text-sm font-bold text-slate-700 text-center">{commRate}%</p></TableCell>
-                  <TableCell><p className="text-sm font-bold text-blue-600 text-center">{commission > 0 ? formatINR(commission) : "—"}</p></TableCell>
-                  <TableCell><p className={`text-sm font-bold text-center ${payoutDue > 0 ? "text-orange-600" : "text-slate-400"}`}>{payoutDue > 0 ? formatINR(payoutDue) : "—"}</p></TableCell>
-                  <TableCell><p className={`text-sm font-bold text-center ${refundAmount > 0 ? "text-rose-600" : "text-slate-400"}`}>{refundAmount > 0 ? formatINR(refundAmount) : "—"}</p></TableCell>
+                  <TableCell>
+                    <p className="text-sm font-bold text-slate-700 text-center">
+                      {formatINR(totalOrders > 0 ? (revenue / totalOrders) : 0)}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <p className={`text-sm font-bold text-center ${refundAmount > 0 ? "text-rose-600" : "text-slate-400"}`}>
+                      {refundAmount > 0 ? formatINR(refundAmount) : "—"}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-blue-600">{commission > 0 ? formatINR(commission) : "—"}</p>
+                      <p className="text-[10px] text-slate-400">{commRate}% rate</p>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center py-3">
                     <div className="flex flex-col items-center gap-1">
                       {rating > 0 ? (
@@ -273,6 +283,24 @@ export default function AllVendorsPage() {
                       <span>{tier.emoji}</span>
                       <span>{tier.label.toUpperCase()}</span>
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const type = v.vendorProfile?.businessType || "Standard Store";
+                      const config: Record<string, { label: string; icon: string; color: string }> = {
+                        "Experience Store": { label: "Experience", icon: "🏢", color: "bg-purple-50 text-purple-600 border-purple-100" },
+                        "Standard Store": { label: "Standard", icon: "🏬", color: "bg-blue-50 text-blue-600 border-blue-100" },
+                        "Processing Hub": { label: "Processing", icon: "🏭", color: "bg-orange-50 text-orange-600 border-orange-100" },
+                        "Collection Centre": { label: "Collection", icon: "📦", color: "bg-slate-50 text-slate-600 border-slate-100" },
+                      };
+                      const item = config[type] || config["Standard Store"];
+                      return (
+                        <Badge variant="outline" className={`${item.color} border font-black text-[9px] px-2 py-0.5 gap-1 shadow-sm`}>
+                          <span>{item.icon}</span>
+                          <span>{item.label.toUpperCase()}</span>
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-center py-3">
                     {(() => {

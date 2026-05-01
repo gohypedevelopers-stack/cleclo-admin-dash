@@ -138,7 +138,7 @@ const managementItems: NavItem[] = [
         icon: LayoutDashboard,
       },
       {
-        title: "Fleet Intelligence",
+        title: "Riders",
         href: "/riders",
         icon: Users,
       },
@@ -258,10 +258,7 @@ export function AdminSidebar() {
               }}
             >
               {!hasSubItems || isCollapsed ? (
-                <Link
-                  href={item.href}
-                  className="contents"
-                >
+                <Link href={item.href} className="contents">
                   <item.icon className="h-5 w-5 shrink-0" />
                   {!isCollapsed && (
                     <>
@@ -450,9 +447,9 @@ export function AdminSidebar() {
           adminRole === "finance_admin"
             ? supportItems.filter((i) => i.title === "Settings")
             : adminRole === "operations_admin"
-            ? supportItems.filter((i) => i.title !== "Settings")
-            : supportItems,
-          "Support"
+              ? supportItems.filter((i) => i.title !== "Settings")
+              : supportItems,
+          "Support",
         )}
       </div>
     </div>

@@ -100,6 +100,11 @@ interface VendorRecord {
     termsAccepted?: boolean;
     slaAccepted?: boolean;
     rating?: number;
+    totalRevenue?: number;
+    totalOrders?: number;
+    revenueThisMonth?: number;
+    refundAmount?: number;
+    commissionEarned?: number;
   };
   addresses?: Array<{ city?: string; area?: string; fullAddress?: string }>;
   _count?: { ordersAsVendor?: number };
@@ -345,12 +350,11 @@ function VendorsContent() {
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">City</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Commission</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Documents</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Orders</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Actions</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Revenue This Month</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Avg Order Value</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Refund Amount</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Commission Earned</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right pr-6 tracking-wider">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -370,49 +374,29 @@ function VendorsContent() {
                   <TableRow key={vendor.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/vendors/${vendor.id}`)}>
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border">
-                          <AvatarFallback className="bg-orange-50 text-orange-600 font-bold">
-                            {displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-orange-50 text-orange-600 font-bold">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
                         <div>
                           <p className="font-semibold text-black text-sm">{displayName}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">
-                            {ownerName} • {vendor.phone}
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Badge className={`${getStatusColor(status)} border-none font-bold text-[8px] px-1.5 py-0`}>{status.toUpperCase()}</Badge>
+                            <span className="text-[10px] text-slate-400">· {city}</span>
+                          </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 text-slate-600 text-xs">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                        {city}
-                      </div>
+                      <div className="text-sm font-semibold text-emerald-600">₹{(vendor.vendorProfile?.revenueThisMonth || 0).toLocaleString()}</div>
+                      <div className="text-[9px] text-slate-400">Total: ₹{(vendor.vendorProfile?.totalRevenue || 0).toLocaleString()}</div>
                     </TableCell>
                     <TableCell>
-                      <span className="font-bold text-sm text-slate-700">{commission}</span>
+                      <div className="text-sm font-medium text-slate-700">₹{vendor.vendorProfile?.totalOrders && vendor.vendorProfile.totalOrders > 0 ? Math.round((vendor.vendorProfile.totalRevenue || 0) / vendor.vendorProfile.totalOrders).toLocaleString() : "0"}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="outline" className={`text-[8px] font-bold px-1.5 py-0 h-5 rounded-md ${hasKYC ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                          KYC {hasKYC ? "✓" : "✗"}
-                        </Badge>
-                        <Badge variant="outline" className={`text-[8px] font-bold px-1.5 py-0 h-5 rounded-md ${hasBank ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                          Bank {hasBank ? "✓" : "✗"}
-                        </Badge>
-                        <Badge variant="outline" className={`text-[8px] font-bold px-1.5 py-0 h-5 rounded-md ${hasGST ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-slate-300 text-slate-500 bg-slate-50"}`}>
-                          GST {hasGST ? "✓" : "—"}
-                        </Badge>
-                      </div>
+                      <div className={`text-sm ${(vendor.vendorProfile?.refundAmount || 0) > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>₹{(vendor.vendorProfile?.refundAmount || 0).toLocaleString()}</div>
                     </TableCell>
-                    <TableCell className="font-medium text-slate-700">{orderCount}</TableCell>
                     <TableCell>
-                      <Badge className={`${getStatusColor(status)} border-none font-bold text-[10px] gap-1`}>
-                        {status === "Active" && <CheckCircle className="h-3 w-3" />}
-                        {status === "Pending" && <Clock className="h-3 w-3" />}
-                        {status === "Suspended" && <Ban className="h-3 w-3" />}
-                        {status}
-                      </Badge>
+                      <div className="text-sm font-semibold text-blue-600">₹{(vendor.vendorProfile?.commissionEarned || 0).toLocaleString()}</div>
+                      <div className="text-[9px] text-slate-400">{vendor.vendorProfile?.commissionRate || 18}% rate</div>
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>

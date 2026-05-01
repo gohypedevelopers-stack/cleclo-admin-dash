@@ -967,7 +967,7 @@ function ItemsPageContent() {
             if (selectedCityCodes.length === 0) return toast.error("Please select at least one city");
             
             const formData = new FormData(e.currentTarget);
-            const overrides = [];
+            const overrides: any[] = [];
             
             selectedCityCodes.forEach(cityCode => {
               filteredItems.forEach(item => {
@@ -1117,7 +1117,7 @@ function ItemsPageContent() {
             if (!selectedVendorId) return toast.error("Please select a vendor first");
             
             const formData = new FormData(e.currentTarget);
-            const overrides = [];
+            const overrides: any[] = [];
             filteredItems.forEach(item => {
               const price = formData.get(`price_${item.id}`);
               const share = formData.get(`share_${item.id}`);

@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +54,7 @@ export default function VendorDetailPage() {
 
   const [vendor, setVendor] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
+  const [settlements, setSettlements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -81,6 +82,13 @@ export default function VendorDetailPage() {
       try {
         const ordRes = await apiFetch(`${ORDER_API_URL}?vendorId=${vendorId}`, { headers: getAuthHeaders() });
         if (ordRes.ok) { const d = await ordRes.json(); setOrders(Array.isArray(d) ? d : d.orders || []); }
+        
+        const setRes = await apiFetch(`${AUTH_API_URL}/settlements`, { headers: getAuthHeaders() });
+        if (setRes.ok) { 
+          const d = await setRes.json(); 
+          const vendorSets = (Array.isArray(d) ? d : d.settlements || []).filter((s: any) => s.vendorId === vendorId);
+          setSettlements(vendorSets); 
+        }
       } catch {}
     } catch (err: any) {
       setError(err.message);
@@ -151,14 +159,57 @@ export default function VendorDetailPage() {
     } catch (err: any) { toast.error(err.message); }
   };
 
+  const vp = vendor?.vendorProfile || {};
+  const displayName = vp.businessName || vendor?.name || "Vendor";
+  const ownerName = vp.ownerName || vendor?.name || "";
+  const city = vendor?.addresses?.[0]?.city || "—";
+  const status = vendor?.isBlocked ? "Suspended" : !vp.isApproved ? "Pending" : "Active";
+
+  const ledgerEntries = useMemo(() => {
+    if (!vendor) return [];
+    const entries: any[] = [];
+    orders.forEach(o => {
+      if (o.status !== 'CANCELLED') {
+        const comm = o.commissionAmount || (o.totalAmount * (vp.commissionRate / 100 || 0.2));
+        const refund = o.refundAmount || (o.status === 'REFUNDED' ? o.totalAmount : 0);
+        entries.push({
+          date: o.createdAt,
+          type: 'ORDER',
+          description: `Order #${o.id.slice(0,8).toUpperCase()}`,
+          revenue: o.totalAmount,
+          commission: comm,
+          refund: refund,
+          payout: 0,
+          net: o.totalAmount - comm - refund
+        });
+      }
+    });
+    settlements.forEach(s => {
+      if (s.status?.toLowerCase() === 'paid' || s.status?.toLowerCase() === 'completed') {
+        entries.push({
+          date: s.createdAt,
+          type: 'PAYOUT',
+          description: `Payout ID ${s.id.slice(0,8).toUpperCase()}`,
+          revenue: 0,
+          commission: 0,
+          refund: 0,
+          payout: s.amount,
+          net: -s.amount
+        });
+      }
+    });
+    entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    let currentBalance = 0;
+    return entries.map(e => {
+      const opening = currentBalance;
+      currentBalance += e.net;
+      return { ...e, opening, closing: currentBalance };
+    });
+  }, [orders, settlements, vendor, vp.commissionRate]);
+
   if (isLoading) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading vendor...</p></div>;
   if (error || !vendor) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><AlertTriangle className="h-10 w-10 text-red-500" /><p className="text-slate-500">{error || "Not found"}</p><Button variant="outline" onClick={() => router.back()}><ArrowLeft className="h-4 w-4 mr-2" /> Go Back</Button></div>;
 
-  const vp = vendor.vendorProfile || {};
-  const displayName = vp.businessName || vendor.name;
-  const ownerName = vp.ownerName || vendor.name;
-  const city = vendor.addresses?.[0]?.city || "—";
-  const status = vendor.isBlocked ? "Suspended" : !vp.isApproved ? "Pending" : "Active";
 
   return (
     <div className="flex flex-col gap-6 pb-10 max-w-7xl mx-auto">
@@ -284,11 +335,46 @@ export default function VendorDetailPage() {
           {/* Stats */}
           <div className="bg-white rounded-2xl border shadow-sm p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><Briefcase className="h-24 w-24" /></div>
-            <h3 className="text-base font-bold text-slate-800 mb-4">Performance Overview</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <h3 className="text-base font-bold text-slate-800 mb-4">Financial & Performance Summary</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
               <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1 flex items-center gap-1"><Star className="h-3 w-3" /> Rating</p><p className="text-xl font-bold text-slate-800">{vp.rating || "N/A"}</p></div>
-              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Commission</p><p className="text-xl font-bold text-slate-800">{vp.commissionRate ? `${vp.commissionRate}%` : "—"}</p></div>
-              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Orders</p><p className="text-xl font-bold text-slate-800">{vendor._count?.ordersAsVendor ?? orders.length}</p></div>
+              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Commission Rate</p><p className="text-xl font-bold text-slate-800">{vp.commissionRate ? `${vp.commissionRate}%` : "20%"}</p></div>
+              <div className="bg-slate-50 rounded-xl p-3 border"><p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Total Orders</p><p className="text-xl font-bold text-slate-800">{vendor._count?.ordersAsVendor ?? orders.length}</p></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+              <div>
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Total Revenue (GMV)</p>
+                <p className="text-lg font-black text-slate-900">{formatINR(orders.reduce((s, o) => s + (o.totalAmount || 0), 0))}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Total Commission</p>
+                <p className="text-lg font-black text-violet-600">-{formatINR(orders.reduce((s, o) => s + (o.commissionAmount || (o.totalAmount * (vp.commissionRate / 100 || 0.2))), 0))}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Refunds Adjusted</p>
+                <p className="text-lg font-black text-rose-600">-{formatINR(orders.reduce((s, o) => s + (o.refundAmount || (o.status === 'REFUNDED' ? o.totalAmount : 0)), 0))}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Net Payouts</p>
+                <p className="text-lg font-black text-[#3E8940]">{formatINR(orders.reduce((s, o) => s + (o.totalAmount || 0), 0) - orders.reduce((s, o) => s + (o.commissionAmount || (o.totalAmount * (vp.commissionRate / 100 || 0.2))), 0) - orders.reduce((s, o) => s + (o.refundAmount || (o.status === 'REFUNDED' ? o.totalAmount : 0)), 0))}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-50 border-dashed">
+              <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100">
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">TDS Deducted (1%)</p>
+                  <p className="text-sm font-bold text-slate-800">{formatINR(orders.reduce((s, o) => s + (o.totalAmount * 0.01), 0))}</p>
+                </div>
+                <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><ShieldCheck className="h-4 w-4" /></div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100">
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">GST Collected on Comm. (18%)</p>
+                  <p className="text-sm font-bold text-slate-800">{formatINR(orders.reduce((s, o) => s + (o.commissionAmount || (o.totalAmount * (vp.commissionRate / 100 || 0.2))) * 0.18, 0))}</p>
+                </div>
+                <div className="h-8 w-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600"><FileText className="h-4 w-4" /></div>
+              </div>
             </div>
           </div>
 
@@ -379,7 +465,7 @@ export default function VendorDetailPage() {
       </div>
 
       {/* Orders */}
-      <div className="bg-white rounded-2xl border shadow-sm p-6">
+      <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4">Assigned Orders</h3>
         {orders.length > 0 ? (
           <div className="overflow-x-auto">
@@ -409,6 +495,64 @@ export default function VendorDetailPage() {
         ) : (
           <div className="text-center py-8 text-slate-500 text-sm">No orders found.</div>
         )}
+      </div>
+
+      {/* Financial Ledger */}
+      <div className="bg-white rounded-2xl border shadow-sm p-6 mt-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">Financial Ledger</h3>
+            <p className="text-xs text-slate-500">Running balance and settlement history</p>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Running Balance</span>
+            <span className="text-2xl font-black text-[#3E8940]">{formatINR(ledgerEntries[ledgerEntries.length - 1]?.closing || 0)}</span>
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <Table className="min-w-[900px]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent bg-slate-50/50">
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3">Date</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3">Event</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Opening</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Revenue</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Comm.</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Refund</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Payout</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-3 text-right">Closing</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ledgerEntries.length > 0 ? [...ledgerEntries].reverse().map((entry, idx) => (
+                <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="text-[10px] font-medium text-slate-500">{formatDate(entry.date)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-900">{entry.description}</span>
+                      <span className="text-[9px] text-slate-400 uppercase font-medium">{entry.type}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-xs font-medium text-slate-500">{formatINR(entry.opening)}</TableCell>
+                  <TableCell className="text-right text-xs font-bold text-slate-900">{entry.revenue > 0 ? `+${formatINR(entry.revenue)}` : '—'}</TableCell>
+                  <TableCell className="text-right text-xs font-bold text-red-500">{entry.commission > 0 ? `-${formatINR(entry.commission)}` : '—'}</TableCell>
+                  <TableCell className="text-right text-xs font-bold text-rose-600">{entry.refund > 0 ? `-${formatINR(entry.refund)}` : '—'}</TableCell>
+                  <TableCell className="text-right text-xs font-bold text-blue-600">{entry.payout > 0 ? `-${formatINR(entry.payout)}` : '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <span className={cn("text-sm font-black", entry.closing >= 0 ? "text-[#3E8940]" : "text-red-600")}>
+                      {formatINR(entry.closing)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500 text-sm">No financial history available for this ledger.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

@@ -140,6 +140,7 @@ export interface DashboardOverview {
     };
     searchPlaceholder: string;
     kpis: DashboardKpi[];
+    revenueBreakdown: FinanceSnapshotItem[];
     financeSnapshot: FinanceSnapshotItem[];
     growthMetrics: GrowthMetricItem[];
     approvals: DashboardApproval[];
