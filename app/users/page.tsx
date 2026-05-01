@@ -66,7 +66,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3001/admin";
 
 const getAuthHeaders = () => ({
   "Content-Type": "application/json",
@@ -486,15 +486,9 @@ function UsersPageContent() {
                   <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => handleViewDetails(user)}>
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
-<<<<<<< HEAD
                         <Avatar className="h-9 w-9 border shadow-sm">
                           <AvatarImage src={(user as any).image || null} className="object-cover" />
                           <AvatarFallback className={`font-bold text-xs ${
-=======
-                        <Avatar className="h-10 w-10 border shadow-sm">
-                          <AvatarImage src={(user as any).image || undefined} className="object-cover" />
-                          <AvatarFallback className={`font-bold ${
->>>>>>> dc8fdb602e3587daa882882e5202406000b2b3a0
                             user.role === "vendor" ? "bg-orange-50 text-orange-600" :
                             user.role === "rider" ? "bg-purple-50 text-purple-600" :
                             "bg-blue-50 text-blue-600"
