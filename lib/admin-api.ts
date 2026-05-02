@@ -30,6 +30,7 @@ const apiFetch = async (url: string, options?: RequestInit): Promise<Response> =
         });
 
         if (res.status === 401) {
+            console.error(`[Admin API] 401 Unauthorized at ${url}. Redirecting to login.`);
             if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
                 localStorage.removeItem('admin_auth_token');
                 window.location.href = '/login';

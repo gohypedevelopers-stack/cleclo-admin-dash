@@ -83,9 +83,12 @@ const getAuthHeaders = () => ({
 
 const apiFetch = async (url: string, options?: RequestInit) => {
   const res = await fetch(url, options);
-  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
-    localStorage.removeItem("admin_auth_token");
-    window.location.href = "/login";
+  if (res.status === 401) {
+    console.error(`[Users API] 401 Unauthorized at ${url}. Redirecting to login.`);
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      localStorage.removeItem("admin_auth_token");
+      window.location.href = "/login";
+    }
   }
   return res;
 };

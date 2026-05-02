@@ -25,6 +25,7 @@ const apiFetch = async (url: string, options?: RequestInit): Promise<Response> =
         });
 
         if (res.status === 401) {
+            console.error(`[Dashboard API] 401 Unauthorized at ${url}. Redirecting to login.`);
             if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
                 localStorage.removeItem('admin_auth_token');
                 window.location.href = '/login';
@@ -34,8 +35,10 @@ const apiFetch = async (url: string, options?: RequestInit): Promise<Response> =
         return res;
     } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
+            console.error(`[Dashboard API] Request timed out: ${url}`);
             throw new Error(`Request timed out: ${url}`);
         }
+        console.error(`[Dashboard API] Fetch error at ${url}:`, error);
         throw error;
     } finally {
         clearTimeout(timeoutId);
