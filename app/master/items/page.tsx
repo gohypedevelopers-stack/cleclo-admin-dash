@@ -167,6 +167,7 @@ const computeFinancials = (item: {
     gstPercent,
     platformCommission,
     commissionPercent,
+    marginPct: commissionPercent,
     gstAmount,
     netPlatformMargin,
     isLoss,
