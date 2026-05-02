@@ -29,6 +29,7 @@ const apiFetch = async (url: string, options?: RequestInit): Promise<Response> =
                 localStorage.removeItem('admin_auth_token');
                 window.location.href = '/login';
             }
+            throw new Error('Authentication required. Redirecting to login...');
         }
         return res;
     } catch (error) {

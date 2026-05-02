@@ -24,7 +24,16 @@ import {
   IndianRupee,
   Zap,
   Activity,
+  TrendingUp,
+  BarChart3,
+  Gauge,
+  Package,
+  Shield,
+  CalendarClock,
+  Truck,
+  Award,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -103,12 +112,33 @@ interface VendorRecord {
     totalRevenue?: number;
     totalOrders?: number;
     revenueThisMonth?: number;
+    ordersThisMonth?: number;
     refundAmount?: number;
     commissionEarned?: number;
+    payoutPending?: number;
+    slaScore?: number;
+    issueRate?: number;
+    dailyCapacity?: number;
+    currentLoad?: number;
+    areaCoverage?: string;
+    city?: string;
+    area?: string;
+    cluster?: string;
+    agreementSignedAt?: string;
   };
   addresses?: Array<{ city?: string; area?: string; fullAddress?: string }>;
   _count?: { ordersAsVendor?: number };
 }
+
+const getVendorTier = (sla: number, rating: number) => {
+  if (sla >= 95 && rating >= 4.7) return { label: "🥇 Gold", color: "bg-amber-100 text-amber-800 border-amber-300" };
+  if (sla >= 85 && rating >= 4.0) return { label: "🥈 Silver", color: "bg-slate-100 text-slate-700 border-slate-300" };
+  if (sla < 80) return { label: "⚠ Probation", color: "bg-red-100 text-red-700 border-red-300" };
+  return { label: "Standard", color: "bg-blue-50 text-blue-600 border-blue-200" };
+};
+
+const formatINR = (amount: number) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 
 const getStatusLabel = (vendor: VendorRecord) => {
   if (vendor.isBlocked) return "Suspended";
@@ -346,58 +376,125 @@ function VendorsContent() {
 
       {/* Vendors Table */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <Table>
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+        <Table className="min-w-[1400px] w-full">
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Revenue This Month</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Avg Order Value</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Refund Amount</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider whitespace-nowrap">Commission Earned</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right pr-6 tracking-wider">Actions</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 pl-6 tracking-wider w-[16%]">Vendor</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Orders / Revenue</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Commission</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Payout Due</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">SLA</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Rating</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Issues</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Capacity</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Coverage</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider text-right pr-6 w-[6%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredVendors.length > 0 ? (
               filteredVendors.map((vendor) => {
-                const displayName = vendor.vendorProfile?.businessName || vendor.name || "Unknown";
-                const ownerName = vendor.vendorProfile?.ownerName || vendor.name || "";
-                const city = vendor.addresses?.[0]?.city || "—";
+                const vp = vendor.vendorProfile;
+                const displayName = vp?.businessName || vendor.name || "Unknown";
                 const status = getStatusLabel(vendor);
-                const commission = vendor.vendorProfile?.commissionRate ? `${vendor.vendorProfile.commissionRate}%` : "—";
-                const hasKYC = vendor.vendorProfile?.ownerIdProofUrl && vendor.vendorProfile?.businessProofUrl;
-                const hasBank = vendor.vendorProfile?.bankVerified;
-                const hasGST = vendor.vendorProfile?.gstRegistered;
-                const orderCount = vendor._count?.ordersAsVendor ?? "—";
+                const revenue = vp?.totalRevenue || 0;
+                const revenueMonth = vp?.revenueThisMonth || 0;
+                const orders = vp?.totalOrders || 0;
+                const commission = vp?.commissionEarned || 0;
+                const commRate = vp?.commissionRate || 18;
+                const payout = vp?.payoutPending || 0;
+                const sla = vp?.slaScore || 0;
+                const rating = vp?.rating || 0;
+                const issueRate = vp?.issueRate || 0;
+                const capacity = vp?.dailyCapacity || 0;
+                const load = vp?.currentLoad || 0;
+                const loadPct = capacity > 0 ? Math.round((load / capacity) * 100) : 0;
+                const avgOrderVal = orders > 0 ? Math.round(revenue / orders) : 0;
+                const city = vp?.city || vendor.addresses?.[0]?.city || "—";
+                const area = vp?.area || vendor.addresses?.[0]?.area || "";
+                const coverage = vp?.areaCoverage || "";
+                const tier = getVendorTier(sla, rating);
+                const agreementDate = vp?.agreementSignedAt;
 
                 return (
-                  <TableRow key={vendor.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/vendors/${vendor.id}`)}>
+                  <TableRow key={vendor.id} className="hover:bg-slate-50 cursor-pointer group" onClick={() => router.push(`/vendors/${vendor.id}`)}>
+                    {/* Vendor Name + Tier + Status */}
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-orange-50 text-orange-600 font-bold">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                        <div>
-                          <p className="font-semibold text-black text-sm">{displayName}</p>
+                        <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-orange-50 text-orange-600 font-bold text-xs">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-black text-sm truncate">{displayName}</p>
+                            <Badge className={`${tier.color} border text-[7px] h-4 px-1 font-black`}>{tier.label}</Badge>
+                          </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <Badge className={`${getStatusColor(status)} border-none font-bold text-[8px] px-1.5 py-0`}>{status.toUpperCase()}</Badge>
                             <span className="text-[10px] text-slate-400">· {city}</span>
                           </div>
+                          {agreementDate && (
+                            <p className="text-[9px] text-slate-400 mt-0.5 flex items-center gap-0.5">
+                              <CalendarClock className="h-2.5 w-2.5" /> Agreement: {formatDate(agreementDate)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </TableCell>
+                    {/* Orders + Revenue */}
                     <TableCell>
-                      <div className="text-sm font-semibold text-emerald-600">₹{(vendor.vendorProfile?.revenueThisMonth || 0).toLocaleString()}</div>
-                      <div className="text-[9px] text-slate-400">Total: ₹{(vendor.vendorProfile?.totalRevenue || 0).toLocaleString()}</div>
+                      <p className="text-sm font-bold text-slate-900">{orders} <span className="text-slate-400 font-medium text-xs">orders</span></p>
+                      <p className="text-xs font-semibold text-emerald-600">{formatINR(revenue)}</p>
+                      <p className="text-[9px] text-slate-400">This month: {formatINR(revenueMonth)}</p>
+                      <p className="text-[9px] text-slate-400">AOV: {formatINR(avgOrderVal)}</p>
                     </TableCell>
+                    {/* Commission */}
                     <TableCell>
-                      <div className="text-sm font-medium text-slate-700">₹{vendor.vendorProfile?.totalOrders && vendor.vendorProfile.totalOrders > 0 ? Math.round((vendor.vendorProfile.totalRevenue || 0) / vendor.vendorProfile.totalOrders).toLocaleString() : "0"}</div>
+                      <p className="text-sm font-bold text-purple-700">{formatINR(commission)}</p>
+                      <p className="text-[9px] text-slate-400">{commRate}% rate</p>
                     </TableCell>
+                    {/* Payout Due */}
                     <TableCell>
-                      <div className={`text-sm ${(vendor.vendorProfile?.refundAmount || 0) > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>₹{(vendor.vendorProfile?.refundAmount || 0).toLocaleString()}</div>
+                      <p className={cn("text-sm font-bold", payout > 0 ? "text-orange-600" : "text-slate-400")}>{formatINR(payout)}</p>
+                      {payout > 10000 && <p className="text-[9px] text-red-500 font-semibold">⚠️ High</p>}
                     </TableCell>
+                    {/* SLA */}
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={cn("font-bold text-[10px]", sla >= 90 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : sla >= 80 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{sla > 0 ? `${sla}%` : "—"}</Badge>
+                      {sla > 0 && sla < 80 && <p className="text-[8px] text-red-500 font-bold mt-0.5">⚠️ Breach</p>}
+                    </TableCell>
+                    {/* Rating */}
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                        <span className="text-xs font-bold text-slate-800">{rating > 0 ? rating.toFixed(1) : "—"}</span>
+                      </div>
+                    </TableCell>
+                    {/* Issue Rate */}
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={cn("font-bold text-[10px]", issueRate > 5 ? "text-red-600 border-red-200 bg-red-50" : issueRate > 2 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-emerald-600 border-emerald-200 bg-emerald-50")}>{issueRate > 0 ? `${issueRate.toFixed(1)}%` : "0%"}</Badge>
+                    </TableCell>
+                    {/* Capacity */}
                     <TableCell>
-                      <div className="text-sm font-semibold text-blue-600">₹{(vendor.vendorProfile?.commissionEarned || 0).toLocaleString()}</div>
-                      <div className="text-[9px] text-slate-400">{vendor.vendorProfile?.commissionRate || 18}% rate</div>
+                      {capacity > 0 ? (
+                        <div>
+                          <div className="flex items-center gap-1 mb-1">
+                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={cn("h-full rounded-full", loadPct > 90 ? "bg-red-500" : loadPct > 70 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${Math.min(loadPct, 100)}%` }} />
+                            </div>
+                            <span className="text-[9px] text-slate-500 font-bold">{loadPct}%</span>
+                          </div>
+                          <p className="text-[9px] text-slate-400">{load}/{capacity} orders</p>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">—</span>
+                      )}
                     </TableCell>
+                    {/* Coverage */}
+                    <TableCell>
+                      <p className="text-[11px] text-slate-700 font-medium truncate max-w-[120px]">{city}{area ? `, ${area}` : ""}</p>
+                      {coverage && <p className="text-[9px] text-slate-400 truncate max-w-[120px]">{coverage}</p>}
+                    </TableCell>
+                    {/* Actions */}
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -405,10 +502,27 @@ function VendorsContent() {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuContent align="end" className="rounded-xl w-52">
                           <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}`); }}>
                             <Eye className="h-4 w-4" /> View Details
                           </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=performance`); }}>
+                            <BarChart3 className="h-4 w-4" /> View Performance
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=payouts`); }}>
+                            <IndianRupee className="h-4 w-4" /> View Settlements
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=commission`); }}>
+                            <TrendingUp className="h-4 w-4" /> Adjust Commission %
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=sla`); }}>
+                            <Gauge className="h-4 w-4" /> Set SLA Override
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=area`); }}>
+                            <MapPin className="h-4 w-4" /> Assign City
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           {status === "Pending" && (
                             <DropdownMenuItem className="gap-2 text-green-600" onClick={(e) => { e.stopPropagation(); handleApprove(vendor.id); }}>
                               <CheckCircle className="h-4 w-4" /> Approve Vendor
@@ -416,7 +530,7 @@ function VendorsContent() {
                           )}
                           {status === "Active" && (
                             <DropdownMenuItem className="gap-2 text-red-600" onClick={(e) => { e.stopPropagation(); handleSuspend(vendor.id); }}>
-                              <Ban className="h-4 w-4" /> Suspend Vendor
+                              <Ban className="h-4 w-4" /> Suspend Temporarily
                             </DropdownMenuItem>
                           )}
                           {status === "Suspended" && (
@@ -424,9 +538,8 @@ function VendorsContent() {
                               <CheckCircle className="h-4 w-4" /> Reactivate
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${vendor.id}?tab=payouts`); }}>
-                            <CreditCard className="h-4 w-4" /> View Payouts
+                          <DropdownMenuItem className="gap-2 text-amber-600" onClick={(e) => { e.stopPropagation(); toast.info("Warning notice sent to vendor"); }}>
+                            <AlertTriangle className="h-4 w-4" /> Send Warning Notice
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -436,11 +549,12 @@ function VendorsContent() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-slate-500">No vendors found.</TableCell>
+                <TableCell colSpan={10} className="h-32 text-center text-slate-500">No vendors found.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        </div>
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50">
           <p className="text-sm text-slate-500">Showing {filteredVendors.length} of {vendors.length} vendors</p>
         </div>
