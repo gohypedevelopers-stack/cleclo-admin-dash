@@ -126,6 +126,42 @@ const normalizeServiceType = (name?: string | null) => {
   return raw;
 };
 
+const normalizeArray = (raw: unknown, key?: string) => {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") {
+    if (key && Array.isArray((raw as any)[key])) return (raw as any)[key];
+    // Try some common keys if key not provided or not found
+    const firstArrayKey = Object.keys(raw).find(k => Array.isArray((raw as any)[k]));
+    if (firstArrayKey) return (raw as any)[firstArrayKey];
+  }
+  return [];
+};
+
+const normalizeVendors = (raw: unknown) => {
+  const list = normalizeArray(raw, "vendors");
+  return list.map((v: any) => ({
+    id: v.id,
+    businessName: v.vendorProfile?.businessName || v.businessName || "",
+    contactName: v.name || v.contactName || ""
+  }));
+};
+
+const normalizeStates = (raw: unknown) => {
+  const list = normalizeArray(raw, "states");
+  return list.map((s: any) => ({
+    code: s.code || "",
+    name: s.name || ""
+  }));
+};
+
+const normalizeCities = (raw: unknown) => {
+  const list = normalizeArray(raw, "cities");
+  return list.map((c: any) => ({
+    cityCode: c.cityCode || c.code || "",
+    cityName: c.cityName || c.name || ""
+  }));
+};
+
 function ItemsPageContent() {
   const searchParams = useSearchParams();
   const subCategoryIdFromUrl = searchParams.get("subcategoryId");
@@ -201,9 +237,7 @@ function ItemsPageContent() {
         adminCatalogApi.getItems(),
       ]);
 
-      let categories: CategoryRecord[] = Array.isArray(categoriesRaw)
-        ? categoriesRaw
-        : [];
+      let categories: CategoryRecord[] = normalizeArray(categoriesRaw, "categories");
 
       if (!serviceIdFromUrl && serviceFromUrl) {
         categories = categories.filter(
@@ -220,9 +254,7 @@ function ItemsPageContent() {
       const categoryById = new Map(categories.map((category) => [category.id, category]));
       const allowedCategoryIds = new Set(categories.map((category) => category.id));
 
-      let subCategories: SubCategoryRecord[] = Array.isArray(subCategoriesRaw)
-        ? subCategoriesRaw
-        : [];
+      let subCategories: SubCategoryRecord[] = normalizeArray(subCategoriesRaw, "subCategories");
 
       if (allowedCategoryIds.size > 0) {
         subCategories = subCategories.filter((subCategory) =>
@@ -249,9 +281,9 @@ function ItemsPageContent() {
 
       const allowedSubCategoryIds = new Set(normalizedSubCategories.map((subCategory) => subCategory.id));
 
-      const normalizedItems: ItemRecord[] = (Array.isArray(itemsRaw) ? itemsRaw : [])
-        .filter((item) => allowedSubCategoryIds.has(item.subCategoryId))
-        .map((item) => ({
+      const normalizedItems: ItemRecord[] = normalizeArray(itemsRaw, "items")
+        .filter((item: any) => allowedSubCategoryIds.has(item.subCategoryId))
+        .map((item: any) => ({
           ...item,
           isActive: item.isActive !== false,
           subCategory: subCategoryMap.get(item.subCategoryId) || item.subCategory,
@@ -291,8 +323,8 @@ function ItemsPageContent() {
       }));
 
       // Fetch states and vendors in background
-      adminLocationApi.getStates().then(setStates).catch(console.error);
-      adminVendorApi.getVendors().then(setVendors).catch(console.error);
+      adminLocationApi.getStates().then(res => setStates(normalizeStates(res))).catch(console.error);
+      adminVendorApi.getVendors().then(res => setVendors(normalizeVendors(res))).catch(console.error);
       
     } catch (error) {
       console.error(error);
@@ -315,7 +347,7 @@ function ItemsPageContent() {
 
   useEffect(() => {
     if (selectedStateCode) {
-      adminLocationApi.getCitiesByState(selectedStateCode).then(setCityOptions).catch(console.error);
+      adminLocationApi.getCitiesByState(selectedStateCode).then(res => setCityOptions(normalizeCities(res))).catch(console.error);
     } else {
       setCityOptions([]);
     }
@@ -324,7 +356,7 @@ function ItemsPageContent() {
   useEffect(() => {
     if (selectedCityCodes.length > 0 && isCityPriceOpen) {
       adminCatalogApi.getItemPriceOverrides(selectedCityCodes[0], undefined)
-        .then(setCityOverrides)
+        .then(res => setCityOverrides(normalizeArray(res, "overrides")))
         .catch(console.error);
     } else {
       setCityOverrides([]);
@@ -334,7 +366,7 @@ function ItemsPageContent() {
   useEffect(() => {
     if (selectedVendorId && isVendorPriceOpen) {
       adminCatalogApi.getItemPriceOverrides(undefined, selectedVendorId)
-        .then(setVendorOverrides)
+        .then(res => setVendorOverrides(normalizeArray(res, "overrides")))
         .catch(console.error);
     }
   }, [selectedVendorId, isVendorPriceOpen]);
