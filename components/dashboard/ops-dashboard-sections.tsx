@@ -32,6 +32,7 @@ interface StatusDistributionProps {
 }
 
 export function OrderStatusDistribution({ orders }: StatusDistributionProps) {
+  const router = useRouter();
   const statusCounts: Record<string, number> = {};
   orders.forEach((o) => {
     statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
@@ -81,13 +82,14 @@ export function OrderStatusDistribution({ orders }: StatusDistributionProps) {
         {statuses.map(([status, count]) => (
           <div
             key={status}
-            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all"
+            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm hover:border-blue-200 transition-all cursor-pointer group/status min-w-0"
+            onClick={() => router.push(`/orders?status=${status.toLowerCase().replace(/ /g, "_")}`)}
           >
             <div
-              className={`w-3 h-3 rounded-full ${statusColors[status] || "bg-slate-300"}`}
+              className={`w-3 h-3 rounded-full ${statusColors[status] || "bg-slate-300"} group-hover/status:scale-125 transition-transform`}
             />
             <div>
-              <p className="text-lg font-bold text-slate-900">{count}</p>
+              <p className="text-lg font-bold text-slate-900 group-hover/status:text-blue-600 transition-colors">{count}</p>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 {status}
               </p>
@@ -189,7 +191,7 @@ export function SlaRiskPanel({ orders }: SlaRiskProps) {
         {items.map((item) => (
           <div
             key={item.label}
-            className={`p-4 rounded-xl border ${item.border} ${item.bg} hover:shadow-sm transition-all`}
+            className={`p-4 rounded-xl border ${item.border} ${item.bg} hover:shadow-sm transition-all min-w-0`}
           >
             <div className="flex items-center gap-2 mb-2">
               <item.icon className={`h-5 w-5 ${item.color}`} />
@@ -374,133 +376,111 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
 }
 
 /* ─── Rider Performance Snapshot ──────────────────────────── */
-
-export function RiderPerformanceSnapshot() {
-  const router = useRouter();
-
-  // Mock data since rider data isn't available in dashboard API
-  const riders = [
-    {
-      name: "Rohit Sharma",
-      deliveries: 184,
-      onTime: 96,
-      rating: 4.7,
-      status: "online",
-    },
-    {
-      name: "Amit Patel",
-      deliveries: 156,
-      onTime: 92,
-      rating: 4.5,
-      status: "on_delivery",
-    },
-    {
-      name: "Vikas Kumar",
-      deliveries: 142,
-      onTime: 88,
-      rating: 4.3,
-      status: "online",
-    },
-    {
-      name: "Deepak Singh",
-      deliveries: 98,
-      onTime: 78,
-      rating: 3.9,
-      status: "offline",
-    },
-  ];
-
-  const statusColors: Record<string, string> = {
-    online: "bg-emerald-400",
-    on_delivery: "bg-amber-400",
-    offline: "bg-slate-300",
-  };
-  const statusLabels: Record<string, string> = {
-    online: "Online",
-    on_delivery: "On Delivery",
-    offline: "Offline",
-  };
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-violet-50">
-            <Truck className="h-5 w-5 text-violet-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              Rider Performance Snapshot
-            </h2>
-            <p className="text-xs text-slate-500 font-medium">
-              Top riders by delivery volume and reliability
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-sm font-semibold text-[#3E8940] hover:text-[#3E8940]/80 hover:bg-green-50 gap-1"
-          onClick={() => router.push("/rider")}
-        >
-          View All <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="space-y-3">
-        {riders.map((r) => (
-          <div
-            key={r.name}
-            className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all cursor-pointer"
-            onClick={() => router.push("/rider")}
-          >
-            <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
-              <span className="text-sm font-bold text-violet-700">
-                {r.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-sm text-slate-900 truncate">
-                  {r.name}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-2 h-2 rounded-full ${statusColors[r.status]}`}
-                  />
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    {statusLabels[r.status]}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                {r.deliveries} deliveries this month
-              </p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="text-center">
-                <p
-                  className={`text-sm font-bold ${r.onTime >= 90 ? "text-emerald-600" : r.onTime >= 80 ? "text-amber-600" : "text-red-600"}`}
-                >
-                  {r.onTime}%
-                </p>
-                <p className="text-[8px] font-bold text-slate-400 uppercase">
-                  On-time
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-900">⭐ {r.rating}</p>
-                <p className="text-[8px] font-bold text-slate-400 uppercase">
-                  Rating
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+ 
+ interface RiderPerformanceProps {
+   riders: any[];
+ }
+ 
+ export function RiderPerformanceSnapshot({ riders }: RiderPerformanceProps) {
+   const router = useRouter();
+ 
+   const statusColors: Record<string, string> = {
+     online: "bg-emerald-400",
+     on_delivery: "bg-amber-400",
+     offline: "bg-slate-300",
+   };
+   const statusLabels: Record<string, string> = {
+     online: "Online",
+     on_delivery: "On Delivery",
+     offline: "Offline",
+   };
+ 
+   return (
+     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+       <div className="flex items-center justify-between mb-6">
+         <div className="flex items-center gap-3">
+           <div className="p-2 rounded-xl bg-violet-50">
+             <Truck className="h-5 w-5 text-violet-600" />
+           </div>
+           <div>
+             <h2 className="text-lg font-bold text-slate-900">
+               Rider Performance Snapshot
+             </h2>
+             <p className="text-xs text-slate-500 font-medium">
+               Top riders by delivery volume and reliability from live order data
+             </p>
+           </div>
+         </div>
+         <Button
+           variant="ghost"
+           size="sm"
+           className="text-sm font-semibold text-[#3E8940] hover:text-[#3E8940]/80 hover:bg-green-50 gap-1"
+           onClick={() => router.push("/rider")}
+         >
+           View All <ArrowRight className="h-4 w-4" />
+         </Button>
+       </div>
+ 
+       {riders.length === 0 ? (
+         <p className="text-sm text-slate-500 text-center py-8">
+           No rider activity data available for this period.
+         </p>
+       ) : (
+         <div className="space-y-3">
+           {riders.map((r) => (
+             <div
+               key={r.id}
+               className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all cursor-pointer"
+               onClick={() => router.push(`/rider?search=${encodeURIComponent(r.name)}`)}
+             >
+               <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                 <span className="text-sm font-bold text-violet-700">
+                   {r.name
+                     .split(" ")
+                     .map((n: string) => n[0])
+                     .join("")}
+                 </span>
+               </div>
+               <div className="flex-1 min-w-0">
+                 <div className="flex items-center gap-2">
+                   <p className="font-bold text-sm text-slate-900 truncate">
+                     {r.name}
+                   </p>
+                   <div className="flex items-center gap-1.5">
+                     <div
+                       className={`w-2 h-2 rounded-full ${statusColors[r.status] || "bg-slate-300"}`}
+                     />
+                     <span className="text-[10px] text-slate-500 font-medium">
+                       {statusLabels[r.status] || "Offline"}
+                     </span>
+                   </div>
+                 </div>
+                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                   {r.deliveries} deliveries • {r.issues} issues reported
+                 </p>
+               </div>
+               <div className="flex items-center gap-3 shrink-0">
+                 <div className="text-center">
+                   <p
+                     className={`text-sm font-bold ${r.onTime >= 90 ? "text-emerald-600" : r.onTime >= 80 ? "text-amber-600" : "text-red-600"}`}
+                   >
+                     {r.onTime}%
+                   </p>
+                   <p className="text-[8px] font-bold text-slate-400 uppercase">
+                     On-time
+                   </p>
+                 </div>
+                 <div className="text-center">
+                   <p className="text-sm font-bold text-slate-900">⭐ {r.rating}</p>
+                   <p className="text-[8px] font-bold text-slate-400 uppercase">
+                     Rating
+                   </p>
+                 </div>
+               </div>
+             </div>
+           ))}
+         </div>
+       )}
+     </div>
+   );
+ }

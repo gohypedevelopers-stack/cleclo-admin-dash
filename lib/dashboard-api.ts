@@ -108,12 +108,29 @@ export interface DashboardApproval {
 export interface DashboardIssueDigest {
     id: string;
     orderId: string;
+    supportTicketId?: string;
     type: string;
     severity: string;
     vendor: string;
     summary: string;
     city: string;
     unread: boolean;
+    assignedTo?: string;
+    financialRiskAmount?: string;
+    status: 'Open' | 'Escalated' | 'Resolved';
+    vendorRiskLevel?: 'Low' | 'Medium' | 'High';
+    financialRisk?: { label: string; value: string; color: string };
+    refundStatus?: 'Not Initiated' | 'Processing' | 'Completed';
+    damageClaim?: {
+        preCleanImageUrl?: string;
+        postCleanImageUrl?: string;
+        invoiceValue: number;
+        liabilityCap: number;
+    };
+    resolution?: {
+        rootCause?: 'Vendor Fault' | 'Rider Fault' | 'Customer Fault' | 'System Issue';
+        resolvedAt?: string;
+    };
 }
 
 export interface FinanceSnapshotItem {
@@ -149,6 +166,7 @@ export interface DashboardOverview {
     growthMetrics: GrowthMetricItem[];
     approvals: DashboardApproval[];
     issueDigest: DashboardIssueDigest[];
+    riders: any[];
     primaryTable: {
         type: 'orders' | 'settlements';
         title: string;
@@ -203,6 +221,41 @@ export const dashboardApi = {
     getAnalytics: async () => {
         const res = await apiFetch(`${ORDER_API_URL}/analytics`, { headers: getAuthHeaders() });
         if (!res.ok) return null;
+        return res.json();
+    },
+
+    updateIssue: async (issueId: string, payload: {
+        action?: 'assign' | 'review' | 'escalate' | 'resolve';
+        assignedTo?: string;
+        rootCause?: string;
+        refundStatus?: string;
+        damageClaim?: any;
+    }) => {
+        const res = await apiFetch(`${AUTH_API_URL}/issues/${issueId}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to update issue');
+        }
+        return res.json();
+    },
+
+    updateVendor: async (vendorId: string, payload: {
+        status?: 'Active' | 'Rejected' | 'Suspended';
+        action?: 'approve' | 'reject';
+    }) => {
+        const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to update vendor');
+        }
         return res.json();
     }
 };

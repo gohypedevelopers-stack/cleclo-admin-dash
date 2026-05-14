@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   Users,
@@ -256,7 +256,8 @@ const issueAlerts = [
     vendor: "Clean Express",
     customer: "Robert Fox",
     contact: "+91 87654 32109",
-    description: "Customer reported that a silk shirt was returned with a visible tear near the collar. Vendor claims it was received in this condition.",
+    description:
+      "Customer reported that a silk shirt was returned with a visible tear near the collar. Vendor claims it was received in this condition.",
     location: "Andheri, Mumbai",
     priority: "Critical",
   },
@@ -267,7 +268,8 @@ const issueAlerts = [
     vendor: "Sparkle Wash",
     customer: "Sarah Jenkins",
     contact: "+91 76543 21098",
-    description: "Customer complained about a missing item (a pair of socks) from their laundry bag. Vendor is checking CCTV.",
+    description:
+      "Customer complained about a missing item (a pair of socks) from their laundry bag. Vendor is checking CCTV.",
     location: "Bandra, Mumbai",
     priority: "High",
   },
@@ -278,7 +280,8 @@ const issueAlerts = [
     vendor: "Quick Clean",
     customer: "James Doe",
     contact: "+91 98765 43210",
-    description: "The rider reached the location but the customer was not available and didn't pick up the call after multiple attempts.",
+    description:
+      "The rider reached the location but the customer was not available and didn't pick up the call after multiple attempts.",
     location: "Juhu, Mumbai",
     priority: "Low",
   },
@@ -334,31 +337,50 @@ export default function AdminDashboardPage() {
   // Update mock data with dates for filtering
   const updatedOrders = recentOrders.map((order, idx) => ({
     ...order,
-    date: idx === 0 ? "2026-03-25" : idx === 1 ? "2026-03-24" : idx === 2 ? "2026-03-23" : "2026-03-22",
+    date:
+      idx === 0
+        ? "2026-03-25"
+        : idx === 1
+          ? "2026-03-24"
+          : idx === 2
+            ? "2026-03-23"
+            : "2026-03-22",
     city: order.location.split(", ")[1] || order.location,
   }));
 
   const filteredOrders = updatedOrders.filter((order) => {
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    const matchesVendor = vendorFilter === "all" || order.vendor === vendorFilter;
+    const matchesStatus =
+      statusFilter === "all" || order.status === statusFilter;
+    const matchesVendor =
+      vendorFilter === "all" || order.vendor === vendorFilter;
     const matchesCity = cityFilter === "all" || order.city === cityFilter;
     const matchesDate = !dateFilter || order.date === dateFilter;
-    
+
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || 
+    const matchesSearch =
+      !searchQuery ||
       order.id.toLowerCase().includes(searchLower) ||
       order.customer.toLowerCase().includes(searchLower) ||
       order.vendor.toLowerCase().includes(searchLower) ||
       order.city.toLowerCase().includes(searchLower) ||
       (order.phone && order.phone.includes(searchQuery)) ||
-      (order.transactionId && order.transactionId.toLowerCase().includes(searchLower));
+      (order.transactionId &&
+        order.transactionId.toLowerCase().includes(searchLower));
 
-    return matchesStatus && matchesVendor && matchesCity && matchesDate && matchesSearch;
+    return (
+      matchesStatus &&
+      matchesVendor &&
+      matchesCity &&
+      matchesDate &&
+      matchesSearch
+    );
   });
 
   const uniqueVendors = Array.from(new Set(updatedOrders.map((o) => o.vendor)));
   const uniqueCities = Array.from(new Set(updatedOrders.map((o) => o.city)));
-  const uniqueStatuses = Array.from(new Set(updatedOrders.map((o) => o.status)));
+  const uniqueStatuses = Array.from(
+    new Set(updatedOrders.map((o) => o.status)),
+  );
 
   const handleClearFilters = () => {
     setStatusFilter("all");
@@ -387,12 +409,26 @@ export default function AdminDashboardPage() {
                 <SelectValue placeholder="Select period" />
               </div>
             </SelectTrigger>
-            <SelectContent position="popper" sideOffset={4} className="w-[180px] rounded-xl border-slate-200 shadow-xl">
-              <SelectItem value="today" className="rounded-lg">Today</SelectItem>
-              <SelectItem value="yesterday" className="rounded-lg">Yesterday</SelectItem>
-              <SelectItem value="week" className="rounded-lg">This Week</SelectItem>
-              <SelectItem value="month" className="rounded-lg">This Month</SelectItem>
-              <SelectItem value="custom" className="rounded-lg">Custom Date Range</SelectItem>
+            <SelectContent
+              position="popper"
+              sideOffset={4}
+              className="w-[180px] rounded-xl border-slate-200 shadow-xl"
+            >
+              <SelectItem value="today" className="rounded-lg">
+                Today
+              </SelectItem>
+              <SelectItem value="yesterday" className="rounded-lg">
+                Yesterday
+              </SelectItem>
+              <SelectItem value="week" className="rounded-lg">
+                This Week
+              </SelectItem>
+              <SelectItem value="month" className="rounded-lg">
+                This Month
+              </SelectItem>
+              <SelectItem value="custom" className="rounded-lg">
+                Custom Date Range
+              </SelectItem>
             </SelectContent>
           </Select>
 
@@ -423,7 +459,9 @@ export default function AdminDashboardPage() {
               className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}
+                >
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
                 <Badge
@@ -432,11 +470,15 @@ export default function AdminDashboardPage() {
                     stat.trend === "up"
                       ? "text-green-700 bg-green-50"
                       : stat.trend === "down"
-                      ? "text-red-700 bg-red-50"
-                      : "text-slate-600 bg-slate-50"
+                        ? "text-red-700 bg-red-50"
+                        : "text-slate-600 bg-slate-50"
                   } font-bold text-[10px] border-none px-2`}
                 >
-                  {stat.trend === "up" ? "Γåæ" : stat.trend === "down" ? "Γåô" : "ΓÇó"}
+                  {stat.trend === "up"
+                    ? "Γåæ"
+                    : stat.trend === "down"
+                      ? "Γåô"
+                      : "ΓÇó"}
                   {stat.change}
                 </Badge>
               </div>
@@ -455,7 +497,9 @@ export default function AdminDashboardPage() {
         {/* Finance Section Separator */}
         <div className="flex items-center gap-4 py-2">
           <div className="h-px bg-slate-100 flex-1" />
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Financial Insights</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">
+            Financial Insights
+          </span>
           <div className="h-px bg-slate-100 flex-1" />
         </div>
 
@@ -466,7 +510,9 @@ export default function AdminDashboardPage() {
               className="bg-linear-to-br from-white to-slate-50/50 rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}
+                >
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
                 <Badge
@@ -499,13 +545,21 @@ export default function AdminDashboardPage() {
         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
           <Wallet className="h-32 w-32 text-[#3E8940]" />
         </div>
-        
+
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Settlement & Finance Snapshot</h2>
-            <p className="text-sm font-medium text-slate-500 mt-0.5">Real-time overview of platform liquidity and vendor payouts</p>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              Settlement & Finance Snapshot
+            </h2>
+            <p className="text-sm font-medium text-slate-500 mt-0.5">
+              Real-time overview of platform liquidity and vendor payouts
+            </p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-slate-200 text-slate-600 font-bold gap-2"
+          >
             <TrendingUp className="h-4 w-4 text-[#3E8940]" />
             Full Report
           </Button>
@@ -513,17 +567,26 @@ export default function AdminDashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {financeStats.map((stat: any, idx: number) => (
-            <div key={idx} className="relative p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg hover:border-transparent transition-all duration-300 group/card">
+            <div
+              key={idx}
+              className="relative p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg hover:border-transparent transition-all duration-300 group/card"
+            >
               <div className="flex items-start justify-between mb-4">
-                <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover/card:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`p-2.5 rounded-xl ${stat.bgColor} group-hover/card:scale-110 transition-transform duration-300`}
+                >
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
                 <div className="h-1.5 w-1.5 rounded-full bg-slate-200" />
               </div>
-              
+
               <div className="space-y-1">
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{stat.value}</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.title}</p>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  {stat.value}
+                </h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  {stat.title}
+                </p>
                 <p className="text-[10px] font-medium text-slate-500 pt-1 flex items-center gap-1">
                   {stat.description}
                 </p>
@@ -531,7 +594,10 @@ export default function AdminDashboardPage() {
 
               {/* Decorative progress bar */}
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-100 overflow-hidden rounded-b-2xl">
-                <div className={`h-full w-1/3 opacity-30 ${stat.bgColor.replace('bg-', 'bg-')}`} style={{backgroundColor: 'currentColor'}} />
+                <div
+                  className={`h-full w-1/3 opacity-30 ${stat.bgColor.replace("bg-", "bg-")}`}
+                  style={{ backgroundColor: "currentColor" }}
+                />
               </div>
             </div>
           ))}
@@ -545,13 +611,17 @@ export default function AdminDashboardPage() {
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <h2 className="text-lg font-bold text-slate-900">Recent Orders</h2>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Recent Orders
+                </h2>
                 <div className="relative group w-64">
                   <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 group-focus-within:text-[#3E8940] transition-colors" />
                   <Input
                     placeholder="Search by ID, Phone, Transaction..."
                     value={searchQuery}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setSearchQuery(e.target.value)
+                    }
                     className="h-8 pl-9 bg-slate-50 border-slate-100 text-xs rounded-lg focus-visible:ring-1 focus-visible:ring-[#3E8940] transition-all"
                   />
                 </div>
@@ -568,7 +638,9 @@ export default function AdminDashboardPage() {
             {/* Filters Row */}
             <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Status:
+                </span>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-[130px] h-9 bg-white border-slate-200 text-xs font-medium rounded-lg">
                     <SelectValue placeholder="All Status" />
@@ -576,14 +648,18 @@ export default function AdminDashboardPage() {
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Status</SelectItem>
                     {uniqueStatuses.map((status) => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vendor:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Vendor:
+                </span>
                 <Select value={vendorFilter} onValueChange={setVendorFilter}>
                   <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200 text-xs font-medium rounded-lg">
                     <SelectValue placeholder="All Vendors" />
@@ -591,14 +667,18 @@ export default function AdminDashboardPage() {
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Vendors</SelectItem>
                     {uniqueVendors.map((vendor) => (
-                      <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
+                      <SelectItem key={vendor} value={vendor}>
+                        {vendor}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">City:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  City:
+                </span>
                 <Select value={cityFilter} onValueChange={setCityFilter}>
                   <SelectTrigger className="w-[130px] h-9 bg-white border-slate-200 text-xs font-medium rounded-lg">
                     <SelectValue placeholder="All Cities" />
@@ -606,14 +686,18 @@ export default function AdminDashboardPage() {
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Cities</SelectItem>
                     {uniqueCities.map((city) => (
-                      <SelectItem key={city} value={city}>{city}</SelectItem>
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Date:
+                </span>
                 <input
                   type="date"
                   value={dateFilter}
@@ -622,7 +706,11 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {(statusFilter !== "all" || vendorFilter !== "all" || cityFilter !== "all" || dateFilter !== "" || searchQuery !== "") && (
+              {(statusFilter !== "all" ||
+                vendorFilter !== "all" ||
+                cityFilter !== "all" ||
+                dateFilter !== "" ||
+                searchQuery !== "") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -674,64 +762,67 @@ export default function AdminDashboardPage() {
               <TableBody>
                 {filteredOrders.length > 0 ? (
                   filteredOrders.map((order) => (
-                  <TableRow
-                    key={order.id}
-                    className="hover:bg-slate-50/80 border-b border-slate-50 last:border-0 cursor-pointer transition-colors"
-                    onClick={() => router.push(`/orders/${order.id}`)}
-                  >
-                    <TableCell className="font-bold text-slate-900 whitespace-nowrap">
-                      #{order.id}
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-700 whitespace-nowrap">
-                      {order.customer}
-                    </TableCell>
-                    <TableCell className="text-slate-600 whitespace-nowrap">
-                      {order.vendor}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500 whitespace-nowrap font-medium">
-                      {order.location}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${getOrderTypeColor(
-                          order.orderType,
-                        )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
-                      >
-                        {order.orderType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${getStatusColor(
-                          order.status,
-                        )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
-                      >
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${getPaymentStatusColor(
-                          order.paymentStatus,
-                        )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
-                      >
-                        {order.paymentStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-[11px] font-medium text-slate-600 whitespace-nowrap">
-                      {order.pickupSlot}
-                    </TableCell>
-                    <TableCell className="text-[11px] font-bold text-[#3E8940] whitespace-nowrap">
-                      {order.deliveryEta}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-slate-900 whitespace-nowrap">
-                      {order.amount}
-                    </TableCell>
-                  </TableRow>
+                    <TableRow
+                      key={order.id}
+                      className="hover:bg-slate-50/80 border-b border-slate-50 last:border-0 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/orders/${order.id}`)}
+                    >
+                      <TableCell className="font-bold text-slate-900 whitespace-nowrap">
+                        #{order.id}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-700 whitespace-nowrap">
+                        {order.customer}
+                      </TableCell>
+                      <TableCell className="text-slate-600 whitespace-nowrap">
+                        {order.vendor}
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-500 whitespace-nowrap font-medium">
+                        {order.location}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${getOrderTypeColor(
+                            order.orderType,
+                          )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
+                        >
+                          {order.orderType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${getStatusColor(
+                            order.status,
+                          )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
+                        >
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${getPaymentStatusColor(
+                            order.paymentStatus,
+                          )} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}
+                        >
+                          {order.paymentStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[11px] font-medium text-slate-600 whitespace-nowrap">
+                        {order.pickupSlot}
+                      </TableCell>
+                      <TableCell className="text-[11px] font-bold text-[#3E8940] whitespace-nowrap">
+                        {order.deliveryEta}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-slate-900 whitespace-nowrap">
+                        {order.amount}
+                      </TableCell>
+                    </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-32 text-center text-slate-500 font-medium">
+                    <TableCell
+                      colSpan={10}
+                      className="h-32 text-center text-slate-500 font-medium"
+                    >
                       No orders found matching your filters.
                     </TableCell>
                   </TableRow>
@@ -798,9 +889,9 @@ export default function AdminDashboardPage() {
                 <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
                   {issueAlerts.length}
                 </Badge>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-7 text-[10px] font-bold text-[#3E8940] hover:bg-green-50 px-2"
                   onClick={() => router.push("/issues")}
                 >
@@ -810,30 +901,34 @@ export default function AdminDashboardPage() {
             </div>
             <div className="space-y-3">
               {issueAlerts.map((issue, idx) => {
-                const colors = {
-                  Critical: "bg-red-50 border-red-100 text-red-700 badge:bg-red-100",
-                  High: "bg-orange-50 border-orange-100 text-orange-700 badge:bg-orange-100",
-                  Medium: "bg-yellow-50 border-yellow-100 text-yellow-700 badge:bg-yellow-100",
-                  Low: "bg-green-50 border-green-100 text-green-700 badge:bg-green-100",
-                }[issue.priority as 'Critical' | 'High' | 'Medium' | 'Low'] || "bg-slate-50 border-slate-100 text-slate-700 badge:bg-slate-100";
+                const colors =
+                  {
+                    Critical:
+                      "bg-red-50 border-red-100 text-red-700 badge:bg-red-100",
+                    High: "bg-orange-50 border-orange-100 text-orange-700 badge:bg-orange-100",
+                    Medium:
+                      "bg-yellow-50 border-yellow-100 text-yellow-700 badge:bg-yellow-100",
+                    Low: "bg-green-50 border-green-100 text-green-700 badge:bg-green-100",
+                  }[issue.priority as "Critical" | "High" | "Medium" | "Low"] ||
+                  "bg-slate-50 border-slate-100 text-slate-700 badge:bg-slate-100";
 
                 return (
                   <div
                     key={idx}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-sm ${colors.split('badge:')[0]}`}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-sm ${colors.split("badge:")[0]}`}
                     onClick={() => setSelectedIssue(issue)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`font-bold text-[10px] px-2 py-0.5 rounded-md transition-colors ${colors.split('badge:')[1]}`}>
+                      <span
+                        className={`font-bold text-[10px] px-2 py-0.5 rounded-md transition-colors ${colors.split("badge:")[1]}`}
+                      >
                         #{issue.orderId}
                       </span>
                       <span className="text-[10px] font-bold opacity-70">
                         {issue.time}
                       </span>
                     </div>
-                    <p className="text-sm font-bold mb-0.5">
-                      {issue.type}
-                    </p>
+                    <p className="text-sm font-bold mb-0.5">{issue.type}</p>
                     <p className="text-[10px] font-bold opacity-60 uppercase tracking-tight">
                       Vendor: {issue.vendor}
                     </p>
@@ -846,7 +941,10 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Issue Detail Dialog */}
-      <Dialog open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>
+      <Dialog
+        open={!!selectedIssue}
+        onOpenChange={() => setSelectedIssue(null)}
+      >
         <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
           {selectedIssue && (
             <>
@@ -867,14 +965,23 @@ export default function AdminDashboardPage() {
               <div className="p-6 space-y-6">
                 {/* Priority Badge */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-500">Urgency Level</span>
-                  <Badge className={`
-                    ${selectedIssue.priority === 'Critical' ? 'bg-red-100 text-red-700 border-red-200' : 
-                      selectedIssue.priority === 'High' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                      selectedIssue.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                      'bg-green-100 text-green-700 border-green-200'} 
+                  <span className="text-sm font-semibold text-slate-500">
+                    Urgency Level
+                  </span>
+                  <Badge
+                    className={`
+                    ${
+                      selectedIssue.priority === "Critical"
+                        ? "bg-red-100 text-red-700 border-red-200"
+                        : selectedIssue.priority === "High"
+                          ? "bg-orange-100 text-orange-700 border-orange-200"
+                          : selectedIssue.priority === "Medium"
+                            ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                            : "bg-green-100 text-green-700 border-green-200"
+                    } 
                     font-bold px-3 py-1 rounded-full text-xs shadow-none border
-                  `}>
+                  `}
+                  >
                     {selectedIssue.priority}
                   </Badge>
                 </div>
@@ -893,21 +1000,27 @@ export default function AdminDashboardPage() {
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Customer
+                    </p>
                     <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                       <User className="h-4 w-4 text-slate-400" />
                       {selectedIssue.customer}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Contact</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Contact
+                    </p>
                     <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                       <Phone className="h-4 w-4 text-slate-400" />
                       {selectedIssue.contact}
                     </div>
                   </div>
                   <div className="space-y-1.5 col-span-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vendor Involved</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Vendor Involved
+                    </p>
                     <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                       <Store className="h-4 w-4 text-slate-400" />
                       {selectedIssue.vendor}
@@ -917,19 +1030,19 @@ export default function AdminDashboardPage() {
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
-                  <Button 
+                  <Button
                     className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold h-11 rounded-xl shadow-md border-b-2 border-red-800 active:border-b-0 active:translate-y-0.5 transition-all"
                     onClick={() => {
                       toast.success("Support Ticket Created", {
-                        description: `Our team will investigate Order #${selectedIssue.orderId} immediately.`
+                        description: `Our team will investigate Order #${selectedIssue.orderId} immediately.`,
                       });
                       setSelectedIssue(null);
                     }}
                   >
                     Investigate Now
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1 font-bold h-11 rounded-xl text-slate-600 border-slate-200"
                     onClick={() => setSelectedIssue(null)}
                   >

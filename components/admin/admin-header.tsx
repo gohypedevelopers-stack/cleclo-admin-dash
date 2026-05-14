@@ -63,6 +63,18 @@ export function AdminHeader() {
       return null;
     }
   });
+  const [sessionInfo] = useState<any>(() => {
+    try {
+      const raw = localStorage.getItem("admin_security");
+      if (raw) {
+        const security = JSON.parse(raw);
+        return security.currentLogin;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -314,8 +326,24 @@ export function AdminHeader() {
               </div>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 p-1 shadow-2xl border-slate-200">
+          <DropdownMenuContent align="end" className="w-64 p-1 shadow-2xl border-slate-200">
             <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-widest">My Account</DropdownMenuLabel>
+            {sessionInfo && (
+              <div className="px-3 pb-3 pt-1">
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+                    <span>Current Session</span>
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  </div>
+                  <div className="text-xs text-slate-700 font-medium break-all">
+                    <span className="text-slate-400 mr-1">IP:</span> {sessionInfo.ipAddress || 'Unknown IP'}
+                  </div>
+                  <div className="text-xs text-slate-700 font-medium">
+                    <span className="text-slate-400 mr-1">Loc:</span> {sessionInfo.locationLabel || 'Unknown Location'}
+                  </div>
+                </div>
+              </div>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => adminUser?.id && router.push(`/users/${adminUser.id}`)} className="cursor-pointer py-2.5 rounded-lg flex items-center gap-2 group">
               <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">

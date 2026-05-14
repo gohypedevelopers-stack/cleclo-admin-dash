@@ -42,6 +42,7 @@ interface CommissionProps {
 }
 
 export function CommissionIntelligence({ settlements }: CommissionProps) {
+  const router = useRouter();
   const totalGross = settlements.reduce((s, r) => s + r.grossAmount, 0);
   const totalCommission = settlements.reduce(
     (s, r) => s + r.commissionAmount,
@@ -143,10 +144,11 @@ export function CommissionIntelligence({ settlements }: CommissionProps) {
               return (
                 <div
                   key={name}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm hover:border-[#3E8940]/30 transition-all cursor-pointer group/vendor"
+                  onClick={() => router.push(`/vendors?search=${encodeURIComponent(name)}`)}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-slate-900 truncate">
+                    <p className="font-bold text-sm text-slate-900 truncate group-hover/vendor:text-[#3E8940] transition-colors">
                       {name}
                     </p>
                     <p className="text-[10px] text-slate-500 font-medium">
@@ -268,17 +270,18 @@ export function SettlementAgingTracker({
           return (
             <div
               key={bucket.label}
-              className={`p-5 rounded-xl border ${bucket.border} ${bucket.color} hover:shadow-sm transition-all`}
+              className={`p-5 rounded-xl border ${bucket.border} ${bucket.color} hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group/bucket`}
+              onClick={() => router.push(`/finance/settlements?aging=${bucket.label.replace(/[⚠️<> ]/g, "").toLowerCase()}`)}
             >
               <div className="flex items-center gap-2 mb-3">
-                <bucket.icon className={`h-5 w-5 ${bucket.textColor}`} />
+                <bucket.icon className={`h-5 w-5 ${bucket.textColor} group-hover/bucket:scale-110 transition-transform`} />
                 <span
                   className={`text-sm font-bold ${bucket.textColor} uppercase`}
                 >
                   {bucket.label}
                 </span>
               </div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-slate-900 group-hover/bucket:text-[#3E8940] transition-colors">
                 {bucket.items.length}
               </p>
               <p className="text-xs text-slate-500 font-medium mt-1">
@@ -307,6 +310,7 @@ interface PayoutReconciliationProps {
 export function PayoutReconciliation({
   settlements,
 }: PayoutReconciliationProps) {
+  const router = useRouter();
   const completed = settlements.filter((s) => s.status === "Completed");
   const pending = settlements.filter(
     (s) => s.status === "Pending" || s.status === "Processing"
@@ -380,9 +384,10 @@ export function PayoutReconciliation({
         {segments.map((seg) => (
           <div
             key={seg.label}
-            className={`p-4 rounded-xl ${seg.bgColor} border border-slate-100 text-center`}
+            className={`p-4 rounded-xl ${seg.bgColor} border border-slate-100 text-center hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group/seg`}
+            onClick={() => router.push(`/finance/settlements?status=${seg.label.toLowerCase()}`)}
           >
-            <p className={`text-2xl font-bold ${seg.textColor}`}>
+            <p className={`text-2xl font-bold ${seg.textColor} group-hover/seg:scale-110 transition-transform`}>
               {seg.count}
             </p>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
@@ -479,11 +484,12 @@ export function RevenueByVendor({ settlements }: RevenueByVendorProps) {
             return (
               <div
                 key={name}
-                className="p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all"
+                className="p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm hover:border-violet-200 transition-all cursor-pointer group/rev"
+                onClick={() => router.push(`/vendors?search=${encodeURIComponent(name)}`)}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <p className="font-bold text-sm text-slate-900">{name}</p>
+                    <p className="font-bold text-sm text-slate-900 group-hover/rev:text-violet-600 transition-colors">{name}</p>
                     <p className="text-[10px] text-slate-500 font-medium">
                       {stats.city} • {stats.orders} orders
                     </p>
@@ -537,6 +543,7 @@ interface WorkingCapitalProps {
 export function WorkingCapitalForecast({
   settlements,
 }: WorkingCapitalProps) {
+  const router = useRouter();
   const now = new Date();
   const sevenDaysFromNow = new Date(
     now.getTime() + 7 * 24 * 60 * 60 * 1000

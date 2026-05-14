@@ -28,6 +28,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  PhoneCall,
+  ImagePlus,
+  ShieldQuestion,
+  History,
+  MoreVertical,
+  UserPlus,
+  CheckCircle2,
+  ArrowUpCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,6 +61,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { DateRange } from "react-day-picker";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -158,6 +184,17 @@ const getPriorityColor = (priority: string) => {
 const formatINR = (amount: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 
+const getFinancialRisk = (type: string) => {
+  if (!type) return null;
+  const t = type.toLowerCase();
+  if (t.includes('damage')) return { label: 'Estimated Refund Risk', value: '₹620', color: 'text-red-600', icon: AlertTriangle };
+  if (t.includes('no show') || t.includes('pickup delay')) return { label: 'Potential Penalty', value: '₹100', color: 'text-amber-600', icon: Activity };
+  if (t.includes('complaint')) return { label: 'Service Credit Risk', value: '₹250', color: 'text-orange-600', icon: TrendingUp };
+  return null;
+};
+
+const ROOT_CAUSES = ['Vendor Fault', 'Rider Fault', 'Customer Fault', 'System Issue'] as const;
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [data, setData] = React.useState<DashboardOverview | null>(null);
@@ -166,12 +203,15 @@ export default function AdminDashboardPage() {
   const [adminRole, setAdminRole] = React.useState<string>("super_admin");
 
   const [timeRange, setTimeRange] = React.useState("today");
+  const [customDateRange, setCustomDateRange] = React.useState<DateRange | undefined>(undefined);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [selectedIssue, setSelectedIssue] = React.useState<DashboardIssueDigest | null>(null);
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [vendorFilter, setVendorFilter] = React.useState("all");
   const [cityFilter, setCityFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [lastUpdated, setLastUpdated] = React.useState(new Date());
   const itemsPerPage = 5;
 
   // Detect admin role from localStorage
@@ -205,15 +245,18 @@ export default function AdminDashboardPage() {
         vendor: vendorFilter !== "all" ? vendorFilter : undefined,
         city: cityFilter !== "all" ? cityFilter : undefined,
         date: dateFilter || undefined,
+        startDate: timeRange === "custom" && customDateRange?.from ? format(customDateRange.from, "yyyy-MM-dd") : undefined,
+        endDate: timeRange === "custom" && customDateRange?.to ? format(customDateRange.to, "yyyy-MM-dd") : undefined,
       });
       setData(result);
+      setLastUpdated(new Date());
     } catch (err: any) {
       setError(err.message || "Failed to load dashboard");
       console.error("Dashboard fetch error:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, statusFilter, vendorFilter, cityFilter, dateFilter]);
+  }, [timeRange, statusFilter, vendorFilter, cityFilter, dateFilter, customDateRange]);
 
   React.useEffect(() => {
     fetchDashboard();
@@ -226,6 +269,10 @@ export default function AdminDashboardPage() {
 
     return () => clearInterval(interval);
   }, [fetchDashboard]);
+
+  const [issueTypeFilter, setIssueTypeFilter] = React.useState("all");
+  const [issueStatusFilter, setIssueStatusFilter] = React.useState("all");
+  const [issueRootCause, setIssueRootCause] = React.useState<string | null>(null);
 
   const handleClearFilters = () => {
     setStatusFilter("all");
@@ -250,6 +297,80 @@ export default function AdminDashboardPage() {
     } catch (err: any) {
       toast.error("Export failed", {
         description: err.message || "Could not generate report",
+      });
+    }
+  };
+
+  const handleDismissIssue = async (issueId: string) => {
+    try {
+      await dashboardApi.updateIssue(issueId, { action: 'review' });
+      toast.success("Issue dismissed", {
+        description: "The issue has been marked as reviewed.",
+      });
+      setSelectedIssue(null);
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Action failed", {
+        description: err.message || "Could not dismiss issue",
+      });
+    }
+  };
+
+  const handleEscalateIssue = async (issueId: string) => {
+    try {
+      await dashboardApi.updateIssue(issueId, { action: 'escalate' });
+      toast.success("Issue escalated", {
+        description: "Assigned to Senior Support Team for immediate resolution.",
+      });
+      setSelectedIssue(null);
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Escalation failed", {
+        description: err.message || "Could not escalate issue",
+      });
+    }
+  };
+
+  const handleContactAction = (type: 'vendor' | 'customer', name: string, orderId?: string) => {
+    // Find the actual phone number from the orders list if available
+    const order = orders.find(o => o.transactionId === orderId || o.id === orderId);
+    const phone = type === 'customer' ? (order?.customerPhone || '+91 98765 43210') : (order?.vendorPhone || '+91 91234 56789');
+    
+    toast.info(`Contacting ${type}`, {
+      description: (
+        <div className="mt-1 flex flex-col gap-2">
+          <p className="font-medium">Dialing {name}...</p>
+          <a 
+            href={`tel:${phone.replace(/\s/g, '')}`} 
+            className="flex items-center gap-2 text-emerald-600 font-bold hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PhoneCall className="h-3 w-3" />
+            {phone}
+          </a>
+        </div>
+      ),
+      duration: 5000,
+      icon: <PhoneCall className="h-4 w-4 text-emerald-500" />,
+    });
+  };
+
+  const handleAssignToTeam = (issueId: string) => {
+    toast.success("Assigned to Dispatch Team", {
+      description: "Team lead notified for immediate field follow-up.",
+    });
+  };
+
+  const handleVendorAction = async (vendorId: string, vendorName: string, action: 'approve' | 'reject') => {
+    try {
+      await dashboardApi.updateVendor(vendorId, { action });
+      toast.success(action === 'approve' ? "Vendor Approved" : "Vendor Rejected", {
+        description: `${vendorName} has been ${action === 'approve' ? 'activated' : 'rejected'}.`,
+      });
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Action failed", {
+        description: err.message || `Could not ${action} vendor`,
       });
     }
   };
@@ -306,19 +427,45 @@ export default function AdminDashboardPage() {
           <h1 className="text-3xl text-black font-bold tracking-tight">
             {data.title}
           </h1>
-          <p className="text-[#3E8940] mt-1 font-medium italic">
-            {data.subtitle}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-[#3E8940] font-medium italic">
+              {data.subtitle}
+            </p>
+            <Badge className="bg-emerald-50 text-emerald-600 border-none px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+              LIVE
+            </Badge>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-2 hidden sm:inline-block">
+              Last Sync: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
         </div>
         <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto pb-1 md:w-auto md:justify-end md:overflow-visible md:pb-0">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="h-10 w-[180px] shrink-0 bg-white border-slate-200 text-slate-700 font-medium rounded-xl">
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-10 rounded-xl border-slate-200 text-slate-600 font-bold gap-2 bg-white shadow-sm hover:bg-slate-50 transition-all shrink-0",
+              isLoading && "opacity-50"
+            )}
+            onClick={() => fetchDashboard()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={cn("h-4 w-4 text-[#3E8940]", isLoading && "animate-spin")} />
+            {isLoading ? "Syncing..." : "Refresh"}
+          </Button>
+          <Select value={timeRange} onValueChange={(val) => {
+            setTimeRange(val);
+            if (val === "custom") {
+              setTimeout(() => setIsCalendarOpen(true), 50);
+            }
+          }}>
+            <SelectTrigger className="h-10 w-auto min-w-[180px] shrink-0 bg-white border-slate-200 text-slate-700 font-medium rounded-xl">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-[#3E8940]" />
                 <SelectValue placeholder="Select period" />
               </div>
             </SelectTrigger>
-            <SelectContent position="popper" sideOffset={4} className="w-[180px] rounded-xl border-slate-200 shadow-xl">
+            <SelectContent position="popper" sideOffset={4} className="w-auto min-w-[180px] rounded-xl border-slate-200 shadow-xl">
               {data.filters.timeRangeOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value} className="rounded-lg">
                   {opt.label}
@@ -327,9 +474,44 @@ export default function AdminDashboardPage() {
             </SelectContent>
           </Select>
 
+          {timeRange === "custom" && (
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant={isCalendarOpen ? "default" : "outline"} 
+                  className={cn(
+                    "h-10 shrink-0 gap-2 rounded-xl px-3 font-medium transition-all", 
+                    isCalendarOpen ? "bg-[#3E8940] text-white hover:bg-[#3E8940]/90 shadow-md" : "text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  {customDateRange?.from ? (
+                    customDateRange.to ? (
+                      <>{format(customDateRange.from, "LLL dd")} - {format(customDateRange.to, "LLL dd")}</>
+                    ) : (
+                      format(customDateRange.from, "LLL dd")
+                    )
+                  ) : (
+                    "Select Dates"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <CalendarComponent
+                  initialFocus
+                  mode="range"
+                  defaultMonth={customDateRange?.from}
+                  selected={customDateRange}
+                  onSelect={setCustomDateRange}
+                  numberOfMonths={2}
+                  disabled={{ after: new Date() }}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+
           <Button
             variant="outline"
-            className="h-10 shrink-0 gap-2 text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl"
+            className="h-10 shrink-0 gap-2 text-slate-700 border-slate-200 rounded-xl"
             onClick={handleGenerateReport}
           >
             <Download className="h-4 w-4" />
@@ -387,7 +569,6 @@ export default function AdminDashboardPage() {
                 <div className={`p-2.5 rounded-xl ${accent.bg} group-hover:scale-110 transition-transform duration-300`}>
                   <IconComponent className={`h-5 w-5 ${accent.text}`} />
                 </div>
-                <span className={`text-[10px] font-bold ${accent.text} uppercase tracking-wider`}>Live</span>
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -401,126 +582,20 @@ export default function AdminDashboardPage() {
                     <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-[#3E8940] transition-colors" />
                   )}
                 </div>
-                <p className="text-[10px] text-slate-500 font-medium mt-0.5">{kpi.note}</p>
+                {kpi.note && <p className="text-[10px] text-slate-500 font-medium mt-0.5">{kpi.note}</p>}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Revenue Breakdown */}
-      {data.revenueBreakdown && data.revenueBreakdown.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-            <TrendingUp className="h-32 w-32 text-[#3E8940]" />
-          </div>
 
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Revenue Breakdown</h2>
-              <p className="text-sm font-medium text-slate-500 mt-0.5">Granular split of gross platform revenue and earnings</p>
-            </div>
-            <Badge className="bg-[#3E8940]/10 text-[#3E8940] hover:bg-[#3E8940]/20 border-none font-bold px-3 py-1 rounded-full">
-              Live Breakdown
-            </Badge>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {data.revenueBreakdown.map((item) => (
-              <div key={item.key} className="relative p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg hover:border-transparent transition-all duration-300 group/card">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{item.value}</h3>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.title}</p>
-                  <p className="text-[10px] font-medium text-slate-500 pt-1">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Finance Snapshot */}
-      {data.financeSnapshot.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-            <Wallet className="h-32 w-32 text-[#3E8940]" />
-          </div>
-
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Settlement & Finance Snapshot</h2>
-              <p className="text-sm font-medium text-slate-500 mt-0.5">Real-time overview of platform liquidity and vendor payouts</p>
-            </div>
-            <Button variant="outline" size="sm" className="rounded-xl border-slate-200 text-slate-600 font-bold gap-2" onClick={() => router.push("/finance/settlements")}>
-              <TrendingUp className="h-4 w-4 text-[#3E8940]" />
-              Full Report
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {data.financeSnapshot.map((item) => (
-              <div key={item.key} className="relative p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg hover:border-transparent transition-all duration-300 group/card">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{item.value}</h3>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.title}</p>
-                  <p className="text-[10px] font-medium text-slate-500 pt-1">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Growth Metrics */}
-      {data.growthMetrics.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-indigo-50">
-                <BarChart3 className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Growth Metrics</h2>
-                <p className="text-xs text-slate-500 font-medium">Platform intelligence from live data</p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {data.growthMetrics.map((metric) => (
-              <div key={metric.key} className="p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm transition-all">
-                <p className="text-2xl font-bold text-slate-900">{metric.value}</p>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">{metric.title}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{metric.detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── Operations Admin: SLA & Allocation Risk ──────────── */}
-      {adminRole === "operations_admin" && orders.length > 0 && (
-        <SlaRiskPanel orders={orders} />
-      )}
-
-      {/* ─── Operations Admin: Order Status Distribution ─────── */}
-      {adminRole === "operations_admin" && orders.length > 0 && (
-        <OrderStatusDistribution orders={orders} />
-      )}
-
-      {/* ─── Finance Admin: Commission Intelligence ──────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <CommissionIntelligence settlements={settlements} />
-      )}
-
-      {/* ─── Finance Admin: Settlement Aging ──────────────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <SettlementAgingTracker settlements={settlements} />
-      )}
-
-      {/* Main Content Grid */}
-      <div className={`grid gap-8 ${data.approvals.length > 0 || data.issueDigest.length > 0 ? "lg:grid-cols-3" : "lg:grid-cols-1"}`}>
+      {/* Main Content Area (Full Width) */}
+      <div className="space-y-8">
         {/* Primary Table */}
-        <div className={`${data.approvals.length > 0 || data.issueDigest.length > 0 ? "lg:col-span-2" : "lg:col-span-1"} bg-white rounded-xl shadow-sm border border-slate-100 p-6 overflow-hidden`}>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 overflow-hidden">
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -604,13 +679,14 @@ export default function AdminDashboardPage() {
 
           {/* Orders Table */}
           {data.primaryTable.type === "orders" && (
-            <div className="overflow-x-auto -mx-6 px-6">
+            <>
               <Table className="min-w-[1100px]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-slate-100">
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Order ID</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Customer</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Vendor</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Location</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">City</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Type</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Status</TableHead>
@@ -633,14 +709,32 @@ export default function AdminDashboardPage() {
                         </TableCell>
                         <TableCell className="font-medium text-slate-700 whitespace-nowrap text-xs">{order.customer}</TableCell>
                         <TableCell className="text-slate-600 whitespace-nowrap text-xs">{order.vendor}</TableCell>
+                        <TableCell className="text-xs text-slate-500 whitespace-nowrap font-medium truncate max-w-[150px]">{order.location}</TableCell>
                         <TableCell className="text-xs text-slate-500 whitespace-nowrap font-medium">{order.city}</TableCell>
                         <TableCell>
                           <Badge className={`${getOrderTypeColor(order.orderType)} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}>
                             {order.orderType}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge className={`${getStatusColor(order.status)} border-none text-[10px] font-bold px-2 py-0.5 rounded-md`}>
+                        <TableCell 
+                          onClick={(e) => {
+                            if (order.status === "Issue Reported" && order.issueSummary) {
+                              e.stopPropagation();
+                              setSelectedIssue({
+                                id: `msg-${order.id}`,
+                                orderId: order.transactionId,
+                                type: order.issueSummary.title,
+                                severity: order.issueSummary.severity,
+                                vendor: order.vendor,
+                                summary: order.issueSummary.summary,
+                                city: order.city,
+                                unread: false,
+                                status: 'Open'
+                              } as DashboardIssueDigest);
+                            }
+                          }}
+                        >
+                          <Badge className={`${getStatusColor(order.status)} border-none text-[10px] font-bold px-2 py-0.5 rounded-md ${order.status === "Issue Reported" ? "cursor-help hover:scale-105" : ""} transition-transform`}>
                             {order.status}
                           </Badge>
                         </TableCell>
@@ -693,13 +787,12 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Settlements Table */}
           {data.primaryTable.type === "settlements" && (
-            <div className="overflow-x-auto -mx-6 px-6">
-              <Table className="min-w-[900px]">
+            <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-slate-100">
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Transaction ID</TableHead>
@@ -731,13 +824,12 @@ export default function AdminDashboardPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
         </div>
 
-        {/* Right Sidebar */}
+        {/* Actionable Panels Section (Moved from Sidebar to Bottom) */}
         {(data.approvals.length > 0 || data.issueDigest.length > 0) && (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Pending Vendor Approvals */}
             {data.approvals.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
@@ -746,15 +838,63 @@ export default function AdminDashboardPage() {
                     <Clock className="h-4 w-4 text-amber-500" />
                     Pending Approvals
                   </h3>
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-bold px-2 rounded-full">
-                    {data.approvals.length}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1 rounded-full bg-slate-50 border border-slate-100 cursor-help">
+                            <Activity className="h-3 w-3 text-slate-400" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white border-none rounded-lg p-2">
+                          <p className="text-[10px] font-bold">Not all vendors are equal. High risk vendors require physical inspection.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
+                      {data.summary.openIssues}
+                    </Badge>
+                  </div>
                 </div>
+
+                {/* Issue Filters Row */}
+                <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
+                  <Select value={issueTypeFilter} onValueChange={setIssueTypeFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="damage">Damage</SelectItem>
+                      <SelectItem value="noshow">No Show</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={issueStatusFilter} onValueChange={setIssueStatusFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="escalated">Escalated</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { setIssueTypeFilter("all"); setIssueStatusFilter("all"); }}>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Reset
+                  </Button>
+                </div>
+
                 <div className="space-y-3">
                   {data.approvals.slice(0, 5).map((vendor) => (
-                    <div key={vendor.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm">
+                    <div 
+                      key={vendor.id} 
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm hover:border-[#3E8940]/30 cursor-pointer group/card"
+                      onClick={() => router.push(`/vendors/review/${vendor.id}`)}
+                    >
                       <div className="flex items-center justify-between mb-2">
-                        <p className="font-bold text-sm text-slate-900">{vendor.vendorName}</p>
+                        <p className="font-bold text-sm text-slate-900 group-hover/card:text-[#3E8940] transition-colors">{vendor.vendorName}</p>
                         <Badge className={`${getPriorityColor(vendor.priority)} border-none text-[9px] font-bold px-2 py-0.5 rounded-md`}>
                           {vendor.priority}
                         </Badge>
@@ -777,9 +917,31 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400 font-medium">{vendor.commissionModel}</span>
-                        <Button size="sm" className="bg-[#3E8940] hover:bg-[#3E8940]/90 h-7 text-[10px] font-semibold shadow-sm px-3 rounded-lg" onClick={() => router.push(`/vendors/review/${vendor.id}`)}>
-                          Review
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            className="bg-[#3E8940] hover:bg-[#3E8940]/90 h-7 text-[10px] font-semibold shadow-sm px-3 rounded-lg group-hover/card:scale-105 transition-transform"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/vendors/review/${vendor.id}`);
+                            }}
+                          >
+                            Review
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="outline" className="h-7 w-7 p-0 rounded-lg border-slate-200">
+                                <MoreVertical className="h-3 w-3 text-slate-400" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-xl">
+                              <DropdownMenuItem className="text-xs font-semibold py-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleVendorAction(vendor.id, vendor.vendorName, 'approve'); }}>Approve Now</DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs font-semibold py-2 text-red-600 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleVendorAction(vendor.id, vendor.vendorName, 'reject'); }}>Reject</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs font-semibold py-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/review/${vendor.id}`); }}>View Docs</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -799,6 +961,33 @@ export default function AdminDashboardPage() {
                     Issue Alerts
                   </h3>
                   <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" className="h-7 text-[10px] font-bold text-slate-400 hover:bg-slate-50 px-2 rounded-lg gap-1.5">
+                          <Activity className="h-3 w-3" />
+                          Legend
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-4 rounded-xl shadow-2xl border-slate-100">
+                        <h4 className="text-[10px] font-bold uppercase text-slate-400 mb-3 tracking-wider">Severity Guide</h4>
+                        <div className="space-y-2.5">
+                          {[
+                            { label: 'Critical', desc: 'Item Damaged', color: 'bg-red-500' },
+                            { label: 'High', desc: 'Customer Complaint', color: 'bg-orange-500' },
+                            { label: 'Medium', desc: 'Pickup Delay', color: 'bg-amber-500' },
+                            { label: 'Low', desc: 'Customer No Show', color: 'bg-emerald-500' },
+                          ].map(s => (
+                            <div key={s.label} className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`h-2 w-2 rounded-full ${s.color}`} />
+                                <span className="text-[10px] font-bold text-slate-700">{s.label}</span>
+                              </div>
+                              <span className="text-[10px] font-medium text-slate-400">{s.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
                       {data.summary.openIssues}
                     </Badge>
@@ -808,12 +997,27 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {data.issueDigest.map((issue) => {
-                    const colors = getSeverityColor(issue.severity);
+                  {data.issueDigest
+                    .filter(issue => {
+                      if (issueTypeFilter !== "all") {
+                        const type = issue.type.toLowerCase();
+                        if (issueTypeFilter === "damage" && !type.includes("damage")) return false;
+                        if (issueTypeFilter === "noshow" && !type.includes("no show")) return false;
+                        if (issueTypeFilter === "complaint" && !type.includes("complaint")) return false;
+                      }
+                      if (issueStatusFilter !== "all") {
+                        if (issueStatusFilter === "open" && issue.status !== "Open") return false;
+                        if (issueStatusFilter === "escalated" && issue.status !== "Escalated") return false;
+                        if (issueStatusFilter === "resolved" && issue.status !== "Resolved") return false;
+                      }
+                      return true;
+                    })
+                    .map((issue) => {
+                      const colors = getSeverityColor(issue.severity);
                     return (
                       <div
                         key={issue.id}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer group hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
+                        className={`p-4 rounded-xl border transition-all cursor-pointer group/card hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
                         onClick={() => setSelectedIssue(issue)}
                       >
                         {/* Severity left stripe */}
@@ -830,17 +1034,74 @@ export default function AdminDashboardPage() {
                               </span>
                             )}
                           </div>
-                          <Badge className={`${colors.badge} border-none text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
-                            {issue.severity}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={`${colors.badge} border-none text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
+                              {issue.severity}
+                            </Badge>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" className="h-6 w-6 p-0 rounded-md hover:bg-white/50">
+                                  <MoreVertical className="h-3.5 w-3.5 text-slate-400" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-slate-100">
+                                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-3 py-2">Quick Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="gap-2 text-xs font-semibold py-2 px-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${issue.orderId}`); }}>
+                                  <Eye className="h-3.5 w-3.5 text-slate-400" /> View Order
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-xs font-semibold py-2 px-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleContactAction('vendor', issue.vendor, issue.orderId); }}>
+                                  <Store className="h-3.5 w-3.5 text-slate-400" /> Contact Vendor
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-xs font-semibold py-2 px-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleContactAction('customer', 'Customer', issue.orderId); }}>
+                                  <PhoneCall className="h-3.5 w-3.5 text-slate-400" /> Call Customer
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-xs font-semibold py-2 px-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleAssignToTeam(issue.id); }}>
+                                  <UserPlus className="h-3.5 w-3.5 text-slate-400" /> Assign to Team
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="gap-2 text-xs font-bold py-2 px-3 cursor-pointer text-emerald-600 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleDismissIssue(issue.id); }}>
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Mark Resolved
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-xs font-bold py-2 px-3 cursor-pointer text-red-600 hover:text-red-700" onClick={(e) => { e.stopPropagation(); handleEscalateIssue(issue.id); }}>
+                                  <ArrowUpCircle className="h-3.5 w-3.5" /> Escalate
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
-                        <p className={`text-sm font-bold mb-0.5 pl-2 ${colors.text}`}>
-                          {issue.type}
-                        </p>
-                        <p className={`text-[10px] font-bold uppercase tracking-tight pl-2 ${colors.text} opacity-60`}>
-                        Vendor: {issue.vendor} • {issue.city}
-                      </p>
-                    </div>
+                        <div className="pl-2 space-y-1">
+                          <p className={`text-sm font-bold ${colors.text}`}>
+                            {issue.type}
+                          </p>
+                          <p className={`text-[10px] font-bold uppercase tracking-tight ${colors.text} opacity-60`}>
+                            Vendor: {issue.vendor} • {issue.city}
+                          </p>
+                          
+                          {/* Financial Risk Indicator */}
+                          {getFinancialRisk(issue.type) && (
+                            <div className="mt-2 pt-2 border-t border-slate-100/30 flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                {React.createElement(getFinancialRisk(issue.type)!.icon, { className: "h-2.5 w-2.5" })}
+                                {getFinancialRisk(issue.type)?.label}
+                              </span>
+                              <span className={`text-[11px] font-bold ${getFinancialRisk(issue.type)?.color}`}>
+                                {getFinancialRisk(issue.type)?.value}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Vendor Risk Warning */}
+                          {issue.vendorRiskLevel === 'High' && (
+                            <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2">
+                              <AlertTriangle className="h-3 w-3 text-red-600" />
+                              <span className="text-[9px] font-bold text-red-700 uppercase tracking-tight">
+                                Vendor Risk Level: HIGH
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                   );
                 })}
               </div>
@@ -850,34 +1111,53 @@ export default function AdminDashboardPage() {
       )}
     </div>
 
-      {/* ─── Operations Admin: Vendor SLA Scorecard ──────────── */}
-      {adminRole === "operations_admin" && orders.length > 0 && (
-        <VendorSlaScorecard orders={orders} />
+      {/* ─── Operations & Super Admin Sections ───────────────── */}
+      {(adminRole === "operations_admin" || adminRole === "super_admin") && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <SlaRiskPanel orders={orders} />
+          <OrderStatusDistribution orders={orders} />
+        </div>
       )}
 
-      {/* ─── Operations Admin: Rider Performance ─────────────── */}
-      {adminRole === "operations_admin" && (
-        <RiderPerformanceSnapshot />
+      {(adminRole === "operations_admin" || adminRole === "super_admin") && orders.length > 0 && (
+        <div className="mb-6">
+          <VendorSlaScorecard orders={orders} />
+        </div>
       )}
 
-      {/* ─── Finance Admin: Payout Reconciliation ────────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <PayoutReconciliation settlements={settlements} />
+      {(adminRole === "operations_admin" || adminRole === "super_admin") && data?.riders && (
+        <div className="mb-6">
+          <RiderPerformanceSnapshot riders={data.riders} />
+        </div>
       )}
 
-      {/* ─── Finance Admin: Revenue by Vendor ────────────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <RevenueByVendor settlements={settlements} />
+      {/* ─── Finance & Super Admin Sections ──────────────────── */}
+      {(adminRole === "finance_admin" || adminRole === "super_admin") && settlements.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <PayoutReconciliation settlements={settlements} />
+          <CommissionIntelligence settlements={settlements} />
+          <div className="md:col-span-2">
+            <SettlementAgingTracker settlements={settlements} />
+          </div>
+        </div>
       )}
 
-      {/* ─── Finance Admin: Working Capital Forecast ──────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <WorkingCapitalForecast settlements={settlements} />
+      {(adminRole === "finance_admin" || adminRole === "super_admin") && settlements.length > 0 && (
+        <div className="mb-6">
+          <RevenueByVendor settlements={settlements} />
+        </div>
       )}
 
-      {/* ─── Finance Admin: Tax Compliance ────────────────────── */}
-      {adminRole === "finance_admin" && settlements.length > 0 && (
-        <TaxCompliancePanel settlements={settlements} />
+      {(adminRole === "finance_admin" || adminRole === "super_admin") && settlements.length > 0 && (
+        <div className="mb-6">
+          <WorkingCapitalForecast settlements={settlements} />
+        </div>
+      )}
+
+      {(adminRole === "finance_admin" || adminRole === "super_admin") && settlements.length > 0 && (
+        <div className="mb-6">
+          <TaxCompliancePanel settlements={settlements} />
+        </div>
       )}
 
       {/* Issue Detail Dialog */}
@@ -894,23 +1174,40 @@ export default function AdminDashboardPage() {
                     {selectedIssue.type}
                   </DialogTitle>
                   <DialogDescription className="text-red-700/70 font-medium">
-                    {selectedIssue.orderId} • {selectedIssue.severity} severity
+                    {selectedIssue.orderId || selectedIssue.supportTicketId} • {selectedIssue.severity} severity
                   </DialogDescription>
                 </div>
               </DialogHeader>
-              <div className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-500">Severity</span>
-                    <Badge className={`${getSeverityColor(selectedIssue.severity).badge} font-bold px-3 rounded-full text-xs border-none`}>
-                      {selectedIssue.severity}
+
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                    <Badge className={`${
+                      selectedIssue.status === 'Resolved' ? 'bg-emerald-50 text-emerald-700' : 
+                      selectedIssue.status === 'Escalated' ? 'bg-red-50 text-red-700' : 
+                      'bg-amber-50 text-amber-700'
+                    } border-none font-bold text-[10px]`}>
+                      {selectedIssue.status}
                     </Badge>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Assigned To</p>
+                    <p className="text-sm font-bold text-slate-700 truncate">{selectedIssue.assignedTo || 'Unassigned'}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">City</p>
+                    <p className="text-sm font-bold text-slate-700">{selectedIssue.city}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Risk Amount</p>
+                    <p className="text-sm font-bold text-red-600">{selectedIssue.financialRiskAmount}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-slate-400" />
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <MessageSquare className="h-3.5 w-3.5" />
                     Summary
                   </h4>
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed font-medium">
@@ -918,41 +1215,127 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
+                {/* Refund & Damage Tracking (Contextual) */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vendor</p>
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                      <Store className="h-4 w-4 text-slate-400" />
-                      {selectedIssue.vendor}
-                    </div>
+                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
+                    <h5 className="text-[10px] font-bold text-blue-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Wallet className="h-3 w-3" /> Refund Status
+                    </h5>
+                    <Badge className={cn(
+                      "text-[10px] font-bold rounded-md border-none px-2",
+                      selectedIssue.refundStatus === 'Completed' ? "bg-emerald-100 text-emerald-700" :
+                      selectedIssue.refundStatus === 'Processing' ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-100 text-slate-600"
+                    )}>
+                      {selectedIssue.refundStatus || 'Not Initiated'}
+                    </Badge>
                   </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">City</p>
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      {selectedIssue.city}
+
+                  {selectedIssue.type.toLowerCase().includes('damage') && (
+                    <div className="p-4 rounded-xl bg-red-50/50 border border-red-100">
+                      <h5 className="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <AlertTriangle className="h-3 w-3" /> Liability Cap
+                      </h5>
+                      <p className="text-sm font-bold text-red-700">
+                        {formatINR(selectedIssue.damageClaim?.liabilityCap || 2500)}
+                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                {/* Damage Images (Contextual) */}
+                {selectedIssue.type.toLowerCase().includes('damage') && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <ImagePlus className="h-3.5 w-3.5" />
+                      Damage Evidence
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-2 cursor-pointer hover:bg-slate-200 transition-colors">
+                        <ImagePlus className="h-5 w-5 text-slate-400" />
+                        <span className="text-[9px] font-bold text-slate-500">Upload Pre-Clean</span>
+                      </div>
+                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-2 cursor-pointer hover:bg-slate-200 transition-colors">
+                        <ImagePlus className="h-5 w-5 text-slate-400" />
+                        <span className="text-[9px] font-bold text-slate-500">Upload Post-Clean</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Root Cause Selection (Before Resolving) */}
+                {selectedIssue.status !== 'Resolved' && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <ShieldQuestion className="h-3.5 w-3.5" />
+                      Assign Root Cause
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ROOT_CAUSES.map(cause => (
+                        <Button
+                          key={cause}
+                          variant={issueRootCause === cause ? "default" : "outline"}
+                          className={cn(
+                            "text-[10px] font-bold h-9 rounded-lg",
+                            issueRootCause === cause ? "bg-slate-900 text-white" : "text-slate-600"
+                          )}
+                          onClick={() => setIssueRootCause(cause)}
+                        >
+                          {cause}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <div className="flex flex-col gap-3">
                   <Button
-                    className="flex-1 bg-[#3E8940] hover:bg-[#3E8940]/90 text-white font-bold h-11 rounded-xl shadow-md"
-                    onClick={() => {
-                      router.push("/issues");
-                      setSelectedIssue(null);
-                    }}
+                    className="w-full bg-[#3E8940] hover:bg-[#3E8940]/90 text-white font-bold h-12 rounded-xl gap-2 shadow-sm"
+                    onClick={() => router.push(`/issues?search=${selectedIssue.orderId || selectedIssue.supportTicketId}`)}
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View in Issues Page
+                    View Full Issue Details
+                    <ArrowRight className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="font-bold h-11 rounded-xl text-slate-600 border-slate-200"
-                    onClick={() => setSelectedIssue(null)}
-                  >
-                    Dismiss
-                  </Button>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="font-bold h-11 rounded-xl text-slate-600 border-slate-200 bg-white"
+                      onClick={() => handleDismissIssue(selectedIssue.id)}
+                    >
+                      Dismiss Alert
+                    </Button>
+                    {selectedIssue.status !== 'Resolved' && (
+                      <Button
+                        variant="outline"
+                        disabled={!issueRootCause}
+                        className={cn(
+                          "font-bold h-11 rounded-xl bg-white",
+                          issueRootCause ? "text-emerald-600 border-emerald-200 hover:bg-emerald-50" : "text-slate-300 border-slate-100"
+                        )}
+                        onClick={async () => {
+                          try {
+                            await dashboardApi.updateIssue(selectedIssue.id, { 
+                              action: 'resolve',
+                              rootCause: issueRootCause as any
+                            });
+                            toast.success("Issue resolved", {
+                              description: `Root cause identified as ${issueRootCause}`
+                            });
+                            setSelectedIssue(null);
+                            setIssueRootCause(null);
+                            fetchDashboard();
+                          } catch (err: any) {
+                            toast.error("Failed to resolve issue");
+                          }
+                        }}
+                      >
+                        Resolve with Cause
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </>

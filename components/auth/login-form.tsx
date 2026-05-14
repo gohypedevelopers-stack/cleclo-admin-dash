@@ -635,18 +635,90 @@ export function LoginForm() {
                   </div>
                 )}
 
-                <div className="space-y-3 text-center">
-                  <Label className="text-[11px] font-bold uppercase tracking-widest text-[#3E8940] block mb-2">
-                    Code Verification
-                  </Label>
-                  <Input
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    onKeyDown={handleKeyDown}
-                    placeholder="000 000"
-                    maxLength={6}
-                    className="h-16 bg-white border-slate-200 focus:border-[#3E8940] focus:ring-4 focus:ring-[#3E8940]/5 transition-all rounded-2xl text-3xl text-center font-bold tracking-[0.5em] placeholder:text-slate-200"
-                  />
+                <div className="space-y-8">
+                  {/* Security Status Badge */}
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-100 rounded-full">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">
+                        Awaiting Verification
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between gap-2 md:gap-4">
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <div key={index} className="relative flex-1 group">
+                          <input
+                            id={`otp-input-${index}`}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={1}
+                            value={otpCode[index] || ""}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, "");
+                              if (!value) {
+                                // Handle deletion
+                                const newOtp = otpCode.split("");
+                                newOtp[index] = "";
+                                setOtpCode(newOtp.join(""));
+                                return;
+                              }
+                              
+                              // If multiple digits (pasted or fast typed)
+                              if (value.length > 1) {
+                                const pastedOtp = value.slice(0, 6);
+                                setOtpCode(pastedOtp);
+                                document.getElementById(`otp-input-${Math.min(5, pastedOtp.length)}`)?.focus();
+                                return;
+                              }
+
+                              const newOtp = otpCode.split("");
+                              newOtp[index] = value;
+                              const finalOtp = newOtp.join("").slice(0, 6);
+                              setOtpCode(finalOtp);
+                              
+                              // Auto focus next
+                              if (index < 5 && value) {
+                                document.getElementById(`otp-input-${index + 1}`)?.focus();
+                              }
+                            }}
+                            onPaste={(e) => {
+                              e.preventDefault();
+                              const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                              if (pastedData) {
+                                setOtpCode(pastedData);
+                                // Focus the last filled input or the first empty one
+                                const nextIndex = Math.min(5, pastedData.length);
+                                document.getElementById(`otp-input-${nextIndex}`)?.focus();
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Backspace") {
+                                if (!otpCode[index] && index > 0) {
+                                  document.getElementById(`otp-input-${index - 1}`)?.focus();
+                                }
+                              }
+                              if (e.key === "Enter") handleVerifyOtp();
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            className="w-full h-16 md:h-20 bg-slate-50/50 border-2 border-slate-100 focus:border-[#3E8940] focus:bg-white focus:ring-4 focus:ring-[#3E8940]/5 transition-all rounded-2xl text-2xl md:text-3xl text-center font-bold text-slate-900 outline-none"
+                          />
+                          {otpCode[index] && (
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#3E8940] rounded-full"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-center text-[11px] text-slate-400 font-medium uppercase tracking-[0.2em]">
+                      Six-digit security protocol
+                    </p>
+                  </div>
                 </div>
 
                 <div className="pt-2 space-y-4">
@@ -654,38 +726,49 @@ export function LoginForm() {
                     <Button
                       type="button"
                       onClick={handleVerifyOtp}
-                      disabled={isLoading || otpCode.length < 4}
-                      className="w-full h-14 text-base font-bold bg-[#3E8940] hover:bg-[#327333] text-white rounded-2xl transition-all duration-300 shadow-sm"
+                      disabled={isLoading || otpCode.length < 6}
+                      className="w-full h-14 text-base font-bold bg-[#3E8940] hover:bg-[#327333] text-white rounded-2xl transition-all duration-300 shadow-[0_4px_12px_rgba(62,137,64,0.2)] flex items-center justify-center gap-3"
                     >
                       {isLoading ? (
-                        <div className="flex items-center justify-center gap-2.5">
+                        <>
                           <Loader2 className="h-5 w-5 animate-spin" />
-                          <span>Verifying...</span>
-                        </div>
+                          <span>Executing Protocol...</span>
+                        </>
                       ) : (
-                        "Verify Identity"
+                        <>
+                          <Shield className="h-5 w-5" />
+                          <span>Authorize Access</span>
+                        </>
                       )}
                     </Button>
                   </motion.div>
 
-                  <div className="flex items-center justify-between text-sm px-2">
+                  <div className="flex items-center justify-between text-[11px] px-2">
                     <button
                       type="button"
-                      onClick={() => setStep("credentials")}
-                      className="text-slate-500 font-bold hover:text-slate-800 transition-colors"
+                      onClick={() => {
+                        setOtpCode("");
+                        setStep("credentials");
+                      }}
+                      className="text-slate-400 font-bold hover:text-slate-600 transition-colors uppercase tracking-widest flex items-center gap-2"
                     >
-                      ← Back
+                      <RefreshCw className="h-3 w-3" />
+                      Re-authenticate
                     </button>
                     <button
                       type="button"
                       onClick={handleResend}
                       disabled={resendCooldown > 0}
-                      className="flex items-center gap-2 text-[#3E8940] font-bold disabled:opacity-50 transition-opacity"
+                      className="flex items-center gap-2 text-[#3E8940] font-bold disabled:opacity-40 transition-all uppercase tracking-widest"
                     >
-                      <RefreshCw
-                        className={`h-4 w-4 ${resendCooldown === 0 ? "hover:rotate-180 transition-transform duration-500" : ""}`}
-                      />
-                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+                      {resendCooldown > 0 ? (
+                        <span className="tabular-nums">Retry in {resendCooldown}s</span>
+                      ) : (
+                        <>
+                          <MessageCircle className="h-3 w-3" />
+                          Resend Code
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -694,10 +777,10 @@ export function LoginForm() {
           </AnimatePresence>
 
           <footer className="mt-8 pt-6 flex items-center justify-center gap-3 border-t border-slate-50">
-            <div className="flex items-center gap-2 text-slate-400">
-              <Lock className="h-3 w-3" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.1em]">
-                Encrypted Access | Role-Based Security Enabled
+            <div className="flex items-center gap-2 text-slate-300">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em]">
+                Cleclo Secure Workstation | v2.4.0 | AES-256 Encrypted
               </span>
             </div>
           </footer>

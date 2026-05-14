@@ -376,8 +376,7 @@ function VendorsContent() {
 
       {/* Vendors Table */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-        <Table className="min-w-[1400px] w-full">
+        <Table className="min-w-[1200px] w-full">
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 pl-6 tracking-wider w-[16%]">Vendor</TableHead>
@@ -554,7 +553,6 @@ function VendorsContent() {
             )}
           </TableBody>
         </Table>
-        </div>
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50">
           <p className="text-sm text-slate-500">Showing {filteredVendors.length} of {vendors.length} vendors</p>
         </div>

@@ -17,6 +17,7 @@ import {
   User,
   XCircle,
   Loader2,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,11 +46,14 @@ const getAuthHeaders = () => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}`,
 });
 
+import { use } from "react";
+
 export default function VendorReviewPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const router = useRouter();
   const [vendorData, setVendorData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +64,7 @@ export default function VendorReviewPage({
   useEffect(() => {
     async function loadVendor() {
       try {
-        const res = await fetch(`${AUTH_API_URL}/users/${params.id}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${AUTH_API_URL}/users/${id}`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error("Failed to load vendor");
         const data = await res.json();
         setVendorData(data);
@@ -72,12 +76,12 @@ export default function VendorReviewPage({
       }
     }
     loadVendor();
-  }, [params.id, router]);
+  }, [id, router]);
 
   const handleApprove = async () => {
     setIsProcessing(true);
     try {
-      const res = await fetch(`${AUTH_API_URL}/vendors/${params.id}/approve`, {
+      const res = await fetch(`${AUTH_API_URL}/vendors/${id}/approve`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({ isApproved: true })
@@ -101,7 +105,7 @@ export default function VendorReviewPage({
     }
     setIsProcessing(true);
     try {
-      const res = await fetch(`${AUTH_API_URL}/vendors/${params.id}/suspend`, {
+      const res = await fetch(`${AUTH_API_URL}/vendors/${id}/suspend`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({ suspended: true })
@@ -141,10 +145,28 @@ export default function VendorReviewPage({
   const profile = vendorData.vendorProfile;
   const isPending = !profile.isApproved && !profile.suspended;
 
-  // Mock standard document verification mapping since documents are not strictly modeled strictly yet.
   const documents = [
-    { name: "Business Registration (GST)", status: "Verified", type: "pdf", num: profile.gstNumber },
-    { name: "Bank Account Details", status: "Verified", type: "pdf", num: profile.accountNumber }
+    { 
+      name: "Business Registration (GST)", 
+      status: profile.businessProofUrl ? "Verified" : "Pending", 
+      type: "pdf", 
+      num: profile.gstNumber || "Not Provided",
+      url: profile.businessProofUrl
+    },
+    { 
+      name: "Owner ID Proof", 
+      status: profile.ownerIdProofUrl ? "Verified" : "Pending", 
+      type: "pdf", 
+      num: "ID Document",
+      url: profile.ownerIdProofUrl
+    },
+    { 
+      name: "Bank Details Verification", 
+      status: profile.bankVerified ? "Verified" : "Pending", 
+      type: "verification", 
+      num: profile.accountNumber || "Not Provided",
+      url: null
+    }
   ];
 
   return (
@@ -372,8 +394,14 @@ export default function VendorReviewPage({
                         Pending
                       </Badge>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Banknote className="h-4 w-4 text-slate-400" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      disabled={!doc.url}
+                      onClick={() => doc.url && window.open(doc.url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4 text-slate-400" />
                     </Button>
                   </div>
                 </div>
