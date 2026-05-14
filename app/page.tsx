@@ -36,6 +36,10 @@ import {
   UserPlus,
   CheckCircle2,
   ArrowUpCircle,
+  XCircle,
+  Users,
+  Trophy,
+  Timer,
 } from "lucide-react";
 import {
   Dialog,
@@ -130,7 +134,14 @@ const KPI_ICONS: Record<string, any> = {
   net_commission_earned: TrendingUp,
   vendor_payout_due: HandCoins,
   settlement_pending_amount: Activity,
+  pending_settlements_count: Clock,
   settlements_completed: CheckCircle,
+  failed_transactions: ShieldAlert,
+  customer_retention: Users,
+  repeat_order_rate: RefreshCw,
+  top_vendor: Trophy,
+  worst_sla_vendor: AlertTriangle,
+  avg_turnaround: Timer,
 };
 
 const getStatusColor = (status: string) => {
@@ -174,10 +185,19 @@ const getSeverityColor = (severity: string) => {
 
 const getPriorityColor = (priority: string) => {
   switch (priority) {
-    case "Ready to Activate": return "bg-emerald-100 text-emerald-700";
-    case "Incomplete Documents": return "bg-amber-100 text-amber-700";
-    case "High Risk": return "bg-red-100 text-red-700";
-    default: return "bg-slate-100 text-slate-700";
+    case "Ready to Activate": return "bg-emerald-50 text-emerald-700 border-emerald-100";
+    case "Incomplete Documents": return "bg-amber-50 text-amber-700 border-amber-100";
+    case "High Risk": return "bg-red-50 text-red-700 border-red-100";
+    default: return "bg-slate-50 text-slate-700 border-slate-100";
+  }
+};
+
+const getPriorityIcon = (priority: string) => {
+  switch (priority) {
+    case "High Risk": return "🔴";
+    case "Incomplete Documents": return "🟡";
+    case "Ready to Activate": return "🟢";
+    default: return "⚪";
   }
 };
 
@@ -209,7 +229,8 @@ export default function AdminDashboardPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [vendorFilter, setVendorFilter] = React.useState("all");
   const [cityFilter, setCityFilter] = React.useState("all");
-  const [dateFilter, setDateFilter] = React.useState("");
+  const [startDateFilter, setStartDateFilter] = React.useState("");
+  const [endDateFilter, setEndDateFilter] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [lastUpdated, setLastUpdated] = React.useState(new Date());
   const itemsPerPage = 5;
@@ -244,9 +265,10 @@ export default function AdminDashboardPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         vendor: vendorFilter !== "all" ? vendorFilter : undefined,
         city: cityFilter !== "all" ? cityFilter : undefined,
-        date: dateFilter || undefined,
         startDate: timeRange === "custom" && customDateRange?.from ? format(customDateRange.from, "yyyy-MM-dd") : undefined,
         endDate: timeRange === "custom" && customDateRange?.to ? format(customDateRange.to, "yyyy-MM-dd") : undefined,
+        tableStartDate: startDateFilter || undefined,
+        tableEndDate: endDateFilter || undefined,
       });
       setData(result);
       setLastUpdated(new Date());
@@ -256,7 +278,7 @@ export default function AdminDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, statusFilter, vendorFilter, cityFilter, dateFilter, customDateRange]);
+  }, [timeRange, statusFilter, vendorFilter, cityFilter, startDateFilter, endDateFilter, customDateRange]);
 
   React.useEffect(() => {
     fetchDashboard();
@@ -272,13 +294,16 @@ export default function AdminDashboardPage() {
 
   const [issueTypeFilter, setIssueTypeFilter] = React.useState("all");
   const [issueStatusFilter, setIssueStatusFilter] = React.useState("all");
+  const [vendorCommissionFilter, setVendorCommissionFilter] = React.useState("all");
+  const [vendorAgreementFilter, setVendorAgreementFilter] = React.useState("all");
   const [issueRootCause, setIssueRootCause] = React.useState<string | null>(null);
 
   const handleClearFilters = () => {
     setStatusFilter("all");
     setVendorFilter("all");
     setCityFilter("all");
-    setDateFilter("");
+    setStartDateFilter("");
+    setEndDateFilter("");
   };
 
   const handleGenerateReport = () => {
@@ -571,7 +596,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+                <h3 className={`font-bold text-slate-900 tracking-tight leading-tight ${String(kpi.value).length > 15 ? 'text-lg' : 'text-xl'}`}>
                   {kpi.value}
                 </h3>
                 <div className="flex items-center justify-between">
@@ -659,16 +684,26 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From:</span>
                 <input
                   type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-[140px] h-9 px-3 bg-white border border-slate-200 text-xs font-medium rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 focus:border-[#3E8940] transition-all"
+                  value={startDateFilter}
+                  onChange={(e) => setStartDateFilter(e.target.value)}
+                  className="w-[130px] h-9 px-2 bg-white border border-slate-200 text-[11px] font-medium rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 focus:border-[#3E8940] transition-all"
                 />
               </div>
 
-              {(statusFilter !== "all" || vendorFilter !== "all" || cityFilter !== "all" || dateFilter !== "") && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">To:</span>
+                <input
+                  type="date"
+                  value={endDateFilter}
+                  onChange={(e) => setEndDateFilter(e.target.value)}
+                  className="w-[130px] h-9 px-2 bg-white border border-slate-200 text-[11px] font-medium rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 focus:border-[#3E8940] transition-all"
+                />
+              </div>
+
+              {(statusFilter !== "all" || vendorFilter !== "all" || cityFilter !== "all" || startDateFilter !== "" || endDateFilter !== "") && (
                 <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3 text-xs font-semibold text-red-500 hover:text-red-600 hover:bg-red-50 gap-1.5">
                   <X className="h-3.5 w-3.5" />
                   Clear
@@ -682,17 +717,17 @@ export default function AdminDashboardPage() {
             <>
               <Table className="min-w-[1100px]">
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b border-slate-100">
+                  <TableRow className="hover:bg-transparent border-b border-slate-100 cursor-default">
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Order ID</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Customer</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Vendor</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Location</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">City</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Type</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Order Type</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Payment</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Pickup</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">ETA</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Payment Status</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Pickup Slot</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 whitespace-nowrap">Delivery ETA</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right whitespace-nowrap">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -749,7 +784,7 @@ export default function AdminDashboardPage() {
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent cursor-default">
                       <TableCell colSpan={10} className="h-32 text-center text-slate-500 font-medium">
                         No orders found matching your filters.
                       </TableCell>
@@ -818,7 +853,7 @@ export default function AdminDashboardPage() {
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent cursor-default">
                       <TableCell colSpan={6} className="h-32 text-center text-slate-500 font-medium">No settlements found.</TableCell>
                     </TableRow>
                   )}
@@ -857,37 +892,45 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Issue Filters Row */}
+                {/* Vendor Approvals Filters Row */}
                 <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
-                  <Select value={issueTypeFilter} onValueChange={setIssueTypeFilter}>
-                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
-                      <SelectValue placeholder="Type" />
+                  <Select value={vendorCommissionFilter} onValueChange={setVendorCommissionFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[120px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Commission" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="damage">Damage</SelectItem>
-                      <SelectItem value="noshow">No Show</SelectItem>
-                      <SelectItem value="complaint">Complaint</SelectItem>
+                      <SelectItem value="all">All Models</SelectItem>
+                      <SelectItem value="15">15% Tier</SelectItem>
+                      <SelectItem value="18">18% Tier</SelectItem>
+                      <SelectItem value="20">20% Tier</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={issueStatusFilter} onValueChange={setIssueStatusFilter}>
-                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
-                      <SelectValue placeholder="Status" />
+                  <Select value={vendorAgreementFilter} onValueChange={setVendorAgreementFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[120px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Agreement" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="escalated">Escalated</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="signed">Signed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { setIssueTypeFilter("all"); setIssueStatusFilter("all"); }}>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { setVendorCommissionFilter("all"); setVendorAgreementFilter("all"); }}>
                     <RefreshCw className="h-3 w-3 mr-1" /> Reset
                   </Button>
                 </div>
 
-                <div className="space-y-3">
-                  {data.approvals.slice(0, 5).map((vendor) => (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                  {data.approvals
+                    .filter(v => {
+                      if (vendorCommissionFilter !== "all" && !v.commissionModel.includes(vendorCommissionFilter)) return false;
+                      if (vendorAgreementFilter !== "all") {
+                        if (vendorAgreementFilter === "signed" && !v.agreementSigned) return false;
+                        if (vendorAgreementFilter === "pending" && v.agreementSigned) return false;
+                      }
+                      return true;
+                    })
+                    .map((vendor) => (
                     <div 
                       key={vendor.id} 
                       className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm hover:border-[#3E8940]/30 cursor-pointer group/card"
@@ -895,28 +938,52 @@ export default function AdminDashboardPage() {
                     >
                       <div className="flex items-center justify-between mb-2">
                         <p className="font-bold text-sm text-slate-900 group-hover/card:text-[#3E8940] transition-colors">{vendor.vendorName}</p>
-                        <Badge className={`${getPriorityColor(vendor.priority)} border-none text-[9px] font-bold px-2 py-0.5 rounded-md`}>
+                        <Badge className={`${getPriorityColor(vendor.priority)} border text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1`}>
+                          <span>{getPriorityIcon(vendor.priority)}</span>
                           {vendor.priority}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-3">
-                        <span>{vendor.city}</span>
-                        <span>•</span>
-                        <span>{vendor.appliedLabel}</span>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-4">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-slate-400" />
+                          {vendor.city}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span>Applied {vendor.appliedLabel}</span>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap mb-3">
-                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.documentStatus === "Documents Verified" ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-amber-300 text-amber-700 bg-amber-50"}`}>
-                          {vendor.documentStatus}
-                        </Badge>
-                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.bankVerified ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                          {vendor.bankVerified ? "Bank ✓" : "Bank ✗"}
-                        </Badge>
-                        <Badge variant="outline" className={`text-[9px] font-bold rounded-md ${vendor.agreementSigned ? "border-emerald-300 text-emerald-700 bg-emerald-50" : "border-red-300 text-red-700 bg-red-50"}`}>
-                          {vendor.agreementSigned ? "Agreement ✓" : "Agreement ✗"}
-                        </Badge>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4 p-3 bg-white rounded-lg border border-slate-100/50">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Document Status</span>
+                          <span className={`text-[10px] font-bold ${vendor.documentStatus === "Documents Verified" ? "text-emerald-600" : "text-amber-600"}`}>
+                            {vendor.documentStatus}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Commission Model</span>
+                          <span className="text-[10px] font-bold text-slate-700">{vendor.commissionModel}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Agreement Signed</span>
+                          <div className="flex items-center gap-1">
+                            {vendor.agreementSigned ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <XCircle className="h-3 w-3 text-red-400" />}
+                            <span className={`text-[10px] font-bold ${vendor.agreementSigned ? "text-emerald-600" : "text-red-600"}`}>
+                              {vendor.agreementSigned ? "Signed" : "Pending"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Bank Verified</span>
+                          <div className="flex items-center gap-1">
+                            {vendor.bankVerified ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <XCircle className="h-3 w-3 text-red-400" />}
+                            <span className={`text-[10px] font-bold ${vendor.bankVerified ? "text-emerald-600" : "text-red-600"}`}>
+                              {vendor.bankVerified ? "Verified" : "Pending"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400 font-medium">{vendor.commissionModel}</span>
+
+                      <div className="flex items-center justify-end">
                         <div className="flex items-center gap-2">
                           <Button 
                             size="sm" 
@@ -996,7 +1063,36 @@ export default function AdminDashboardPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-3">
+
+                {/* Issue Filters Row */}
+                <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
+                  <Select value={issueTypeFilter} onValueChange={setIssueTypeFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="damage">Damage</SelectItem>
+                      <SelectItem value="noshow">No Show</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={issueStatusFilter} onValueChange={setIssueStatusFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="escalated">Escalated</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { setIssueTypeFilter("all"); setIssueStatusFilter("all"); }}>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Reset
+                  </Button>
+                </div>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                   {data.issueDigest
                     .filter(issue => {
                       if (issueTypeFilter !== "all") {

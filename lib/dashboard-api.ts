@@ -190,6 +190,8 @@ export const dashboardApi = {
         vendor?: string;
         city?: string;
         date?: string;
+        tableStartDate?: string;
+        tableEndDate?: string;
     } = {}): Promise<DashboardOverview> => {
         const query = new URLSearchParams();
         if (params.period) query.set('period', params.period);
@@ -200,6 +202,8 @@ export const dashboardApi = {
         if (params.vendor) query.set('vendor', params.vendor);
         if (params.city) query.set('city', params.city);
         if (params.date) query.set('date', params.date);
+        if (params.tableStartDate) query.set('tableStartDate', params.tableStartDate);
+        if (params.tableEndDate) query.set('tableEndDate', params.tableEndDate);
 
         const url = `${AUTH_API_URL}/dashboard/overview${query.toString() ? '?' + query.toString() : ''}`;
         const res = await apiFetch(url, { headers: getAuthHeaders() });

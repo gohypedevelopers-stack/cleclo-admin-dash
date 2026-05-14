@@ -77,10 +77,62 @@ export function LoginForm() {
     ipAddress?: string;
   } | null>(null);
 
+  const [loginContext, setLoginContext] = React.useState<any>({
+    locationLabel: "Gurgaon, Haryana, India",
+    city: "Gurgaon",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  });
   const [mounted, setMounted] = React.useState(false);
   const roleDropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    async function detectLocation() {
+      // 1. Try Browser Geolocation for high precision
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          try {
+            // Try to get address from coordinates (Reverse Geocoding fallback)
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`);
+            if (res.ok) {
+              const data = await res.json();
+              setLoginContext((prev: any) => ({
+                ...prev,
+                locationLabel: data.display_name,
+                city: data.address.city || data.address.town || data.address.village,
+                latitude,
+                longitude
+              }));
+              return; // Success with high precision
+            }
+          } catch (e) {
+            console.warn("Reverse geocoding failed, keeping coordinates.");
+            setLoginContext((prev: any) => ({ ...prev, latitude, longitude }));
+          }
+        }, (err) => {
+          console.warn("Geolocation permission denied or failed:", err.message);
+        });
+      }
+
+      // 2. Fallback to IP-based detection
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (res.ok) {
+          const data = await res.json();
+          setLoginContext({
+            locationLabel: `${data.city}, ${data.region}, ${data.country_name}`,
+            city: data.city,
+            timezone: data.timezone,
+            ipAddress: data.ip,
+            latitude: data.latitude,
+            longitude: data.longitude
+          });
+        }
+      } catch (e) {
+        console.warn("IP Location detection failed, using fallback.");
+      }
+    }
+    detectLocation();
     setMounted(true);
   }, []);
 
@@ -143,6 +195,7 @@ export function LoginForm() {
           deliveryChannel,
           captchaChallengeId: captchaRequired ? captchaChallengeId : undefined,
           captchaAnswer: captchaRequired ? captchaAnswer : undefined,
+          loginContext
         }),
       });
 
@@ -218,7 +271,12 @@ export function LoginForm() {
       const response = await fetch(`${AUTH_URL}/auth/admin/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId, otpCode: otpCode.trim(), rememberMe }),
+        body: JSON.stringify({ 
+          challengeId, 
+          otpCode: otpCode.trim(), 
+          rememberMe,
+          loginContext
+        }),
       });
 
       const data = await response.json().catch(() => ({}));

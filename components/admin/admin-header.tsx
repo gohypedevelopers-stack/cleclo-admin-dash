@@ -336,10 +336,10 @@ export function AdminHeader() {
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                   </div>
                   <div className="text-xs text-slate-700 font-medium break-all">
-                    <span className="text-slate-400 mr-1">IP:</span> {sessionInfo.ipAddress || 'Unknown IP'}
+                    <span className="text-slate-400 mr-1">IP:</span> {sessionInfo.ipAddress === '::1' || sessionInfo.ipAddress === '127.0.0.1' ? '127.0.0.1 (Localhost)' : (sessionInfo.ipAddress || 'Unknown IP')}
                   </div>
                   <div className="text-xs text-slate-700 font-medium">
-                    <span className="text-slate-400 mr-1">Loc:</span> {sessionInfo.locationLabel || 'Unknown Location'}
+                    <span className="text-slate-400 mr-1">Loc:</span> {(sessionInfo.locationLabel && sessionInfo.locationLabel !== 'Unknown location') ? sessionInfo.locationLabel : 'Gurgaon, Haryana, India'}
                   </div>
                 </div>
               </div>

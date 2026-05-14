@@ -18,6 +18,11 @@ import {
   XCircle,
   Loader2,
   Eye,
+  Zap,
+  ShieldCheck,
+  ClipboardCheck,
+  Scale,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -348,6 +353,134 @@ export default function VendorReviewPage({
                 <p className="font-medium text-slate-900 mt-1 font-mono">
                   {profile.ifscCode || "Not Provided"}
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Onboarding & Compliance */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="h-5 w-5 text-[#3E8940]" />
+                Onboarding & Compliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-y-4 gap-x-8 pb-6">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Commission Model
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="font-bold text-slate-900">
+                    {profile.commissionRate || 18}% Standard Commission
+                  </p>
+                  <Badge variant="outline" className="text-[9px] font-bold border-blue-200 text-blue-600 bg-blue-50">
+                    Tier 1
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Legal Agreement
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  {profile.termsAccepted && profile.slaAccepted ? (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-100">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      <span className="text-xs font-bold text-emerald-700">SLA Signed</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 border border-amber-100">
+                      <Clock className="h-3.5 w-3.5 text-amber-500" />
+                      <span className="text-xs font-bold text-amber-700">Pending Signature</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  GST Registration
+                </label>
+                <p className="font-bold text-slate-900 mt-1">
+                  {profile.gstRegistered ? `Verified (${profile.gstNumber})` : "Unregistered / Consumer"}
+                </p>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Internal Verification
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className={profile.isApproved ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>
+                    {profile.isApproved ? "Identity Verified" : "Verification Pending"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Operational Details */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ClipboardCheck className="h-5 w-5 text-blue-500" />
+                Operational Profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-3 gap-6 pb-6">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Service Cluster
+                </label>
+                <p className="font-bold text-slate-900 mt-1">
+                  {profile.cluster || "Not Assigned"}
+                </p>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Area Coverage
+                </label>
+                <p className="font-bold text-slate-900 mt-1">
+                  {profile.area || "Not Defined"}
+                </p>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Daily Capacity
+                </label>
+                <p className="font-bold text-slate-900 mt-1">
+                  {profile.dailyCapacity || "0"} Orders/Day
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Performance Overview */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Scale className="h-5 w-5 text-purple-500" />
+                Lifetime Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-4 gap-4 pb-6">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Revenue</label>
+                <p className="text-sm font-bold text-slate-900">₹{profile.totalRevenue?.toLocaleString() || "0"}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Orders</label>
+                <p className="text-sm font-bold text-slate-900">{profile.totalOrders || "0"}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Avg. Rating</label>
+                <div className="flex items-center gap-1">
+                  <p className="text-sm font-bold text-slate-900">{profile.rating || "N/A"}</p>
+                  {profile.rating > 0 && <span className="text-amber-500 text-xs">★</span>}
+                </div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Issue Rate</label>
+                <p className="text-sm font-bold text-red-600">{profile.issueRate || "0"}%</p>
               </div>
             </CardContent>
           </Card>
