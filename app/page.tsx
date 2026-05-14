@@ -40,6 +40,12 @@ import {
   Users,
   Trophy,
   Timer,
+  Package,
+  UserX,
+  Truck,
+  Ban,
+  CircleDot,
+  FileCheck,
 } from "lucide-react";
 import {
   Dialog,
@@ -215,6 +221,28 @@ const getFinancialRisk = (type: string) => {
 
 const ROOT_CAUSES = ['Vendor Fault', 'Rider Fault', 'Customer Fault', 'System Issue'] as const;
 
+// Issue Type Icons
+const getIssueTypeIcon = (type: string) => {
+  if (!type) return { icon: CircleDot, color: 'text-slate-400' };
+  const t = type.toLowerCase();
+  if (t.includes('damage')) return { icon: Package, color: 'text-red-500' };
+  if (t.includes('no show') || t.includes('no-show')) return { icon: UserX, color: 'text-amber-500' };
+  if (t.includes('delay') || t.includes('pickup')) return { icon: Truck, color: 'text-orange-500' };
+  if (t.includes('complaint')) return { icon: MessageSquare, color: 'text-blue-500' };
+  if (t.includes('cancel')) return { icon: Ban, color: 'text-slate-500' };
+  return { icon: CircleDot, color: 'text-slate-400' };
+};
+
+// Refund Status Color
+const getRefundBadgeStyle = (status?: string) => {
+  switch (status) {
+    case 'Completed': return 'bg-emerald-100 text-emerald-700';
+    case 'Processing': return 'bg-blue-100 text-blue-700';
+    case 'Not Initiated': return 'bg-slate-100 text-slate-500';
+    default: return 'bg-slate-100 text-slate-500';
+  }
+};
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [data, setData] = React.useState<DashboardOverview | null>(null);
@@ -294,8 +322,12 @@ export default function AdminDashboardPage() {
 
   const [issueTypeFilter, setIssueTypeFilter] = React.useState("all");
   const [issueStatusFilter, setIssueStatusFilter] = React.useState("all");
+  const [issueCityFilter, setIssueCityFilter] = React.useState("all");
+  const [issueVendorFilter, setIssueVendorFilter] = React.useState("all");
+  const [issueDateFilter, setIssueDateFilter] = React.useState("");
   const [vendorCommissionFilter, setVendorCommissionFilter] = React.useState("all");
   const [vendorAgreementFilter, setVendorAgreementFilter] = React.useState("all");
+  const [invoiceValue, setInvoiceValue] = React.useState<string>("");
   const [issueRootCause, setIssueRootCause] = React.useState<string | null>(null);
 
   const handleClearFilters = () => {
@@ -343,7 +375,9 @@ export default function AdminDashboardPage() {
 
   const handleEscalateIssue = async (issueId: string) => {
     try {
-      await dashboardApi.updateIssue(issueId, { action: 'escalate' });
+      await dashboardApi.updateIssue(issueId, { 
+        action: 'escalate'
+      });
       toast.success("Issue escalated", {
         description: "Assigned to Senior Support Team for immediate resolution.",
       });
@@ -380,10 +414,35 @@ export default function AdminDashboardPage() {
     });
   };
 
-  const handleAssignToTeam = (issueId: string) => {
-    toast.success("Assigned to Dispatch Team", {
-      description: "Team lead notified for immediate field follow-up.",
-    });
+  const handleMarkAllReviewed = async () => {
+    try {
+      await dashboardApi.markAllIssuesReviewed();
+      toast.success("All issues marked as reviewed", {
+        description: "Unread badges have been cleared.",
+      });
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Failed to mark issues as reviewed", {
+        description: err.message || "Could not complete this action",
+      });
+    }
+  };
+
+  const handleAssignToTeam = async (issueId: string) => {
+    try {
+      await dashboardApi.updateIssue(issueId, { 
+        action: 'assign', 
+        assignedTo: 'Dispatch Team' 
+      });
+      toast.success("Assigned to Dispatch Team", {
+        description: "Team lead notified for immediate field follow-up.",
+      });
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Assignment failed", {
+        description: err.message || "Could not assign issue to team",
+      });
+    }
   };
 
   const handleVendorAction = async (vendorId: string, vendorName: string, action: 'approve' | 'reject') => {
@@ -409,6 +468,36 @@ export default function AdminDashboardPage() {
   }, [orders, currentPage]);
   
   const totalPages = Math.ceil(orders.length / itemsPerPage);
+
+  // Compute filtered issue count (same logic as the rendering filter)
+  const filteredIssueCount = React.useMemo(() => {
+    if (!data) return 0;
+    return data.issueDigest.filter(issue => {
+      if (issueTypeFilter !== "all") {
+        const type = issue.type?.toLowerCase() || "";
+        if (issueTypeFilter === "damage" && !type.includes("damage")) return false;
+        if (issueTypeFilter === "noshow" && !type.includes("no show")) return false;
+        if (issueTypeFilter === "complaint" && !type.includes("complaint")) return false;
+      }
+      if (issueStatusFilter !== "all") {
+        if (issueStatusFilter === "open" && issue.status !== "Open") return false;
+        if (issueStatusFilter === "escalated" && issue.status !== "Escalated") return false;
+        if (issueStatusFilter === "resolved" && issue.status !== "Resolved") return false;
+      }
+      if (issueCityFilter !== "all" && issue.city !== issueCityFilter) return false;
+      if (issueVendorFilter !== "all" && issue.vendor !== issueVendorFilter) return false;
+      if (issueDateFilter) {
+        if (!issue.createdAt?.startsWith(issueDateFilter)) return false;
+      }
+      if (adminRole === "operations_admin") {
+        const opsTeams = ["Operations Team", "Operations Head"];
+        const isAssignedToOps = opsTeams.includes(issue.assignedTo || "");
+        const isEscalatedToOps = issue.status === "Escalated";
+        if (!isAssignedToOps && !isEscalatedToOps) return false;
+      }
+      return true;
+    }).length;
+  }, [data, issueTypeFilter, issueStatusFilter, issueCityFilter, issueVendorFilter, issueDateFilter, adminRole]);
 
   // Loading state
   if (isLoading && !data) {
@@ -562,6 +651,7 @@ export default function AdminDashboardPage() {
           const accent = ACCENT_COLORS[kpi.accent] || ACCENT_COLORS.slate;
           // Mapping KPI keys to application routes with optional status filtering
           const getRedirectUrl = (key: string) => {
+            if (!key) return null;
             const k = key.toLowerCase();
             if (k.includes("order")) {
               if (k.includes("pending")) return "/orders?status=pending";
@@ -887,7 +977,7 @@ export default function AdminDashboardPage() {
                       </Tooltip>
                     </TooltipProvider>
                     <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
-                      {data.summary.openIssues}
+                      {filteredIssueCount}
                     </Badge>
                   </div>
                 </div>
@@ -933,7 +1023,7 @@ export default function AdminDashboardPage() {
                     .map((vendor) => (
                     <div 
                       key={vendor.id} 
-                      className="p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm hover:border-[#3E8940]/30 cursor-pointer group/card"
+                      className="p-3 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:shadow-sm hover:border-[#3E8940]/30 cursor-pointer group/card"
                       onClick={() => router.push(`/vendors/review/${vendor.id}`)}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -943,7 +1033,7 @@ export default function AdminDashboardPage() {
                           {vendor.priority}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-4">
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-3">
                         <span className="flex items-center gap-1">
                           <MapPin className="h-3 w-3 text-slate-400" />
                           {vendor.city}
@@ -952,7 +1042,7 @@ export default function AdminDashboardPage() {
                         <span>Applied {vendor.appliedLabel}</span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4 p-3 bg-white rounded-lg border border-slate-100/50">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-3 p-3 bg-white rounded-lg border border-slate-100/50">
                         <div className="flex flex-col">
                           <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Document Status</span>
                           <span className={`text-[10px] font-bold ${vendor.documentStatus === "Documents Verified" ? "text-emerald-600" : "text-amber-600"}`}>
@@ -1021,8 +1111,8 @@ export default function AdminDashboardPage() {
 
             {/* Issue Alerts */}
             {data.issueDigest.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-                <div className="flex items-center justify-between mb-6">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-900 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
                     Issue Alerts
@@ -1056,13 +1146,50 @@ export default function AdminDashboardPage() {
                       </PopoverContent>
                     </Popover>
                     <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
-                      {data.summary.openIssues}
+                      {filteredIssueCount}
                     </Badge>
                     <Button variant="ghost" size="sm" className="h-7 text-[10px] font-bold text-[#3E8940] hover:bg-green-50 px-2" onClick={() => router.push("/issues")}>
                       View Page
                     </Button>
                   </div>
                 </div>
+
+                {/* Monthly Issue Analytics Mini-Section */}
+                <div className="grid grid-cols-5 gap-2 mb-3">
+                  {[
+                    { label: 'Damage Rate', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.type?.toLowerCase().includes('damage')).length / data.issueDigest.length) * 100)}%`, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'No-Show Rate', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.type?.toLowerCase().includes('no show')).length / data.issueDigest.length) * 100)}%`, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Refund Risk', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.refundStatus && i.refundStatus !== 'Not Initiated').length / data.issueDigest.length) * 100)}%`, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'Escalated', value: `${data.issueDigest.filter(i => i.status === 'Escalated').length}`, color: 'text-orange-600', bg: 'bg-orange-50' },
+                    { label: 'Avg Open', value: `${Math.round(data.issueDigest.filter(i => i.createdAt && i.status !== 'Resolved').reduce((sum, i) => sum + ((new Date().getTime() - new Date(i.createdAt!).getTime()) / (1000 * 60 * 60)), 0) / Math.max(data.issueDigest.filter(i => i.status !== 'Resolved').length, 1))}h`, color: 'text-violet-600', bg: 'bg-violet-50' },
+                  ].map((stat) => (
+                    <div key={stat.label} className={`p-1.5 rounded-xl ${stat.bg} border border-slate-100/50 text-center`}>
+                      <p className={`text-xs font-bold ${stat.color}`}>{stat.value}</p>
+                      <p className="text-[7px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mark All Reviewed + Unread Count */}
+                {data.summary.unreadIssues > 0 && (
+                  <div className="flex items-center justify-between mb-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-[10px] font-bold text-blue-700">
+                        {data.summary.unreadIssues} unread alert{data.summary.unreadIssues > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-3 text-[10px] font-bold text-blue-600 hover:bg-blue-100 rounded-lg gap-1.5"
+                      onClick={handleMarkAllReviewed}
+                    >
+                      <FileCheck className="h-3 w-3" />
+                      Mark All as Reviewed
+                    </Button>
+                  </div>
+                )}
 
                 {/* Issue Filters Row */}
                 <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
@@ -1088,7 +1215,37 @@ export default function AdminDashboardPage() {
                       <SelectItem value="resolved">Resolved</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { setIssueTypeFilter("all"); setIssueStatusFilter("all"); }}>
+                  <Select value={issueCityFilter} onValueChange={setIssueCityFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[100px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="City" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {data.filters.cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={issueVendorFilter} onValueChange={setIssueVendorFilter}>
+                    <SelectTrigger className="h-8 w-auto min-w-[120px] text-[10px] font-bold uppercase bg-white rounded-lg">
+                      <SelectValue placeholder="Vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vendors</SelectItem>
+                      {data.filters.vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <input
+                    type="date"
+                    value={issueDateFilter}
+                    onChange={(e) => setIssueDateFilter(e.target.value)}
+                    className="h-8 px-2 text-[10px] font-bold uppercase bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3E8940]"
+                  />
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { 
+                    setIssueTypeFilter("all"); 
+                    setIssueStatusFilter("all"); 
+                    setIssueCityFilter("all");
+                    setIssueVendorFilter("all");
+                    setIssueDateFilter("");
+                  }}>
                     <RefreshCw className="h-3 w-3 mr-1" /> Reset
                   </Button>
                 </div>
@@ -1096,7 +1253,7 @@ export default function AdminDashboardPage() {
                   {data.issueDigest
                     .filter(issue => {
                       if (issueTypeFilter !== "all") {
-                        const type = issue.type.toLowerCase();
+                        const type = issue.type?.toLowerCase() || "";
                         if (issueTypeFilter === "damage" && !type.includes("damage")) return false;
                         if (issueTypeFilter === "noshow" && !type.includes("no show")) return false;
                         if (issueTypeFilter === "complaint" && !type.includes("complaint")) return false;
@@ -1106,20 +1263,50 @@ export default function AdminDashboardPage() {
                         if (issueStatusFilter === "escalated" && issue.status !== "Escalated") return false;
                         if (issueStatusFilter === "resolved" && issue.status !== "Resolved") return false;
                       }
+                      if (issueCityFilter !== "all" && issue.city !== issueCityFilter) return false;
+                      if (issueVendorFilter !== "all" && issue.vendor !== issueVendorFilter) return false;
+                      if (issueDateFilter) {
+                        if (!issue.createdAt?.startsWith(issueDateFilter)) return false;
+                      }
+
+                      // Role-based visibility: Ops Admin only sees issues assigned to their team
+                      // Super Admin sees everything so they can triage/assign them
+                      if (adminRole === "operations_admin") {
+                        const opsTeams = ["Operations Team", "Operations Head"];
+                        const isAssignedToOps = opsTeams.includes(issue.assignedTo || "");
+                        const isEscalatedToOps = issue.status === "Escalated";
+                        if (!isAssignedToOps && !isEscalatedToOps) return false;
+                      }
+
                       return true;
                     })
                     .map((issue) => {
                       const colors = getSeverityColor(issue.severity);
-                    return (
-                      <div
-                        key={issue.id}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer group/card hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
-                        onClick={() => setSelectedIssue(issue)}
-                      >
+                      
+                      // Auto-Escalation Logic: If open for > 2 hours
+                      const createdAtDate = issue.createdAt ? new Date(issue.createdAt) : null;
+                      const hoursOld = createdAtDate ? (new Date().getTime() - createdAtDate.getTime()) / (1000 * 60 * 60) : 0;
+                      const isAutoEscalated = hoursOld > 2 && issue.status === 'Open';
+
+                      return (
+                        <div
+                          key={issue.id}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer group/card hover:shadow-sm ${colors.bg} ${colors.border} relative overflow-hidden`}
+                          onClick={() => setSelectedIssue(issue)}
+                        >
+                          {/* Auto-Escalation Banner */}
+                          {isAutoEscalated && (
+                            <div className="mb-1.5 p-1.5 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
+                              <Zap className="h-3 w-3 text-red-600 animate-pulse" />
+                              <span className="text-[9px] font-bold text-red-700 uppercase tracking-tight">
+                                System: Auto-Escalated (Ops Head & Super Admin Notified)
+                              </span>
+                            </div>
+                          )}
                         {/* Severity left stripe */}
                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${colors.badge.split(" ")[0]}`} />
 
-                        <div className="flex items-center justify-between mb-2 pl-2">
+                        <div className="flex items-center justify-between mb-1 pl-2">
                           <div className="flex items-center gap-2">
                             <span className={`font-bold text-[10px] px-2 py-0.5 rounded-md ${colors.badge}`}>
                               #{issue.orderId}
@@ -1166,30 +1353,42 @@ export default function AdminDashboardPage() {
                             </DropdownMenu>
                           </div>
                         </div>
-                        <div className="pl-2 space-y-1">
-                          <p className={`text-sm font-bold ${colors.text}`}>
-                            {issue.type}
-                          </p>
-                          <p className={`text-[10px] font-bold uppercase tracking-tight ${colors.text} opacity-60`}>
-                            Vendor: {issue.vendor} • {issue.city}
+                        <div className="pl-2 space-y-0.5">
+                          <div className="flex items-center gap-2 min-h-[1.25rem]">
+                            {/* Issue Type Icon */}
+                            {React.createElement(getIssueTypeIcon(issue.type).icon, {
+                              className: `h-3.5 w-3.5 ${getIssueTypeIcon(issue.type).color} shrink-0`
+                            })}
+                            <p className={`text-sm font-bold ${colors.text} truncate`}>
+                              {issue.type || "Unspecified Issue"}
+                            </p>
+                          </div>
+                          <p className={`text-[10px] font-bold uppercase tracking-tight ${colors.text} opacity-60 leading-tight`}>
+                            Vendor: {issue.vendor} • {issue.city} {issue.assignedTo && `• Assigned: ${issue.assignedTo}`}
                           </p>
                           
-                          {/* Financial Risk Indicator */}
-                          {getFinancialRisk(issue.type) && (
-                            <div className="mt-2 pt-2 border-t border-slate-100/30 flex items-center justify-between">
+                          {/* Financial Risk + Refund Status Row */}
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-100/30 flex items-center justify-between gap-2">
+                            {getFinancialRisk(issue.type) ? (
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                                 {React.createElement(getFinancialRisk(issue.type)!.icon, { className: "h-2.5 w-2.5" })}
-                                {getFinancialRisk(issue.type)?.label}
+                                {getFinancialRisk(issue.type)?.label}:
+                                <span className={`${getFinancialRisk(issue.type)?.color}`}>
+                                  {getFinancialRisk(issue.type)?.value}
+                                </span>
                               </span>
-                              <span className={`text-[11px] font-bold ${getFinancialRisk(issue.type)?.color}`}>
-                                {getFinancialRisk(issue.type)?.value}
+                            ) : <span />}
+                            {/* Refund Status Badge */}
+                            {issue.refundStatus && (
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${getRefundBadgeStyle(issue.refundStatus)}`}>
+                                Refund: {issue.refundStatus}
                               </span>
-                            </div>
-                          )}
+                            )}
+                          </div>
 
                           {/* Vendor Risk Warning */}
                           {issue.vendorRiskLevel === 'High' && (
-                            <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2">
+                            <div className="mt-1 p-1.5 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2">
                               <AlertTriangle className="h-3 w-3 text-red-600" />
                               <span className="text-[9px] font-bold text-red-700 uppercase tracking-tight">
                                 Vendor Risk Level: HIGH
@@ -1258,7 +1457,7 @@ export default function AdminDashboardPage() {
 
       {/* Issue Detail Dialog */}
       <Dialog open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>
-        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-y-auto max-h-[90vh] border-none shadow-2xl custom-scrollbar">
           {selectedIssue && (
             <>
               <DialogHeader className="p-6 bg-red-50/50 border-b border-red-100 flex-row items-center gap-4 space-y-0">
@@ -1276,6 +1475,23 @@ export default function AdminDashboardPage() {
               </DialogHeader>
 
               <div className="p-6 space-y-6">
+                {/* Auto-Escalation Warning in Dialog */}
+                {(() => {
+                  const createdAtDate = selectedIssue.createdAt ? new Date(selectedIssue.createdAt) : null;
+                  const hoursOld = createdAtDate ? (new Date().getTime() - createdAtDate.getTime()) / (1000 * 60 * 60) : 0;
+                  if (hoursOld > 2 && selectedIssue.status === 'Open') {
+                    return (
+                      <div className="p-3 rounded-xl bg-red-600 text-white flex items-center gap-3 shadow-lg shadow-red-200 animate-bounce">
+                        <Zap className="h-5 w-5 fill-white" />
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider">Critical SLA Breach</p>
+                          <p className="text-xs font-bold">Auto-Escalated to Operations Head</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
@@ -1296,8 +1512,12 @@ export default function AdminDashboardPage() {
                     <p className="text-sm font-bold text-slate-700">{selectedIssue.city}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Risk Amount</p>
-                    <p className="text-sm font-bold text-red-600">{selectedIssue.financialRiskAmount}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      {getFinancialRisk(selectedIssue.type)?.label || "Risk Amount"}
+                    </p>
+                    <p className={cn("text-sm font-bold", getFinancialRisk(selectedIssue.type)?.color || "text-red-600")}>
+                      {getFinancialRisk(selectedIssue.type)?.value || selectedIssue.financialRiskAmount || "₹0"}
+                    </p>
                   </div>
                 </div>
 
@@ -1310,6 +1530,21 @@ export default function AdminDashboardPage() {
                     {selectedIssue.summary}
                   </div>
                 </div>
+
+                {/* Vendor Risk Tracking Banner */}
+                {selectedIssue.vendorRiskLevel === 'High' && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                      <ShieldAlert className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-red-700 uppercase tracking-tight">⚠️ Vendor Risk Level: HIGH</p>
+                      <p className="text-[10px] text-red-600/70 font-medium">
+                        This vendor has 5+ damage complaints this week or high refund rate. Physical inspection recommended.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Refund & Damage Tracking (Contextual) */}
                 <div className="grid grid-cols-2 gap-4">
@@ -1327,33 +1562,54 @@ export default function AdminDashboardPage() {
                     </Badge>
                   </div>
 
-                  {selectedIssue.type.toLowerCase().includes('damage') && (
-                    <div className="p-4 rounded-xl bg-red-50/50 border border-red-100">
-                      <h5 className="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <AlertTriangle className="h-3 w-3" /> Liability Cap
-                      </h5>
-                      <p className="text-sm font-bold text-red-700">
-                        {formatINR(selectedIssue.damageClaim?.liabilityCap || 2500)}
-                      </p>
+                  {selectedIssue.type?.toLowerCase()?.includes('damage') && (
+                    <div className="p-4 rounded-xl bg-red-50/50 border border-red-100 flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-[10px] font-bold text-red-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertTriangle className="h-3 w-3" /> Damage Claim Setup
+                        </h5>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] font-bold text-red-800 uppercase opacity-60">Invoice Value</span>
+                          <input 
+                            type="number" 
+                            placeholder="Enter value"
+                            value={invoiceValue}
+                            onChange={(e) => setInvoiceValue(e.target.value)}
+                            className="h-8 px-2 text-xs font-bold bg-white border border-red-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-400"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] font-bold text-red-800 uppercase opacity-60">Liability Cap (25%)</span>
+                          <div className="h-8 px-2 flex items-center text-xs font-bold bg-red-100/50 text-red-700 rounded-lg border border-red-200">
+                            {formatINR(Number(invoiceValue || 0) * 0.25)}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Damage Images (Contextual) */}
-                {selectedIssue.type.toLowerCase().includes('damage') && (
+                {selectedIssue.type?.toLowerCase()?.includes('damage') && (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                       <ImagePlus className="h-3.5 w-3.5" />
                       Damage Evidence
                     </h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-2 cursor-pointer hover:bg-slate-200 transition-colors">
-                        <ImagePlus className="h-5 w-5 text-slate-400" />
-                        <span className="text-[9px] font-bold text-slate-500">Upload Pre-Clean</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
+                        <ImagePlus className="h-4 w-4 text-slate-400" />
+                        <span className="text-[8px] font-bold text-slate-500 text-center px-1">Damage Image</span>
                       </div>
-                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-2 cursor-pointer hover:bg-slate-200 transition-colors">
-                        <ImagePlus className="h-5 w-5 text-slate-400" />
-                        <span className="text-[9px] font-bold text-slate-500">Upload Post-Clean</span>
+                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
+                        <ImagePlus className="h-4 w-4 text-slate-400" />
+                        <span className="text-[8px] font-bold text-slate-500 text-center px-1">Pre-Clean</span>
+                      </div>
+                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
+                        <ImagePlus className="h-4 w-4 text-slate-400" />
+                        <span className="text-[8px] font-bold text-slate-500 text-center px-1">Post-Clean</span>
                       </div>
                     </div>
                   </div>

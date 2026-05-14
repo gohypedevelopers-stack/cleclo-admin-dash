@@ -83,7 +83,7 @@ export function OrderStatusDistribution({ orders }: StatusDistributionProps) {
           <div
             key={status}
             className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-sm hover:border-blue-200 transition-all cursor-pointer group/status min-w-0"
-            onClick={() => router.push(`/orders?status=${status.toLowerCase().replace(/ /g, "_")}`)}
+            onClick={() => router.push(`/orders?status=${(status || "").toLowerCase().replace(/ /g, "_")}`)}
           >
             <div
               className={`w-3 h-3 rounded-full ${statusColors[status] || "bg-slate-300"} group-hover/status:scale-125 transition-transform`}
@@ -265,7 +265,12 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
       let tier: string;
       let tierColor: string;
       let tierEmoji: string;
-      if (sla >= 95) {
+      const isHighRisk = sla < 80 || stats.issues >= 5 || issueRate > 10;
+      if (isHighRisk) {
+        tier = "High Risk";
+        tierColor = "bg-red-50 text-red-700 border-red-100";
+        tierEmoji = "⚠️";
+      } else if (sla >= 95) {
         tier = "Gold";
         tierColor = "bg-amber-100 text-amber-700";
         tierEmoji = "🥇";
@@ -278,7 +283,7 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
         tierColor = "bg-red-100 text-red-700";
         tierEmoji = "⚠";
       }
-      return { name, ...stats, sla, issueRate, tier, tierColor, tierEmoji };
+      return { name, ...stats, sla, issueRate, tier, tierColor, tierEmoji, isHighRisk };
     })
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
@@ -334,11 +339,16 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
                     {v.name}
                   </p>
                   <Badge
-                    className={`${v.tierColor} border-none text-[9px] font-bold px-2 py-0.5 rounded-md`}
+                    className={`${v.tierColor} border-none text-[9px] font-bold px-2 py-0.5 rounded-md ${v.isHighRisk ? "animate-pulse" : ""}`}
                   >
                     {v.tierEmoji} {v.tier}
                   </Badge>
                 </div>
+                {v.isHighRisk && (
+                  <p className="text-[9px] text-red-600 font-bold uppercase mt-0.5 mb-1 flex items-center gap-1">
+                    Critical: {v.issues} issues • {v.issueRate}% fail rate
+                  </p>
+                )}
                 <div className="flex items-center gap-3 text-[10px] text-slate-500 font-medium">
                   <span>{v.total} orders</span>
                   <span>•</span>
@@ -435,10 +445,10 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
              >
                <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
                  <span className="text-sm font-bold text-violet-700">
-                   {r.name
-                     .split(" ")
-                     .map((n: string) => n[0])
-                     .join("")}
+                    {(r.name || "R")
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")}
                  </span>
                </div>
                <div className="flex-1 min-w-0">

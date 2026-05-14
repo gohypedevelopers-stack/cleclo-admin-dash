@@ -271,7 +271,7 @@ export function SettlementAgingTracker({
             <div
               key={bucket.label}
               className={`p-5 rounded-xl border ${bucket.border} ${bucket.color} hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group/bucket`}
-              onClick={() => router.push(`/finance/settlements?aging=${bucket.label.replace(/[⚠️<> ]/g, "").toLowerCase()}`)}
+              onClick={() => router.push(`/finance/settlements?aging=${(bucket.label || "").replace(/[⚠️<> ]/g, "").toLowerCase()}`)}
             >
               <div className="flex items-center gap-2 mb-3">
                 <bucket.icon className={`h-5 w-5 ${bucket.textColor} group-hover/bucket:scale-110 transition-transform`} />
@@ -385,7 +385,7 @@ export function PayoutReconciliation({
           <div
             key={seg.label}
             className={`p-4 rounded-xl ${seg.bgColor} border border-slate-100 text-center hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group/seg`}
-            onClick={() => router.push(`/finance/settlements?status=${seg.label.toLowerCase()}`)}
+            onClick={() => router.push(`/finance/settlements?status=${(seg.label || "").toLowerCase()}`)}
           >
             <p className={`text-2xl font-bold ${seg.textColor} group-hover/seg:scale-110 transition-transform`}>
               {seg.count}

@@ -108,6 +108,7 @@ export interface DashboardApproval {
 export interface DashboardIssueDigest {
     id: string;
     orderId: string;
+    createdAt?: string;
     supportTicketId?: string;
     type: string;
     severity: string;
@@ -259,6 +260,18 @@ export const dashboardApi = {
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             throw new Error(error.message || 'Failed to update vendor');
+        }
+        return res.json();
+    },
+
+    markAllIssuesReviewed: async () => {
+        const res = await apiFetch(`${AUTH_API_URL}/issues/review-all`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to mark issues as reviewed');
         }
         return res.json();
     }
