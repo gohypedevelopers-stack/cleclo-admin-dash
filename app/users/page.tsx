@@ -241,6 +241,12 @@ function UsersPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [financialSummary, setFinancialSummary] = useState({
+    totalCustomerWalletBalance: 0,
+    totalVendorPayoutDue: 0,
+    totalGlobalRevenue: 0,
+    totalGlobalCommission: 0
+  });
   const limit = 10;
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -328,6 +334,9 @@ function UsersPageContent() {
         setUsers(data.users);
         setTotalPages(data.pagination.totalPages);
         setTotalRecords(data.pagination.total);
+        if (data.financialSummary) {
+          setFinancialSummary(data.financialSummary);
+        }
       } else {
         setUsers(Array.isArray(data) ? data : []);
       }
@@ -425,49 +434,40 @@ function UsersPageContent() {
         </div>
       </div>
 
-      {/* Financial Liability Summary */}
-      {(() => {
-        const totalCustomerWallet = users.filter(u => u.role === "customer").reduce((sum, u) => sum + (u.wallet?.balance || 0), 0);
-        const totalVendorPayout = users.filter(u => u.role === "vendor").reduce((sum, u) => sum + (u.vendorProfile?.payoutPending || 0), 0);
-        const totalRevenue = users.filter(u => u.role === "vendor").reduce((sum, u) => sum + (u.vendorProfile?.totalRevenue || 0), 0);
-        const totalCommission = users.filter(u => u.role === "vendor").reduce((sum, u) => sum + (u.vendorProfile?.commissionEarned || 0), 0);
-        return (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg bg-blue-50"><Wallet className="h-3.5 w-3.5 text-blue-600" /></div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer Wallet Balance</p>
-              </div>
-              <p className="text-xl font-bold text-blue-700">{formatINR(totalCustomerWallet)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Platform liability</p>
-            </div>
-            <div className="bg-white rounded-xl border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg bg-orange-50"><CircleDollarSign className="h-3.5 w-3.5 text-orange-600" /></div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vendor Payout Due</p>
-              </div>
-              <p className="text-xl font-bold text-orange-700">{formatINR(totalVendorPayout)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Pending settlements</p>
-            </div>
-            <div className="bg-white rounded-xl border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg bg-emerald-50"><TrendingUp className="h-3.5 w-3.5 text-emerald-600" /></div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
-              </div>
-              <p className="text-xl font-bold text-emerald-700">{formatINR(totalRevenue)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">All vendors combined</p>
-            </div>
-            <div className="bg-white rounded-xl border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg bg-purple-50"><IndianRupee className="h-3.5 w-3.5 text-purple-600" /></div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Commission Earned</p>
-              </div>
-              <p className="text-xl font-bold text-purple-700">{formatINR(totalCommission)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Platform earnings</p>
-            </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-blue-50"><Wallet className="h-3.5 w-3.5 text-blue-600" /></div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer Wallet Balance</p>
           </div>
-        );
-      })()}
+          <p className="text-xl font-bold text-blue-700">{formatINR(financialSummary.totalCustomerWalletBalance)}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Platform liability</p>
+        </div>
+        <div className="bg-white rounded-xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-orange-50"><CircleDollarSign className="h-3.5 w-3.5 text-orange-600" /></div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vendor Payout Due</p>
+          </div>
+          <p className="text-xl font-bold text-orange-700">{formatINR(financialSummary.totalVendorPayoutDue)}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Pending settlements</p>
+        </div>
+        <div className="bg-white rounded-xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-emerald-50"><TrendingUp className="h-3.5 w-3.5 text-emerald-600" /></div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
+          </div>
+          <p className="text-xl font-bold text-emerald-700">{formatINR(financialSummary.totalGlobalRevenue)}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">All vendors combined</p>
+        </div>
+        <div className="bg-white rounded-xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-purple-50"><IndianRupee className="h-3.5 w-3.5 text-purple-600" /></div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Commission Earned</p>
+          </div>
+          <p className="text-xl font-bold text-purple-700">{formatINR(financialSummary.totalGlobalCommission)}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Platform earnings</p>
+        </div>
+      </div>
 
       {/* Role Tabs */}
       <div className="flex items-center gap-1 bg-white p-1.5 rounded-xl border shadow-sm overflow-x-auto">
@@ -542,9 +542,10 @@ function UsersPageContent() {
                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Total Spend</TableHead>
                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Avg Value</TableHead>
                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Wallet Balance</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%] text-center">Source</TableHead>
                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Last Order</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Refunds</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Complaints</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Refunds</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Complaints</TableHead>
                 </>
               ) : roleFilter === "vendor" ? (
                 <>
@@ -665,6 +666,16 @@ function UsersPageContent() {
                         <TableCell className="font-bold text-xs text-slate-800">{formatINR(totalSpent)}</TableCell>
                         <TableCell className="text-xs text-slate-600 font-medium">{formatINR(avgValue)}</TableCell>
                         <TableCell className="font-bold text-xs text-indigo-600">{formatINR(walletBal)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className={cn(
+                            "text-[9px] px-1.5 py-0 uppercase font-black border-none",
+                            user.registrationSource === 'referral' ? "bg-purple-100 text-purple-700" :
+                            user.registrationSource === 'campaign' ? "bg-blue-100 text-blue-700" :
+                            "bg-slate-100 text-slate-600"
+                          )}>
+                            {user.registrationSource || 'Organic'}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-xs text-slate-500">{lastOrderDate ? formatDate(lastOrderDate) : "—"}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn("font-bold text-[10px]", refunds > 0 ? "text-red-600 border-red-200 bg-red-50" : "text-slate-400 border-slate-100")}>{refunds}</Badge>
@@ -725,9 +736,12 @@ function UsersPageContent() {
                           </div>
                         </TableCell>
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
-                        <TableCell className="text-center">
-                          <p className="text-xs font-bold text-slate-800">{orders} <span className="text-slate-400 font-medium">Orders</span></p>
-                          <p className="text-[10px] text-emerald-600 font-semibold">{formatINR(totalSpent)}</p>
+                        <TableCell className="text-center min-w-[180px]">
+                          <p className="text-xs font-bold text-slate-700">
+                            {orders} <span className="text-slate-400 font-medium">Orders</span>
+                            <span className="mx-2 text-slate-300">|</span>
+                            <span className="text-emerald-600 font-bold">{formatINR(totalSpent)}</span> <span className="text-slate-400 font-medium text-[10px]">Revenue</span>
+                          </p>
                         </TableCell>
                         <TableCell className="font-bold text-xs text-slate-700">
                           {user.role === 'vendor' ? formatINR(vendorPayout) : formatINR(walletBal)}
