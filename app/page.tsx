@@ -253,7 +253,17 @@ export default function AdminDashboardPage() {
   const [timeRange, setTimeRange] = React.useState("today");
   const [customDateRange, setCustomDateRange] = React.useState<DateRange | undefined>(undefined);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [issueDateFilter, setIssueDateFilter] = React.useState("");
   const [selectedIssue, setSelectedIssue] = React.useState<DashboardIssueDigest | null>(null);
+  const [issueRootCause, setIssueRootCause] = React.useState<string | null>(null);
+  const [invoiceValue, setInvoiceValue] = React.useState("");
+  const [damageImage, setDamageImage] = React.useState<{name: string, type: string, data: string} | null>(null);
+  const [preCleanImage, setPreCleanImage] = React.useState<{name: string, type: string, data: string} | null>(null);
+  const [uploadingImage, setUploadingImage] = React.useState<string | null>(null);
+  
+  const damageImageInputRef = React.useRef<HTMLInputElement>(null);
+  const preCleanImageInputRef = React.useRef<HTMLInputElement>(null);
+
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [vendorFilter, setVendorFilter] = React.useState("all");
   const [cityFilter, setCityFilter] = React.useState("all");
@@ -324,11 +334,8 @@ export default function AdminDashboardPage() {
   const [issueStatusFilter, setIssueStatusFilter] = React.useState("all");
   const [issueCityFilter, setIssueCityFilter] = React.useState("all");
   const [issueVendorFilter, setIssueVendorFilter] = React.useState("all");
-  const [issueDateFilter, setIssueDateFilter] = React.useState("");
   const [vendorCommissionFilter, setVendorCommissionFilter] = React.useState("all");
   const [vendorAgreementFilter, setVendorAgreementFilter] = React.useState("all");
-  const [invoiceValue, setInvoiceValue] = React.useState<string>("");
-  const [issueRootCause, setIssueRootCause] = React.useState<string | null>(null);
 
   const handleClearFilters = () => {
     setStatusFilter("all");
@@ -337,6 +344,62 @@ export default function AdminDashboardPage() {
     setStartDateFilter("");
     setEndDateFilter("");
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'damage' | 'pre-clean') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size too large", { description: "Maximum 5MB allowed" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const payload = {
+        name: file.name,
+        type: file.type,
+        data: reader.result as string
+      };
+      if (type === 'damage') setDamageImage(payload);
+      else setPreCleanImage(payload);
+      toast.success(`${type === 'damage' ? 'Damage' : 'Pre-clean'} image uploaded`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResolveWithClaim = async () => {
+    if (!selectedIssue || !issueRootCause) return;
+
+    try {
+      const damageClaimPayload = selectedIssue.type?.toLowerCase().includes('damage') ? {
+        invoiceValue: Number(invoiceValue) || 0,
+        liabilityCap: Number(invoiceValue || 0) * 0.25,
+        damageImageFile: damageImage,
+        preCleanImageFile: preCleanImage
+      } : undefined;
+
+      await dashboardApi.updateIssue(selectedIssue.id, { 
+        action: 'resolve',
+        rootCause: issueRootCause as any,
+        damageClaim: damageClaimPayload
+      });
+
+      toast.success("Issue resolved with evidence", {
+        description: `Root cause identified as ${issueRootCause}`
+      });
+      
+      setSelectedIssue(null);
+      setIssueRootCause(null);
+      setInvoiceValue("");
+      setDamageImage(null);
+      setPreCleanImage(null);
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error("Failed to resolve issue");
+    }
+  };
+
 
   const handleGenerateReport = () => {
     if (!data) return;
@@ -580,7 +643,7 @@ export default function AdminDashboardPage() {
               </div>
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4} className="w-auto min-w-[180px] rounded-xl border-slate-200 shadow-xl">
-              {data.filters.timeRangeOptions.map((opt) => (
+              {data.filters?.timeRangeOptions?.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value} className="rounded-lg">
                   {opt.label}
                 </SelectItem>
@@ -647,7 +710,7 @@ export default function AdminDashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {data.kpis.map((kpi) => {
+        {data.kpis?.map((kpi) => {
           const accent = ACCENT_COLORS[kpi.accent] || ACCENT_COLORS.slate;
           // Mapping KPI keys to application routes with optional status filtering
           const getRedirectUrl = (key: string) => {
@@ -673,6 +736,7 @@ export default function AdminDashboardPage() {
 
           const redirectUrl = getRedirectUrl(kpi.key);
           const IconComponent = KPI_ICONS[kpi.key] || Activity;
+          const displayValue = kpi.key === "issue_reported_count" ? filteredIssueCount : kpi.value;
 
           return (
             <div
@@ -686,8 +750,8 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div>
-                <h3 className={`font-bold text-slate-900 tracking-tight leading-tight ${String(kpi.value).length > 15 ? 'text-lg' : 'text-xl'}`}>
-                  {kpi.value}
+                <h3 className={`font-bold text-slate-900 tracking-tight leading-tight ${String(displayValue).length > 15 ? 'text-lg' : 'text-xl'}`}>
+                  {displayValue}
                 </h3>
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
@@ -736,7 +800,7 @@ export default function AdminDashboardPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Status</SelectItem>
-                    {data.filters.statuses.map((s) => (
+                    {data.filters?.statuses?.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -751,7 +815,7 @@ export default function AdminDashboardPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Vendors</SelectItem>
-                    {data.filters.vendors.map((v) => (
+                    {data.filters?.vendors?.map((v) => (
                       <SelectItem key={v} value={v}>{v}</SelectItem>
                     ))}
                   </SelectContent>
@@ -766,7 +830,7 @@ export default function AdminDashboardPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                     <SelectItem value="all">All Cities</SelectItem>
-                    {data.filters.cities.map((c) => (
+                    {data.filters?.cities?.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
@@ -953,10 +1017,10 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Actionable Panels Section (Moved from Sidebar to Bottom) */}
-        {(data.approvals.length > 0 || data.issueDigest.length > 0) && (
+        {(data.approvals?.length > 0 || data.issueDigest?.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Pending Vendor Approvals */}
-            {data.approvals.length > 0 && (
+            {data.approvals?.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-bold text-slate-900 flex items-center gap-2">
@@ -976,8 +1040,8 @@ export default function AdminDashboardPage() {
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold px-2 rounded-full">
-                      {filteredIssueCount}
+                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-bold px-2 rounded-full">
+                      {data.approvals?.length}
                     </Badge>
                   </div>
                 </div>
@@ -1011,7 +1075,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {data.approvals
+                  {data.approvals?
                     .filter(v => {
                       if (vendorCommissionFilter !== "all" && !v.commissionModel.includes(vendorCommissionFilter)) return false;
                       if (vendorAgreementFilter !== "all") {
@@ -1110,7 +1174,7 @@ export default function AdminDashboardPage() {
             )}
 
             {/* Issue Alerts */}
-            {data.issueDigest.length > 0 && (
+            {data.issueDigest?.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-900 flex items-center gap-2">
@@ -1155,28 +1219,43 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Monthly Issue Analytics Mini-Section */}
-                <div className="grid grid-cols-5 gap-2 mb-3">
+                <div className="grid grid-cols-6 gap-2 mb-3">
                   {[
-                    { label: 'Damage Rate', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.type?.toLowerCase().includes('damage')).length / data.issueDigest.length) * 100)}%`, color: 'text-red-600', bg: 'bg-red-50' },
-                    { label: 'No-Show Rate', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.type?.toLowerCase().includes('no show')).length / data.issueDigest.length) * 100)}%`, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Refund Risk', value: `${data.issueDigest.length === 0 ? 0 : Math.round((data.issueDigest.filter(i => i.refundStatus && i.refundStatus !== 'Not Initiated').length / data.issueDigest.length) * 100)}%`, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'Damage Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => i.type.toLowerCase().includes('damage')).length / orders.length) * 100) : 0}%`, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'No-Show Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => i.type.toLowerCase().includes('show')).length / orders.length) * 100) : 0}%`, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Refund Risk', value: `${data.issueDigest.filter(i => i.refundStatus === 'Processing' || i.refundStatus === 'Completed').length}`, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'Top Vendor', value: (() => {
+                      const counts: Record<string, number> = {};
+                      data.issueDigest.forEach(i => counts[i.vendor] = (counts[i.vendor] || 0) + 1);
+                      const top = Object.entries(counts).sort((a,b) => b[1] - a[1])[0];
+                      return top ? (top[0].split(' ')[0]) : 'None';
+                    })(), color: 'text-rose-600', bg: 'bg-rose-50' },
                     { label: 'Escalated', value: `${data.issueDigest.filter(i => i.status === 'Escalated').length}`, color: 'text-orange-600', bg: 'bg-orange-50' },
-                    { label: 'Avg Open', value: `${Math.round(data.issueDigest.filter(i => i.createdAt && i.status !== 'Resolved').reduce((sum, i) => sum + ((new Date().getTime() - new Date(i.createdAt!).getTime()) / (1000 * 60 * 60)), 0) / Math.max(data.issueDigest.filter(i => i.status !== 'Resolved').length, 1))}h`, color: 'text-violet-600', bg: 'bg-violet-50' },
+                    { label: 'Avg Open', value: (() => {
+                        const resolved = data.issueDigest.filter(i => i.status === 'Resolved' && i.resolution?.resolvedAt);
+                        if (!resolved.length) return "N/A";
+                        const avg = resolved.reduce((acc, i) => {
+                          const start = new Date(i.createdAt || 0).getTime();
+                          const end = new Date(i.resolution!.resolvedAt!).getTime();
+                          return acc + (end - start);
+                        }, 0) / resolved.length;
+                        return `${(avg / (1000 * 60 * 60)).toFixed(1)}h`;
+                      })(), color: 'text-violet-600', bg: 'bg-violet-50' },
                   ].map((stat) => (
                     <div key={stat.label} className={`p-1.5 rounded-xl ${stat.bg} border border-slate-100/50 text-center`}>
-                      <p className={`text-xs font-bold ${stat.color}`}>{stat.value}</p>
+                      <p className={`text-[9px] font-bold ${stat.color} truncate px-0.5`}>{stat.value}</p>
                       <p className="text-[7px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* Mark All Reviewed + Unread Count */}
-                {data.summary.unreadIssues > 0 && (
+                {data.summary?.unreadIssues > 0 && (
                   <div className="flex items-center justify-between mb-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
                       <span className="text-[10px] font-bold text-blue-700">
-                        {data.summary.unreadIssues} unread alert{data.summary.unreadIssues > 1 ? 's' : ''}
+                        {data.summary?.unreadIssues} unread alert{data.summary?.unreadIssues > 1 ? 's' : ''}
                       </span>
                     </div>
                     <Button
@@ -1237,20 +1316,20 @@ export default function AdminDashboardPage() {
                     type="date"
                     value={issueDateFilter}
                     onChange={(e) => setIssueDateFilter(e.target.value)}
-                    className="h-8 px-2 text-[10px] font-bold uppercase bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3E8940]"
+                    className="h-8 px-2 text-[10px] font-bold uppercase bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#3E8940]"
                   />
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold text-slate-400" onClick={() => { 
                     setIssueTypeFilter("all"); 
                     setIssueStatusFilter("all"); 
-                    setIssueCityFilter("all");
-                    setIssueVendorFilter("all");
-                    setIssueDateFilter("");
+                    setIssueCityFilter("all"); 
+                    setIssueVendorFilter("all"); 
+                    setIssueDateFilter(""); 
                   }}>
                     <RefreshCw className="h-3 w-3 mr-1" /> Reset
                   </Button>
                 </div>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {data.issueDigest
+                  {data.issueDigest?
                     .filter(issue => {
                       if (issueTypeFilter !== "all") {
                         const type = issue.type?.toLowerCase() || "";
@@ -1599,15 +1678,50 @@ export default function AdminDashboardPage() {
                       Damage Evidence
                     </h4>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
-                        <ImagePlus className="h-4 w-4 text-slate-400" />
-                        <span className="text-[8px] font-bold text-slate-500 text-center px-1">Damage Image</span>
+                      <input type="file" className="hidden" ref={damageImageInputRef} accept="image/*" onChange={(e) => handleImageUpload(e, 'damage')} />
+                      <input type="file" className="hidden" ref={preCleanImageInputRef} accept="image/*" onChange={(e) => handleImageUpload(e, 'pre-clean')} />
+                      
+                      <div 
+                        className={cn(
+                          "aspect-square rounded-xl border border-dashed flex items-center justify-center flex-col gap-1.5 cursor-pointer transition-colors",
+                          damageImage ? "bg-red-50 border-red-300" : "bg-slate-100 border-slate-300 hover:bg-slate-200"
+                        )}
+                        onClick={() => damageImageInputRef.current?.click()}
+                      >
+                        {damageImage ? (
+                          <div className="text-[10px] font-bold text-red-600 flex flex-col items-center gap-1">
+                            <Check className="h-4 w-4" />
+                            <span>READY</span>
+                          </div>
+                        ) : (
+                          <>
+                            <ImagePlus className="h-4 w-4 text-slate-400" />
+                            <span className="text-[8px] font-bold text-slate-500 text-center px-1">Damage Image</span>
+                          </>
+                        )}
                       </div>
-                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
-                        <ImagePlus className="h-4 w-4 text-slate-400" />
-                        <span className="text-[8px] font-bold text-slate-500 text-center px-1">Pre-Clean</span>
+                      
+                      <div 
+                        className={cn(
+                          "aspect-square rounded-xl border border-dashed flex items-center justify-center flex-col gap-1.5 cursor-pointer transition-colors",
+                          preCleanImage ? "bg-emerald-50 border-emerald-300" : "bg-slate-100 border-slate-300 hover:bg-slate-200"
+                        )}
+                        onClick={() => preCleanImageInputRef.current?.click()}
+                      >
+                        {preCleanImage ? (
+                          <div className="text-[10px] font-bold text-emerald-600 flex flex-col items-center gap-1">
+                            <Check className="h-4 w-4" />
+                            <span>READY</span>
+                          </div>
+                        ) : (
+                          <>
+                            <ImagePlus className="h-4 w-4 text-slate-400" />
+                            <span className="text-[8px] font-bold text-slate-500 text-center px-1">Pre-Clean</span>
+                          </>
+                        )}
                       </div>
-                      <div className="aspect-square rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center flex-col gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
+                      
+                      <div className="aspect-square rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center flex-col gap-1.5 opacity-50 cursor-not-allowed">
                         <ImagePlus className="h-4 w-4 text-slate-400" />
                         <span className="text-[8px] font-bold text-slate-500 text-center px-1">Post-Clean</span>
                       </div>
@@ -1667,22 +1781,7 @@ export default function AdminDashboardPage() {
                           "font-bold h-11 rounded-xl bg-white",
                           issueRootCause ? "text-emerald-600 border-emerald-200 hover:bg-emerald-50" : "text-slate-300 border-slate-100"
                         )}
-                        onClick={async () => {
-                          try {
-                            await dashboardApi.updateIssue(selectedIssue.id, { 
-                              action: 'resolve',
-                              rootCause: issueRootCause as any
-                            });
-                            toast.success("Issue resolved", {
-                              description: `Root cause identified as ${issueRootCause}`
-                            });
-                            setSelectedIssue(null);
-                            setIssueRootCause(null);
-                            fetchDashboard();
-                          } catch (err: any) {
-                            toast.error("Failed to resolve issue");
-                          }
-                        }}
+                        onClick={handleResolveWithClaim}
                       >
                         Resolve with Cause
                       </Button>
