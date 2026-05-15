@@ -210,19 +210,22 @@ function RidersContent() {
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-          <Table className="min-w-[1600px] w-full">
+          <Table className="min-w-[1500px] w-full">
             <TableHeader><TableRow className="hover:bg-slate-50/50 border-none bg-slate-50/50">
             <TableHead className="w-[40px] pl-4"><Checkbox checked={selectedRiders.length === filtered.length && filtered.length > 0} onCheckedChange={(val) => val ? setSelectedRiders(filtered.map(r => r.id)) : setSelectedRiders([])} /></TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider w-[14%]">Rider & Contact</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider w-[12%]">Assigned Area / Vendor</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[9%]">Deliveries</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[7%]">Active</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[8%]">On-Time %</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[8%]">Avg Delay</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[8%]">Rating & Quality</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider w-[8%]">Capacity</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[9%]">Earnings (Week)</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center w-[7%]">Status</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Rider Name</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Contact</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Area</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Vendor</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Deliveries (Month)</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Active Orders</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Customer Rating</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">On-Time (%)</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Late Delivery %</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Failed Pickups</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Avg Pickup Delay</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Earnings (Week)</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="w-[50px] pr-4"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
@@ -239,116 +242,116 @@ function RidersContent() {
                 suspended: { dot: "⚫", label: "Suspended", color: "text-slate-500" },
               };
               const avail = availMap[p.availability] || availMap.offline;
-              const loadPct = p.maxCapacity > 0 ? Math.round((p.activeOrders / p.maxCapacity) * 100) : 0;
 
               return (
               <TableRow key={r.id} className={cn("hover:bg-slate-50 transition-colors cursor-pointer border-slate-100", isSelected && "bg-emerald-50/30")}>
                 <TableCell className="pl-4"><Checkbox checked={isSelected} onCheckedChange={(val) => val ? setSelectedRiders(prev => [...prev, r.id]) : setSelectedRiders(prev => prev.filter(id => id !== r.id))} onClick={(e) => e.stopPropagation()} /></TableCell>
-                {/* Rider Name + Contact */}
+                
+                {/* Rider Name */}
                 <TableCell className="py-4" onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">{(r.name || "?").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                    <div className="space-y-0.5">
+                    <Avatar className="h-9 w-9 border shadow-sm"><AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">{(r.name || "?").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                    <div>
                       <p className="font-bold text-slate-900 text-sm">{r.name}</p>
-                      <Badge className={cn("text-[9px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md border-none", getRiderTypeColor(p.type))}>{p.type}</Badge>
-                      <p className="text-[10px] text-slate-400 flex items-center gap-1"><Phone className="h-2.5 w-2.5" /> {r.phone}</p>
+                      <Badge className={cn("text-[8px] font-black uppercase tracking-tighter px-1 py-0 rounded-md border-none", getRiderTypeColor(p.type))}>{p.type}</Badge>
                     </div>
                   </div>
                 </TableCell>
-                {/* Assigned Area / Vendor */}
+
+                {/* Contact */}
+                <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-slate-700 flex items-center gap-1"><Phone className="h-2.5 w-2.5 text-slate-400" /> {r.phone}</p>
+                    <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{r.email}</p>
+                  </div>
+                </TableCell>
+
+                {/* Assigned Area */}
                 <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold text-slate-700 flex items-center gap-1"><MapPin className="h-3 w-3 text-slate-400" /> {p.zone}</p>
-                    {p.cluster && <p className="text-[9px] text-blue-500 font-semibold">Zone: {p.cluster}</p>}
-                    <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1"><Store className="h-2.5 w-2.5" /> {p.assignedVendor}</p>
+                    <p className="text-[9px] text-blue-500 font-semibold">{p.cluster}</p>
                   </div>
                 </TableCell>
-                {/* Deliveries */}
+
+                {/* Assigned Vendor */}
+                <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
+                  <p className="text-xs font-medium text-slate-600 flex items-center gap-1"><Store className="h-3 w-3 text-slate-400" /> {p.assignedVendor}</p>
+                </TableCell>
+
+                {/* Deliveries (Month) */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-slate-900">{p.deliveriesToday} <span className="text-slate-400 text-[10px] font-medium">today</span></p>
-                    <p className="text-[10px] text-slate-500">{p.deliveriesMonth} this month</p>
-                    <p className="text-[10px] text-slate-400">{p.deliveries} total</p>
-                    {p.failedPickups > 0 && <p className="text-[9px] text-red-500 font-bold">⚠️ {p.failedPickups} failed</p>}
+                    <p className="text-sm font-bold text-slate-900">{p.deliveriesMonth}</p>
+                    <p className="text-[9px] text-slate-400">{p.deliveriesToday} today</p>
                   </div>
                 </TableCell>
+
                 {/* Active Orders */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <p className="text-lg font-bold text-slate-900">{p.activeOrders}</p>
-                  <p className="text-[9px] text-slate-400">of {p.maxCapacity}</p>
+                  <p className="text-sm font-bold text-slate-900">{p.activeOrders}</p>
+                  <p className="text-[9px] text-slate-400">capacity: {p.maxCapacity}</p>
                 </TableCell>
-                {/* On-Time % */}
+
+                {/* Customer Rating */}
+                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                      <span className="text-sm font-bold text-slate-700">{p.rating}</span>
+                    </div>
+                    <Badge variant="outline" className={cn("text-[8px] font-black border-none", health.color)}>{health.label}</Badge>
+                  </div>
+                </TableCell>
+
+                {/* On-Time (%) */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
                   <Badge variant="outline" className={cn("font-bold text-[10px]", p.onTimePct >= 90 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : p.onTimePct >= 80 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{p.onTimePct}%</Badge>
-                  {p.lateDeliveryPct > 0 && <p className={cn("text-[9px] mt-0.5 font-bold", p.lateDeliveryPct > 8 ? "text-red-500" : "text-slate-400")}>{p.lateDeliveryPct}% late</p>}
                 </TableCell>
+
+                {/* Late Delivery % */}
+                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                   <p className={cn("text-sm font-bold", p.lateDeliveryPct > 8 ? "text-red-600" : "text-slate-600")}>{p.lateDeliveryPct}%</p>
+                </TableCell>
+
+                {/* Failed Pickups */}
+                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                   <p className={cn("text-sm font-bold", p.failedPickups > 0 ? "text-red-600" : "text-slate-600")}>{p.failedPickups}</p>
+                   {p.failedPickups > 0 && <span className="text-[8px] font-black text-red-400 uppercase">Alert</span>}
+                </TableCell>
+
                 {/* Avg Pickup Delay */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <p className={cn("text-sm font-bold", p.avgPickupDelay > 10 ? "text-red-600" : p.avgPickupDelay > 5 ? "text-amber-600" : "text-emerald-600")}>{p.avgPickupDelay} min</p>
-                  {p.avgPickupDelay > 10 && <p className="text-[8px] text-red-500 font-bold">⚠️ High</p>}
+                  <p className={cn("text-sm font-bold", p.avgPickupDelay > 10 ? "text-red-600" : "text-emerald-600")}>{p.avgPickupDelay} min</p>
                 </TableCell>
-                {/* Rating & Quality */}
+
+                {/* Earnings (This Week) */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center justify-center gap-1">
-                      <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                      <span className="text-sm font-bold text-slate-700">{p.rating}</span>
-                      {p.ratingTrend === "up" ? <TrendingUp className="h-2.5 w-2.5 text-emerald-500" /> : <TrendingDown className="h-2.5 w-2.5 text-red-500" />}
-                    </div>
-                    <Badge variant="outline" className={cn("border-none font-bold text-[8px] px-1 py-0", health.color)}>{health.label}</Badge>
-                  </div>
+                  <p className="font-bold text-[#3E8940] text-sm">{formatINR(p.earningsWeek)}</p>
                 </TableCell>
-                {/* Capacity */}
-                <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
-                  <div>
-                    <div className="flex items-center gap-1 mb-1">
-                      <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", loadPct > 85 ? "bg-red-500" : loadPct > 60 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${Math.min(loadPct, 100)}%` }} />
-                      </div>
-                      <span className="text-[9px] text-slate-500 font-bold">{loadPct}%</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400">{p.activeOrders}/{p.maxCapacity} orders</p>
-                    {loadPct > 85 && <p className="text-[8px] text-red-500 font-bold">⚠️ Overloaded</p>}
-                  </div>
-                </TableCell>
-                {/* Earnings (Week) */}
+
+                {/* Status */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <div className="space-y-0.5">
-                    <p className="font-bold text-[#3E8940] text-sm">{formatINR(p.earningsWeek)}</p>
-                    <p className="text-[9px] text-orange-500 font-semibold">Pending: {formatINR(p.earningsPending)}</p>
-                    {p.incentivesPending > 0 && <p className="text-[9px] text-blue-500">+{formatINR(p.incentivesPending)} incentive</p>}
-                  </div>
-                </TableCell>
-                {/* Availability Status */}
-                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <div className="space-y-1 flex flex-col items-center">
+                  <div className="flex flex-col items-center">
                     <p className={cn("text-xs font-bold flex items-center gap-1", avail.color)}>
                       <span>{avail.dot}</span> {avail.label}
                     </p>
-                    <p className={cn("text-[9px] font-medium", p.lastActive === "Online Now" ? "text-emerald-500" : "text-slate-400")}>
-                      <Activity className="h-2 w-2 inline" /> {p.lastActive}
-                    </p>
+                    <p className="text-[9px] text-slate-400">{p.lastActive}</p>
                   </div>
                 </TableCell>
+
                 {/* Actions */}
                 <TableCell className="pr-4 text-right">
                   <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="rounded-xl w-52">
                       <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/rider/${r.id}`); }}><Eye className="h-4 w-4" /> View Details</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/rider/${r.id}?tab=deliveries`); }}><Bike className="h-4 w-4" /> View Deliveries</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); router.push(`/rider/${r.id}?tab=earnings`); }}><Wallet className="h-4 w-4" /> Earnings Breakdown</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); }}><Store className="h-4 w-4" /> Assign Vendor</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); }}><MapPin className="h-4 w-4" /> Assign Zone</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); }}><CreditCard className="h-4 w-4" /> Process Settlement</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); }}><Bell className="h-4 w-4" /> Send Alert</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 text-amber-600" onClick={(e) => { e.stopPropagation(); toast.info("Rider marked as inactive"); }}><Clock className="h-4 w-4" /> Mark Inactive</DropdownMenuItem>
                       <DropdownMenuItem className="gap-2 text-red-600" onClick={(e) => { e.stopPropagation(); handleBlock(r); }}><Ban className="h-4 w-4" /> {r.isBlocked ? "Unblock" : "Block"} Access</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
               );
-            }) : <TableRow><TableCell colSpan={12} className="h-48 text-center text-slate-500"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 opacity-20" /> No riders found matching your criteria.</TableCell></TableRow>}
+            }) : <TableRow><TableCell colSpan={14} className="h-48 text-center text-slate-500">No riders found.</TableCell></TableRow>}
           </TableBody>
         </Table>
         </div>

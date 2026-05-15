@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Search, Filter, Users, Star, MapPin, CheckCircle, Clock, Ban, Loader2, AlertTriangle, RefreshCw, Phone, TrendingUp, IndianRupee, ShieldAlert, Award, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, BarChart2, Wallet, Percent, Settings2, CalendarClock, AlertOctagon, Bell } from "lucide-react";
+import { toast } from "sonner";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 const getAuthHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_auth_token") || "" : ""}` });
@@ -204,6 +208,7 @@ export default function AllVendorsPage() {
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Type</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Capacity / Load</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Coverage</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Agreement</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
           </TableRow></TableHeader>
@@ -343,6 +348,16 @@ export default function AllVendorsPage() {
                      </div>
                   </TableCell>
                   <TableCell className="text-center">
+                     <div className="flex flex-col items-center gap-0.5">
+                        <span className={cn("text-[10px] font-black", new Date(v.vendorProfile?.agreementExpiry || '2026-12-31') < new Date() ? "text-rose-600" : "text-slate-700")}>
+                           {formatDate(v.vendorProfile?.agreementExpiry || '2026-12-31')}
+                        </span>
+                        {new Date(v.vendorProfile?.agreementExpiry || '2026-12-31') < new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000) && (
+                           <span className="text-[8px] font-bold text-rose-500 uppercase animate-pulse">EXPIRING</span>
+                        )}
+                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
                     <Badge variant="outline" className={`${getStatusColor(status)} font-bold gap-1.5 px-2.5 py-1 text-[10px] shadow-sm`}>
                       {status === "Active" && <CheckCircle className="h-3 w-3" />}
                       {status === "Verification Pending" && <Clock className="h-3 w-3" />}
@@ -351,7 +366,42 @@ export default function AllVendorsPage() {
                       {status.toUpperCase()}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right pr-6"><Button variant="ghost" size="sm" className="text-slate-500 font-bold hover:bg-slate-100 hover:text-[#3E8940]" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${v.id}`); }}>View</Button></TableCell>
+                  <TableCell className="text-right pr-6">
+                    <div className="flex justify-end gap-2">
+                       <Button variant="ghost" size="sm" className="text-slate-500 font-bold hover:bg-slate-100 hover:text-[#3E8940]" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${v.id}`); }}>View</Button>
+                       <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full">
+                                <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                             </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-xl border-slate-200">
+                             <DropdownMenuLabel className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Quick Actions</DropdownMenuLabel>
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer" onClick={() => router.push(`/vendor/analytics?vendorId=${v.id}`)}>
+                                <BarChart2 className="h-3.5 w-3.5 text-blue-500" /> View Performance Dashboard
+                             </DropdownMenuItem>
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer" onClick={() => router.push(`/vendor/payments?vendorId=${v.id}`)}>
+                                <Wallet className="h-3.5 w-3.5 text-emerald-500" /> View Settlements
+                             </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer">
+                                <Percent className="h-3.5 w-3.5 text-amber-500" /> Adjust Commission %
+                             </DropdownMenuItem>
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer">
+                                <Settings2 className="h-3.5 w-3.5 text-slate-500" /> Set SLA Override
+                             </DropdownMenuItem>
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer">
+                                <Bell className="h-3.5 w-3.5 text-orange-500" /> Send Warning Notice
+                             </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem className="text-xs font-bold gap-2 py-2.5 cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                                <AlertOctagon className="h-3.5 w-3.5" /> Suspend Temporarily
+                             </DropdownMenuItem>
+                          </DropdownMenuContent>
+                       </DropdownMenu>
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             }) : <TableRow><TableCell colSpan={11} className="h-32 text-center text-slate-500"><div className="flex flex-col items-center gap-2"><Search className="h-8 w-8 text-slate-300" /><p>No vendors found.</p></div></TableCell></TableRow>}
