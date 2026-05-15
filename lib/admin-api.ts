@@ -236,6 +236,25 @@ export const adminCatalogApi = {
         });
         if (!res.ok) throw new Error('Failed to save price overrides');
         return res.json();
+    },
+    getAvailabilityRules: async (entityType?: string, cityCode?: string) => {
+        const params = new URLSearchParams();
+        if (entityType) params.append('entityType', entityType);
+        if (cityCode) params.append('cityCode', cityCode);
+        const query = params.toString();
+        const url = `${CATALOG_API_URL}/availability-rules${query ? '?' + query : ''}`;
+        const res = await apiFetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch availability rules');
+        return res.json();
+    },
+    saveAvailabilityRules: async (rules: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/availability-rules`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ rules })
+        });
+        if (!res.ok) throw new Error('Failed to save availability rules');
+        return res.json();
     }
 };
 

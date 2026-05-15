@@ -367,15 +367,16 @@ export default function MasterItemsPage() {
   const handleArchive = async (id: string) => {
     if (
       !confirm(
-        "Archive this item? It will become inactive instead of being permanently deleted.",
+        "Move this item to Archive? It will be hidden from customers but remain in the database for records.",
       )
     ) {
       return;
     }
 
     try {
-      await adminCatalogApi.deleteItem(id);
-      toast.success("Item archived");
+      // Use soft-delete (isActive: false) for archiving
+      await adminCatalogApi.updateItem(id, { isActive: false });
+      toast.success("Item moved to Archive");
       fetchData();
     } catch (error) {
       console.error(error);
@@ -397,7 +398,7 @@ export default function MasterItemsPage() {
     const financials = computeFinancials(formData);
     if (financials.isLoss) {
       const shouldContinue = confirm(
-        "Vendor share is greater than or equal to app price. Continue anyway?",
+        "⚠️ Vendor payout exceeds platform margin. This will result in a loss-making item. Continue anyway?",
       );
       if (!shouldContinue) return;
     }
@@ -837,45 +838,45 @@ export default function MasterItemsPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[1500px]">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+          <Table className="min-w-[1300px]">
             <TableHeader className="bg-[#fbfbfb]">
               <TableRow className="border-none">
-                <TableHead className="w-[80px] text-[10px] font-bold uppercase text-[#4FA851] py-4 pl-6">
-                  Image
+                <TableHead className="w-[60px] text-[10px] font-bold uppercase text-[#4FA851] py-4 pl-6">
+                  IMAGE
                 </TableHead>
-                <TableHead className="w-[200px] text-[10px] font-bold uppercase text-[#4FA851] py-4">
-                  Item Name
-                </TableHead>
-                <TableHead className="w-[120px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Category
+                <TableHead className="w-[170px] text-[10px] font-bold uppercase text-[#4FA851] py-4">
+                  ITEM NAME
                 </TableHead>
                 <TableHead className="w-[100px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Service
+                  CATEGORY
                 </TableHead>
-                <TableHead className="w-[150px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  CUSTOMER PRICE ( APP PRICE )
+                <TableHead className="w-[80px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                  SERVICE
+                </TableHead>
+                <TableHead className="w-[130px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                  CUSTOMER PRICE (APP PRICE)
+                </TableHead>
+                <TableHead className="w-[90px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                  VENDOR SHARE
                 </TableHead>
                 <TableHead className="w-[120px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Vendor Share
+                  PLATFORM COMMISSION
                 </TableHead>
-                <TableHead className="w-[140px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Platform Commission
+                <TableHead className="w-[90px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                  TAX (GST)
                 </TableHead>
-                <TableHead className="w-[120px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  TAX ( GST )
-                </TableHead>
-                <TableHead className="w-[150px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                <TableHead className="w-[130px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
                   NET PLATFORM MARGIN
                 </TableHead>
-                <TableHead className="w-[120px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Updated
+                <TableHead className="w-[130px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
+                  LAST UPDATED
                 </TableHead>
                 <TableHead className="w-[100px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-center">
-                  Status
+                  STATUS
                 </TableHead>
-                <TableHead className="w-[100px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-right pr-6">
-                  Actions
+                <TableHead className="w-[80px] text-[10px] font-bold uppercase text-[#4FA851] py-4 text-right pr-6">
+                  ACTIONS
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -990,11 +991,15 @@ export default function MasterItemsPage() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center text-xs text-slate-500">
-                        <p>{item.updatedByAdminName || "Admin"}</p>
-                        <p className="text-[10px] text-slate-400">
-                          {formatDate(item.updatedAt)}
-                        </p>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-0.5 text-[10px]">
+                          <span className="font-bold text-slate-600">
+                            {item.updatedByAdminName || "Admin"}
+                          </span>
+                          <span className="text-slate-400">
+                            {formatDate(item.updatedAt)}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -1280,9 +1285,8 @@ export default function MasterItemsPage() {
               {formFinancials.isLoss ? (
                 <div className="mt-3 flex items-start gap-2 rounded bg-red-100/50 p-2">
                   <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <p className="text-[10px] text-red-600 font-bold leading-tight">
-                    Vendor payout exceeds or equals app price. This can create a
-                    loss-making item.
+                  <p className="text-[10px] text-red-600 font-bold leading-tight uppercase tracking-tight">
+                    ⚠️ Vendor payout exceeds platform margin.
                   </p>
                 </div>
               ) : null}

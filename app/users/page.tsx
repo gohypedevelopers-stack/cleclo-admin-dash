@@ -36,6 +36,10 @@ import {
   CircleDollarSign,
   PackageCheck,
   MapPin,
+  Undo,
+  MessageSquare,
+  Percent,
+  PowerOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -525,47 +529,56 @@ function UsersPageContent() {
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{roleFilter === "vendor" ? "Vendor" : roleFilter === "rider" ? "Rider" : roleFilter === "admin" ? "Admin" : roleFilter === "customer" ? "Customer" : "User"} List</h2>
         </div>
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-          <Table className="min-w-[1200px] w-full table-fixed">
+          <Table className="w-full">
           <TableHeader>
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[14%]">{roleFilter === "vendor" ? "Vendor" : roleFilter === "rider" ? "Rider" : "User"}</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Contact</TableHead>
-              {roleFilter === "all" && <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Role</TableHead>}
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%]">Status</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[9%]">{roleFilter === "vendor" ? "Wallet (Payout)" : "Wallet (Balance)"}</TableHead>
-              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Activity</TableHead>
-              {/* Customer columns */}
-              {(roleFilter === "customer" || roleFilter === "all") && (
+              <TableHead className="py-4 pl-6 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[18%]">
+                {roleFilter === "vendor" ? "Vendor" : roleFilter === "rider" ? "Rider" : roleFilter === "admin" ? "Admin" : "User"}
+              </TableHead>
+              
+              {/* Customer Intelligence */}
+              {roleFilter === "customer" ? (
                 <>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Avg Value</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Last Order</TableHead>
-                  {roleFilter === "customer" && <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">Refunds</TableHead>}
-                  {roleFilter === "customer" && <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Complaints</TableHead>}
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Total Spend</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Avg Value</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Wallet Balance</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Last Order</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Refunds</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Complaints</TableHead>
+                </>
+              ) : roleFilter === "vendor" ? (
+                <>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[11%]">Total Revenue</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[11%]">Commission</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Payout Due</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Avg SLA</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Rating</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Issue Rate</TableHead>
+                </>
+              ) : roleFilter === "rider" ? (
+                <>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%] text-center">Deliveries</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%] text-center">On-time %</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%] text-center">Avg Delay</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">Assigned Vendor</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Earnings</TableHead>
+                </>
+              ) : roleFilter === "admin" ? (
+                <>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[20%]">Contact</TableHead>
+                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">Joined Date</TableHead>
+                </>
+              ) : (
+                <>
+                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">Contact</TableHead>
+                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Role</TableHead>
+                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%] text-center">Activity</TableHead>
+                   <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Wallet / Due</TableHead>
                 </>
               )}
-              {/* Vendor columns */}
-              {roleFilter === "vendor" && (
-                <>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Revenue</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Commission</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">SLA</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[5%] text-center">Rating</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[6%] text-center">Issues</TableHead>
-                </>
-              )}
-              {/* Rider columns */}
-              {roleFilter === "rider" && (
-                <>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%] text-center">Deliveries</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">On-time %</TableHead>
-                  <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%] text-center">Avg Delay</TableHead>
-                </>
-              )}
-              {/* Admin/generic joined */}
-              {(roleFilter === "admin") && (
-                <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Joined</TableHead>
-              )}
-              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[7%]">Actions</TableHead>
+
+              <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">Status</TableHead>
+              <TableHead className="py-4 pr-6 text-right font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[8%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -576,7 +589,7 @@ function UsersPageContent() {
                 const totalSpent = user.totalSpent || 0;
                 const orders = user.totalOrders || 0;
                 const avgValue = user.avgOrderValue || 0;
-                const lastOrder = user.lastOrderDate ? formatRelativeDate(user.lastOrderDate) : "Never";
+                const lastOrderDate = user.lastOrderDate;
                 const refunds = user.refundCount || 0;
                 const complaints = user.complaintCount || 0;
                 const walletBal = user.wallet?.balance || 0;
@@ -596,20 +609,24 @@ function UsersPageContent() {
                 const riderOnTime = rp?.onTimePercent || 0;
                 const riderDelay = rp?.avgPickupDelay || 0;
 
-                // Risk indicators
+                // Risk indicators (Dynamic from Backend Source of Truth)
+                const risks = (user as any).riskIndicators || {};
+                const isHighRefund = risks.isHighRefund;
+                const isHighComplaints = risks.isHighComplaints;
+                const isSLABreach = risks.isSLABreach;
+                const isHighIssueRate = risks.isHighIssueRate;
+                const isFrequentDelay = risks.isFrequentDelay;
+                const isLowOnTime = risks.isLowOnTime;
+
                 const isVIP = user.role === "customer" && totalSpent > 10000;
-                const isFraudProne = user.role === "customer" && refunds >= 2;
                 const lastOrderDays = user.lastOrderDate
                   ? Math.floor((new Date().getTime() - new Date(user.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
                   : null;
                 const isDormant = user.role === "customer" && lastOrderDays !== null && lastOrderDays > 30;
-                const vendorSLABreach = user.role === "vendor" && vendorSLA > 0 && vendorSLA < 70;
-                const vendorHighIssue = user.role === "vendor" && vendorIssueRate > 5;
-                const riderFreqDelay = user.role === "rider" && riderDelay > 15;
-                const riderLowOnTime = user.role === "rider" && riderOnTime > 0 && riderOnTime < 80;
 
                 return (
                   <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => handleViewDetails(user)}>
+                    {/* Common User Info */}
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 border shadow-sm">
@@ -627,61 +644,40 @@ function UsersPageContent() {
                           <div className="flex flex-wrap items-center gap-1">
                             <p className="font-semibold text-gray-900 text-xs truncate">{displayName}</p>
                             {isVIP && <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[8px] h-3 px-1 font-black leading-none">VIP</Badge>}
-                            {isFraudProne && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ RISK</Badge>}
                             {isDormant && <Badge className="bg-slate-100 text-slate-500 border-slate-200 text-[8px] h-3 px-1 font-black leading-none">DORMANT</Badge>}
-                            {vendorSLABreach && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ SLA</Badge>}
-                            {vendorHighIssue && <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ ISSUES</Badge>}
-                            {riderFreqDelay && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ DELAYS</Badge>}
-                            {riderLowOnTime && <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ LATE</Badge>}
+                            
+                            {/* Proactive Risk Badges */}
+                            {isHighRefund && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ HIGH REFUNDS</Badge>}
+                            {isHighComplaints && <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ COMPLAINTS</Badge>}
+                            {isSLABreach && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ SLA BREACH</Badge>}
+                            {isHighIssueRate && <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ HIGH ISSUES</Badge>}
+                            {isFrequentDelay && <Badge className="bg-red-100 text-red-700 border-red-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ FREQUENT DELAYS</Badge>}
+                            {isLowOnTime && <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[8px] h-3 px-1 font-black leading-none">⚠️ LOW ON-TIME</Badge>}
                           </div>
                           <p className="text-[9px] text-slate-400 font-medium">ID: {user.id.slice(-6).toUpperCase()}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        {user.email && <p className="text-[11px] text-slate-600 truncate max-w-[150px]">{user.email}</p>}
-                        <p className="text-[11px] text-slate-500 font-medium">{user.phone}</p>
-                      </div>
-                    </TableCell>
-                    {roleFilter === "all" && <TableCell>{getRoleBadge(user.role)}</TableCell>}
-                    <TableCell>
-                      <Badge className={`${getStatusColor(status)} border font-bold text-[9px] shadow-none rounded-full px-2`}>{status}</Badge>
-                    </TableCell>
-                    {/* Wallet with role-aware label */}
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-xs text-slate-900">{user.role === "vendor" ? formatINR(vendorPayout) : formatINR(walletBal)}</p>
-                        <p className="text-[9px] text-slate-400">{user.role === "vendor" ? "Payout Due" : user.role === "rider" ? "Earnings" : "Balance"}</p>
-                      </div>
-                    </TableCell>
-                    {/* Combined Activity Intelligence */}
-                    <TableCell className="text-center">
-                      <p className="text-xs font-bold text-slate-800">{orders} <span className="text-slate-400 font-medium">Orders</span></p>
-                      <p className="text-[10px] text-emerald-600 font-semibold">{formatINR(totalSpent)}</p>
-                    </TableCell>
-                    {/* Customer columns */}
-                    {(roleFilter === "customer" || roleFilter === "all") && (
+
+                    {/* Role-Specific Intelligence Columns */}
+                    {roleFilter === "customer" ? (
                       <>
-                        <TableCell className="font-medium text-slate-600 text-xs">{formatINR(avgValue)}</TableCell>
-                        <TableCell className="text-[11px] text-slate-500">{lastOrder}</TableCell>
-                        {roleFilter === "customer" && (
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className={cn("font-bold text-[10px]", refunds > 0 ? "text-red-600 border-red-200 bg-red-50" : "text-slate-400 border-slate-100")}>{refunds}</Badge>
-                          </TableCell>
-                        )}
-                        {roleFilter === "customer" && (
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className={cn("font-bold text-[10px]", complaints > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-slate-400 border-slate-100")}>{complaints}</Badge>
-                          </TableCell>
-                        )}
+                        <TableCell className="font-bold text-xs text-slate-800">{formatINR(totalSpent)}</TableCell>
+                        <TableCell className="text-xs text-slate-600 font-medium">{formatINR(avgValue)}</TableCell>
+                        <TableCell className="font-bold text-xs text-indigo-600">{formatINR(walletBal)}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{lastOrderDate ? formatDate(lastOrderDate) : "—"}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn("font-bold text-[10px]", refunds > 0 ? "text-red-600 border-red-200 bg-red-50" : "text-slate-400 border-slate-100")}>{refunds}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn("font-bold text-[10px]", complaints > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-slate-400 border-slate-100")}>{complaints}</Badge>
+                        </TableCell>
                       </>
-                    )}
-                    {/* Vendor columns */}
-                    {roleFilter === "vendor" && (
+                    ) : roleFilter === "vendor" ? (
                       <>
                         <TableCell className="font-bold text-emerald-700 text-xs">{formatINR(vendorRevenue)}</TableCell>
                         <TableCell className="font-semibold text-purple-700 text-xs">{formatINR(vendorCommission)}</TableCell>
+                        <TableCell className="font-bold text-orange-700 text-xs">{formatINR(vendorPayout)}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn("font-bold text-[10px]", vendorSLA >= 85 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : vendorSLA >= 70 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{vendorSLA}%</Badge>
                         </TableCell>
@@ -695,21 +691,54 @@ function UsersPageContent() {
                           <Badge variant="outline" className={cn("font-bold text-[10px]", vendorIssueRate > 5 ? "text-red-600 border-red-200 bg-red-50" : vendorIssueRate > 2 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-emerald-600 border-emerald-200 bg-emerald-50")}>{vendorIssueRate.toFixed(1)}%</Badge>
                         </TableCell>
                       </>
-                    )}
-                    {/* Rider columns */}
-                    {roleFilter === "rider" && (
+                    ) : roleFilter === "rider" ? (
                       <>
                         <TableCell className="text-center font-bold text-xs text-slate-700">{riderDeliveries}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn("font-bold text-[10px]", riderOnTime >= 90 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : riderOnTime >= 75 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{riderOnTime}%</Badge>
                         </TableCell>
                         <TableCell className="text-center text-xs text-slate-600">{riderDelay > 0 ? `${riderDelay} min` : "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Store className="h-3 w-3 text-slate-400" />
+                            <span className="text-[11px] font-medium text-slate-600">{rp?.assignedVendorName || "Unassigned"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-bold text-xs text-slate-900">{formatINR(walletBal)}</TableCell>
+                      </>
+                    ) : roleFilter === "admin" ? (
+                      <>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            {user.email && <p className="text-[11px] text-slate-600 truncate max-w-[150px]">{user.email}</p>}
+                            <p className="text-[11px] text-slate-500 font-medium">{user.phone}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500">{formatDate(user.createdAt)}</TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            {user.email && <p className="text-[11px] text-slate-600 truncate max-w-[150px]">{user.email}</p>}
+                            <p className="text-[11px] text-slate-500 font-medium">{user.phone}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getRoleBadge(user.role)}</TableCell>
+                        <TableCell className="text-center">
+                          <p className="text-xs font-bold text-slate-800">{orders} <span className="text-slate-400 font-medium">Orders</span></p>
+                          <p className="text-[10px] text-emerald-600 font-semibold">{formatINR(totalSpent)}</p>
+                        </TableCell>
+                        <TableCell className="font-bold text-xs text-slate-700">
+                          {user.role === 'vendor' ? formatINR(vendorPayout) : formatINR(walletBal)}
+                        </TableCell>
                       </>
                     )}
-                    {/* Admin joined */}
-                    {(roleFilter === "admin") && (
-                      <TableCell className="text-xs text-slate-500">{formatDate(user.createdAt)}</TableCell>
-                    )}
+
+                    {/* Common Status & Actions */}
+                    <TableCell>
+                      <Badge className={`${getStatusColor(status)} border font-bold text-[9px] shadow-none rounded-full px-2`}>{status}</Badge>
+                    </TableCell>
 
                     <TableCell className="pr-6 text-right">
                       <DropdownMenu>
@@ -718,12 +747,15 @@ function UsersPageContent() {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl w-48">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(user); }} className="gap-2">
+                        <DropdownMenuContent align="end" className="rounded-xl w-52">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(user); }} className="gap-2 font-medium bg-slate-50">
                             <Eye className="h-4 w-4" /> View Details
                           </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
+
                           {/* Customer-specific actions */}
-                          {(user.role === "customer") && (
+                          {user.role === "customer" && (
                             <>
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/orders?userId=${user.id}`); }} className="gap-2">
                                 <ShoppingBag className="h-4 w-4" /> View Orders
@@ -731,13 +763,17 @@ function UsersPageContent() {
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/users/${user.id}?tab=wallet`); }} className="gap-2">
                                 <Wallet className="h-4 w-4" /> Add Wallet Credit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/users/${user.id}?tab=wallet`); }} className="gap-2">
-                                <CreditCard className="h-4 w-4" /> Issue Refund
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 text-indigo-600">
+                                <Undo className="h-4 w-4" /> Issue Refund
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/support?userId=${user.id}`); }} className="gap-2">
+                                <MessageSquare className="h-4 w-4" /> View Complaints
                               </DropdownMenuItem>
                             </>
                           )}
+
                           {/* Vendor-specific actions */}
-                          {(user.role === "vendor") && (
+                          {user.role === "vendor" && (
                             <>
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${user.id}?tab=performance`); }} className="gap-2">
                                 <BarChart3 className="h-4 w-4" /> View Performance
@@ -745,32 +781,41 @@ function UsersPageContent() {
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/settlements?vendorId=${user.id}`); }} className="gap-2">
                                 <IndianRupee className="h-4 w-4" /> View Settlements
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${user.id}?tab=commission`); }} className="gap-2">
-                                <TrendingUp className="h-4 w-4" /> Change Commission
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2">
+                                <Percent className="h-4 w-4" /> Change Commission
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${user.id}?tab=area`); }} className="gap-2">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2">
                                 <MapPin className="h-4 w-4" /> Assign Area
                               </DropdownMenuItem>
                             </>
                           )}
+
                           {/* Rider-specific actions */}
-                          {(user.role === "rider") && (
+                          {user.role === "rider" && (
                             <>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/orders?riderId=${user.id}`); }} className="gap-2">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2">
+                                <Store className="h-4 w-4" /> Assign Vendor
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2">
                                 <Truck className="h-4 w-4" /> View Deliveries
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/users/${user.id}?tab=assign`); }} className="gap-2">
-                                <Store className="h-4 w-4" /> Assign Vendor
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockUser(user.id, Boolean(user.isBlocked)); }} className="gap-2 text-red-600">
+                                <PowerOff className="h-4 w-4" /> Mark Inactive
                               </DropdownMenuItem>
                             </>
                           )}
+
                           <DropdownMenuSeparator />
+                          
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setResetPasswordUser(user); setIsResetModalOpen(true); }} className="gap-2 text-amber-600 font-medium">
                             <RefreshCw className="h-4 w-4" /> Reset Password
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockUser(user.id, Boolean(user.isBlocked)); }} className={`gap-2 ${user.isBlocked ? "text-emerald-600" : "text-red-600"}`}>
-                            <Ban className="h-4 w-4" /> {user.isBlocked ? "Unblock" : "Block"} Access
-                          </DropdownMenuItem>
+                          
+                          {user.role !== "rider" && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockUser(user.id, Boolean(user.isBlocked)); }} className={`gap-2 ${user.isBlocked ? "text-emerald-600" : "text-red-600"}`}>
+                              <Ban className="h-4 w-4" /> {user.isBlocked ? "Unblock Access" : user.role === "vendor" ? "Suspend Vendor" : "Block Access"}
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -779,7 +824,7 @@ function UsersPageContent() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={20} className="h-32 text-center text-slate-500">No results found.</TableCell>
+                <TableCell colSpan={10} className="h-32 text-center text-slate-500">No results found.</TableCell>
               </TableRow>
             )}
           </TableBody>
