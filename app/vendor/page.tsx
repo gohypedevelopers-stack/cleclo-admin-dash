@@ -26,6 +26,7 @@ import {
   CreditCard,
   CheckCircle2,
   AlertCircle,
+  IndianRupee,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +98,23 @@ const getStatusColor = (status: string) => {
     default:
       return "bg-gray-100 text-gray-700";
   }
+};
+
+const getVendorTier = (v: any) => {
+  // Use performanceTier from backend if available
+  if (v.performanceTier) return v.performanceTier;
+  if (v.vendorProfile?.performanceTier) return v.vendorProfile.performanceTier;
+
+  const sla = v.sla || v.vendorProfile?.slaScore || 0;
+  const rating = v.rating || v.vendorProfile?.rating || 0;
+  
+  if (sla > 95 && rating > 4.7) 
+    return { tier: "GOLD", label: "Gold", badge: "🥇 Gold", color: "bg-amber-100 text-amber-700" };
+  if (sla >= 85 && sla <= 95) 
+    return { tier: "SILVER", label: "Silver", badge: "🥈 Silver", color: "bg-slate-100 text-slate-700" };
+  if (sla < 80) 
+    return { tier: "PROBATION", label: "Probation", badge: "⚠️ Probation", color: "bg-red-100 text-red-700" };
+  return { tier: "STANDARD", label: "Standard", badge: "Standard", color: "bg-blue-100 text-blue-700" };
 };
 
 export default function VendorDashboardPage() {
@@ -240,6 +258,61 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
+      {/* Global Financial Liability Summary (Source of Truth) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-[#3E8940] text-white border-none shadow-xl hover:scale-[1.02] transition-transform overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:scale-125 transition-transform">
+            <Wallet className="h-12 w-12" />
+          </div>
+          <CardContent className="p-5">
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Customer Wallet Balance</p>
+            <h3 className="text-2xl font-black mt-1">₹{Number(stats?.financialSummary?.totalCustomerWalletBalance || 0).toLocaleString('en-IN')}</h3>
+            <p className="text-white/50 text-[9px] mt-2 flex items-center gap-1 font-medium italic">
+              <ShieldCheck className="h-2.5 w-2.5" /> Platform liability to users
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-amber-500 text-white border-none shadow-xl hover:scale-[1.02] transition-transform overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:scale-125 transition-transform">
+            <CreditCard className="h-12 w-12" />
+          </div>
+          <CardContent className="p-5">
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Vendor Payout Due</p>
+            <h3 className="text-2xl font-black mt-1">₹{Number(stats?.financialSummary?.totalVendorPayoutDue || 0).toLocaleString('en-IN')}</h3>
+            <p className="text-white/50 text-[9px] mt-2 flex items-center gap-1 font-medium italic">
+              <Clock className="h-2.5 w-2.5" /> Awaiting settlement cycles
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-blue-600 text-white border-none shadow-xl hover:scale-[1.02] transition-transform overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:scale-125 transition-transform">
+            <TrendingUp className="h-12 w-12" />
+          </div>
+          <CardContent className="p-5">
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Revenue Generated</p>
+            <h3 className="text-2xl font-black mt-1">₹{Number(stats?.financialSummary?.totalGlobalRevenue || 0).toLocaleString('en-IN')}</h3>
+            <p className="text-white/50 text-[9px] mt-2 flex items-center gap-1 font-medium italic">
+              <BarChart3 className="h-2.5 w-2.5" /> Gross merchandise value
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-indigo-600 text-white border-none shadow-xl hover:scale-[1.02] transition-transform overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:scale-125 transition-transform">
+            <Zap className="h-12 w-12" />
+          </div>
+          <CardContent className="p-5">
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Commission Earned</p>
+            <h3 className="text-2xl font-black mt-1">₹{Number(stats?.financialSummary?.totalGlobalCommission || 0).toLocaleString('en-IN')}</h3>
+            <p className="text-white/50 text-[9px] mt-2 flex items-center gap-1 font-medium italic">
+              <ShieldCheck className="h-2.5 w-2.5" /> Platform net revenue
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Settlement Status Snapshot */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="bg-white border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
@@ -301,11 +374,19 @@ export default function VendorDashboardPage() {
           },
           {
             key: "revenue",
-            label: "Total Vendor Revenue",
+            label: "Total Revenue Generated",
             value: `₹${Number(stats?.totalRevenue || 0).toLocaleString("en-IN")}`,
             description: "Gross merchandise value",
             icon: Wallet,
             grad: "from-blue-600 to-blue-700",
+          },
+          {
+            key: "aov",
+            label: "Platform Avg Order Value",
+            value: `₹${Number(stats?.avgOrderValue || 0).toLocaleString("en-IN")}`,
+            description: "Overall efficiency metric",
+            icon: IndianRupee,
+            grad: "from-cyan-600 to-cyan-700",
           },
           {
             key: "commission_total",
@@ -333,17 +414,17 @@ export default function VendorDashboardPage() {
           },
           {
             key: "sla",
-            label: "Avg SLA %",
+            label: "Order Fulfilment Rate",
             value: `${Math.round(stats?.avgSla || 0)}%`,
-            description: "Service Level Agreement",
+            description: "Fulfilment vs Commitment",
             icon: CheckCircle,
             grad: "from-teal-600 to-teal-700",
           },
           {
             key: "issues",
-            label: "Avg Issue Rate",
-            value: `${Number(stats?.avgIssueRate || 0).toFixed(1)}%`,
-            description: "Quality complaints per order",
+            label: "Quality Intelligence",
+            value: `IR: ${Number(stats?.avgIssueRate || 0).toFixed(1)}% | DR: ${Number(stats?.avgDamageRate || 0).toFixed(1)}%`,
+            description: "Issue Rate (IR) vs Damage Rate (DR)",
             icon: AlertTriangle,
             grad: "from-rose-600 to-rose-700",
           },
@@ -357,9 +438,9 @@ export default function VendorDashboardPage() {
           },
           {
             key: "score",
-            label: "Composite Vendor Score",
+            label: "Composite Partner Health",
             value: `${(((stats?.avgRating || 0) / 5 * 100 + (stats?.avgSla || 0) + (100 - (stats?.avgIssueRate || 0))) / 3).toFixed(0)}%`,
-            description: `SLA: ${Math.round(stats?.avgSla || 0)}% | Rating: ${Number(stats?.avgRating || 0).toFixed(1)} | Issue: ${Number(stats?.avgIssueRate || 0).toFixed(1)}%`,
+            description: `Fulfilment: ${Math.round(stats?.avgSla || 0)}% | Rating: ${Number(stats?.avgRating || 0).toFixed(1)} | Issue: ${Number(stats?.avgIssueRate || 0).toFixed(1)}%`,
             icon: Star,
             grad: "from-amber-500 to-orange-600",
           },
@@ -740,7 +821,7 @@ export default function VendorDashboardPage() {
                   <p className="text-xs text-slate-500 font-medium">Business excellence based on this month's activity</p>
                </div>
             </div>
-            <Button variant="ghost" size="sm" className="text-[#3E8940] font-bold text-xs hover:bg-green-50">
+            <Button variant="ghost" size="sm" className="text-[#3E8940] font-bold text-xs hover:bg-green-100 hover:text-[#3E8940]">
                View Ranking Details
             </Button>
          </div>
@@ -769,35 +850,100 @@ export default function VendorDashboardPage() {
                         <div className="overflow-hidden">
                            <h3 className="font-bold text-slate-900 group-hover:text-[#3E8940] transition-colors truncate">{vendor.name}</h3>
                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <Badge className="bg-emerald-50 text-emerald-700 border-none font-bold text-[9px] py-0 h-4">PLATINUM</Badge>
-                              <div className="flex items-center text-[10px] font-bold text-amber-500">
-                                 <Star className="h-3 w-3 fill-amber-500" /> {vendor.rating.toFixed(1)}
-                              </div>
+                              {(() => {
+                                 const tier = getVendorTier(vendor);
+                                 return (
+                                    <Badge className={`${tier.color} border-none font-bold text-[9px] py-0 h-4 gap-1`}>
+                                       {tier.badge}
+                                    </Badge>
+                                 );
+                              })()}
                            </div>
                         </div>
                      </div>
 
-                     <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50 transition-colors">
-                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Revenue</p>
-                           <p className="text-sm font-black text-slate-800 tracking-tight">
-                              ₹{Number(vendor.revenue).toLocaleString('en-IN')}
+                     <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Revenue | Orders</p>
+                           <p className="text-xs font-black text-slate-800 tracking-tight">
+                               ₹{Number(vendor.revenue).toLocaleString('en-IN')} | {vendor.orders}
                            </p>
                         </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50 transition-colors">
-                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Orders</p>
-                           <p className="text-sm font-black text-slate-800 tracking-tight">{vendor.orders}</p>
-                        </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50 transition-colors">
-                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">SLA Score</p>
-                           <p className={`text-sm font-black tracking-tight ${vendor.sla >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {Math.round(vendor.sla)}%
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Order Fulfilment Rate</p>
+                           <p className={`text-xs font-black tracking-tight ${vendor.sla >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                               {Math.round(vendor.sla)}%
                            </p>
                         </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50 transition-colors">
+                        
+                        {/* Capacity Indicator */}
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors col-span-2">
+                           <div className="flex justify-between items-center mb-2">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Capacity Indicator</p>
+                              <span className={`text-[10px] font-black ${
+                                 (vendor.currentLoad / vendor.dailyCapacity) >= 0.9 ? 'text-red-600' : 
+                                 (vendor.currentLoad / vendor.dailyCapacity) >= 0.7 ? 'text-amber-600' : 
+                                 'text-[#3E8940]'
+                              }`}>
+                                 {vendor.currentLoad}/{vendor.dailyCapacity} Orders
+                              </span>
+                           </div>
+                           <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div 
+                                 className={`h-full transition-all duration-1000 ${
+                                    (vendor.currentLoad / vendor.dailyCapacity) >= 0.9 ? 'bg-red-500' : 
+                                    (vendor.currentLoad / vendor.dailyCapacity) >= 0.7 ? 'bg-amber-500' : 
+                                    'bg-[#3E8940]'
+                                 }`}
+                                 style={{ width: `${Math.min((vendor.currentLoad / (vendor.dailyCapacity || 1)) * 100, 100)}%` }}
+                              />
+                           </div>
+                           {(vendor.currentLoad / vendor.dailyCapacity) >= 0.95 && (
+                              <p className="text-[8px] font-black text-red-600 mt-1 animate-pulse">⚠️ OVERLOADED - AUTO-LIMIT ACTIVE</p>
+                           )}
+                        </div>
+
+                        {/* Geographic Coverage */}
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors col-span-2">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                              <MapPin className="h-2 w-2" /> Geographic Coverage
+                           </p>
+                           <p className="text-[10px] font-bold text-slate-700 truncate">
+                              {vendor.areaCoverage || "No specific areas listed"}
+                           </p>
+                           <div className="flex gap-1 mt-1 flex-wrap">
+                              {(vendor.areaCoverage || "").split(',').slice(0, 3).map((area: string) => (
+                                 <span key={area} className="text-[8px] bg-white px-1.5 py-0.5 rounded-md border text-slate-500 font-bold">
+                                    {area.trim()}
+                                 </span>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Avg Order Value</p>
+                           <p className="text-xs font-black text-emerald-600 tracking-tight">
+                               ₹{Number(vendor.avgOrderValue || 0).toLocaleString('en-IN')}
+                           </p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Commission</p>
+                           <p className="text-xs font-black text-blue-600 tracking-tight">
+                               ₹{Number(vendor.commission || (vendor.revenue * 0.15)).toLocaleString('en-IN')}
+                           </p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Issue | Damage</p>
+                           <p className="text-xs font-black tracking-tight">
+                               <span className={Number(vendor.issueRate) <= 2 ? 'text-emerald-600' : 'text-red-600'}>{vendor.issueRate}%</span>
+                               <span className="mx-1 text-slate-300">/</span>
+                               <span className={Number(vendor.damageRate) <= 0.5 ? 'text-emerald-600' : 'text-red-600'}>{vendor.damageRate}%</span>
+                           </p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-green-50/50 transition-colors">
                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Rating</p>
-                           <p className="text-sm font-black text-amber-500 flex items-center gap-1">
-                              <Star className="h-3 w-3 fill-amber-500" /> {vendor.rating.toFixed(1)}
+                           <p className="text-xs font-black text-amber-500 flex items-center gap-1">
+                               <Star className="h-3 w-3 fill-amber-500" /> {vendor.rating.toFixed(1)}
                            </p>
                         </div>
                      </div>
@@ -827,7 +973,7 @@ export default function VendorDashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs text-[#3E8940] hover:bg-green-50"
+              className="text-xs text-[#3E8940] font-bold hover:bg-green-100 hover:text-[#3E8940]"
               onClick={() => router.push("/vendor/all")}
             >
               View All <ArrowRight className="ml-1 h-3 w-3" />
@@ -858,8 +1004,21 @@ export default function VendorDashboardPage() {
                         <p className="text-sm font-semibold text-slate-900 group-hover:text-[#3E8940] transition-colors">
                           {name}
                         </p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> {v.phone}
+                        <div className="flex items-center gap-2">
+                           <p className="text-[10px] text-slate-500 font-bold">
+                             {v.vendorProfile?.totalOrders || 0} Orders | ₹{Number(v.vendorProfile?.totalRevenue || 0).toLocaleString('en-IN')} Revenue
+                           </p>
+                           {(() => {
+                              const tier = getVendorTier(v);
+                              return (
+                                 <span className={`text-[9px] font-black px-1.5 rounded-md ${tier.color}`}>
+                                    {tier.badge}
+                                 </span>
+                              );
+                           })()}
+                        </div>
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Phone className="h-2.5 w-2.5" /> {v.phone}
                         </p>
                       </div>
                     </div>
@@ -905,7 +1064,7 @@ export default function VendorDashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs text-[#3E8940] hover:bg-green-50"
+              className="text-xs text-[#3E8940] font-bold hover:bg-green-100 hover:text-[#3E8940]"
               onClick={() => router.push("/vendor/verification")}
             >
               Review All <ArrowRight className="ml-1 h-3 w-3" />

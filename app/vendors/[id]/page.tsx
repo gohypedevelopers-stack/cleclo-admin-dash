@@ -221,7 +221,14 @@ export default function VendorDetailPage() {
           </Button>
           <div>
             <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest bg-slate-100/50 px-2 py-0.5 rounded-full border">Vendor Details</span>
-            <h1 className="text-xl sm:text-3xl font-bold text-slate-900 mt-1">{displayName}</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <h1 className="text-xl sm:text-3xl font-bold text-slate-900">{displayName}</h1>
+              {vp.performanceTier && (
+                <Badge className={cn("text-[10px] sm:text-xs px-2 py-0.5 font-bold border-none shadow-none rounded-lg", vp.performanceTier.color)}>
+                  {vp.performanceTier.badge}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -309,11 +316,18 @@ export default function VendorDetailPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border">
-              <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border shadow-sm text-xl">📍</div>
-              <div className="flex-1">
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Area Coverage</p>
-                <p className="text-xs font-bold text-slate-700">{areaCoverage || "Not specified by vendor"}</p>
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border group hover:border-[#3E8940] transition-colors">
+              <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border shadow-sm text-xl group-hover:scale-110 transition-transform">📍</div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Geographic Coverage</p>
+                <p className="text-xs font-bold text-slate-700 truncate">{areaCoverage || "Not specified by vendor"}</p>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {(areaCoverage || "").split(',').slice(0, 4).map((area: string) => area.trim() && (
+                    <span key={area} className="text-[8px] bg-white px-1.5 py-0.5 rounded-md border text-slate-500 font-bold">
+                      {area.trim()}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border">
@@ -380,8 +394,8 @@ export default function VendorDetailPage() {
 
           {/* Service Capability */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-slate-400" /> Service Capability</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-[#3E8940]" /> Service Capability & Load</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Services Offered</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -390,11 +404,42 @@ export default function VendorDetailPage() {
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col justify-center">
-                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Daily Capacity</p>
-                <div className="flex items-end gap-1">
-                  <p className="text-2xl font-bold text-slate-900">{vp.dailyCapacity || "150"}</p>
-                  <p className="text-xs text-slate-500 mb-1">Units / Day</p>
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Daily Capacity</p>
+                    <div className="flex items-end gap-1">
+                      <p className="text-2xl font-bold text-slate-900">{vp.dailyCapacity || "0"}</p>
+                      <p className="text-xs text-slate-500 mb-1">Orders / Day</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Current Load</p>
+                    <p className={cn("text-lg font-black", (vp.currentLoad / vp.dailyCapacity) >= 0.9 ? "text-red-600" : "text-emerald-600")}>
+                      {vp.currentLoad || 0} Orders
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border">
+                    <div 
+                      className={cn(
+                        "h-full transition-all duration-1000",
+                        (vp.currentLoad / vp.dailyCapacity) >= 0.9 ? "bg-red-500" : 
+                        (vp.currentLoad / vp.dailyCapacity) >= 0.7 ? "bg-amber-500" : "bg-emerald-500"
+                      )}
+                      style={{ width: `${Math.min(((vp.currentLoad || 0) / (vp.dailyCapacity || 1)) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">Utilisation: {Math.min(Math.round(((vp.currentLoad || 0) / (vp.dailyCapacity || 1)) * 100), 100)}%</p>
+                    {(vp.currentLoad / vp.dailyCapacity) >= 0.95 && (
+                      <span className="text-[9px] font-black text-red-600 animate-pulse flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> AUTO-LIMIT ACTIVE
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

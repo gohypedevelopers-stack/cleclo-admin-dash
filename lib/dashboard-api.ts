@@ -179,6 +179,10 @@ export interface DashboardOverview {
         openIssues: number;
         unreadIssues: number;
     };
+    walletLiability: {
+        totalCustomerWalletBalance: number;
+        totalVendorPayoutDue: number;
+    };
 }
 
 export const dashboardApi = {

@@ -304,10 +304,10 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Vendor SLA Scorecard
+              Vendor Performance Intelligence
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Top vendors by revenue with SLA and issue tracking
+              Top vendors by revenue with fulfillment and quality tracking
             </p>
           </div>
         </div>
@@ -350,9 +350,9 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
                   </p>
                 )}
                 <div className="flex items-center gap-3 text-[10px] text-slate-500 font-medium">
-                  <span>{v.total} orders</span>
-                  <span>•</span>
-                  <span>{formatINR(v.revenue)} revenue</span>
+                  <span className="font-bold text-slate-700">{v.total} Orders</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="font-bold text-emerald-600">{formatINR(v.revenue)} Revenue</span>
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
@@ -363,7 +363,7 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
                     {v.sla}%
                   </p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase">
-                    SLA
+                    Order Fulfilment Rate
                   </p>
                 </div>
                 <div className="text-center">
@@ -373,7 +373,7 @@ export function VendorSlaScorecard({ orders }: VendorScoreProps) {
                     {v.issueRate}%
                   </p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase">
-                    Issues
+                    Issue Rate
                   </p>
                 </div>
               </div>

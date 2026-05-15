@@ -148,6 +148,7 @@ const KPI_ICONS: Record<string, any> = {
   top_vendor: Trophy,
   worst_sla_vendor: AlertTriangle,
   avg_turnaround: Timer,
+  quality_intelligence: AlertTriangle,
 };
 
 const getStatusColor = (status: string) => {
@@ -705,6 +706,37 @@ export default function AdminDashboardPage() {
           {isLoading && (
             <Loader2 className="h-5 w-5 animate-spin text-[#3E8940]" />
           )}
+        </div>
+      </div>
+
+      {/* Wallet Liability Summary (Finance Oversight) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+            <Wallet className="h-24 w-24" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1">Total Customer Wallet Balance</p>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-3xl font-black">₹{Number(data.walletLiability?.totalCustomerWalletBalance || 0).toLocaleString('en-IN')}</h2>
+              <Badge className="bg-indigo-500/30 text-indigo-100 border-none text-[10px]">Liability Risk</Badge>
+            </div>
+            <p className="text-indigo-200 text-[10px] mt-2 font-medium">Total funds currently held in customer digital wallets platform-wide.</p>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+            <HandCoins className="h-24 w-24" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-amber-50 text-xs font-bold uppercase tracking-wider mb-1">Total Vendor Payout Due</p>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-3xl font-black">₹{Number(data.walletLiability?.totalVendorPayoutDue || 0).toLocaleString('en-IN')}</h2>
+              <Badge className="bg-amber-400/30 text-amber-50 border-none text-[10px]">Pending Release</Badge>
+            </div>
+            <p className="text-amber-100 text-[10px] mt-2 font-medium">Net amount awaiting settlement release to service partners.</p>
+          </div>
         </div>
       </div>
 

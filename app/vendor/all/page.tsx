@@ -27,18 +27,26 @@ const getStatusColor = (s: string) => {
 };
 
 const getVendorTier = (v: any) => {
+  // Use performanceTier from backend if available, otherwise calculate locally
+  if (v.vendorProfile?.performanceTier) {
+    const tier = v.vendorProfile.performanceTier;
+    return {
+      label: tier.label,
+      emoji: tier.badge.split(' ')[0],
+      color: tier.color + " border-transparent"
+    };
+  }
+
   const sla = v.vendorProfile?.slaScore ?? 0;
   const rating = v.vendorProfile?.rating ?? 0;
-  const issueRate = v.vendorProfile?.issueRate ?? 0;
-  const revenue = v.vendorProfile?.totalRevenue ?? 0;
   
-  if (sla >= 95 && rating >= 4.5 && issueRate <= 2 && revenue >= 100000) 
-    return { label: "Gold", emoji: "🥇", color: "bg-amber-50 text-amber-600 border-amber-200" };
-  if (sla >= 85 && rating >= 4.0 && revenue >= 50000) 
-    return { label: "Silver", emoji: "🥈", color: "bg-slate-50 text-slate-600 border-slate-200" };
-  if (sla < 80 || rating < 3.5 || issueRate > 5) 
-    return { label: "Probation", emoji: "⚠️", color: "bg-rose-50 text-rose-600 border-rose-200" };
-  return { label: "Standard", emoji: "⭐", color: "bg-blue-50 text-blue-600 border-blue-200" };
+  if (sla > 95 && rating > 4.7) 
+    return { label: "Gold", emoji: "🥇", color: "bg-amber-100 text-amber-700 border-amber-200" };
+  if (sla >= 85 && sla <= 95) 
+    return { label: "Silver", emoji: "🥈", color: "bg-slate-100 text-slate-700 border-slate-200" };
+  if (sla < 80) 
+    return { label: "Probation", emoji: "⚠️", color: "bg-red-100 text-red-700 border-red-200" };
+  return { label: "Standard", emoji: "⭐", color: "bg-blue-100 text-blue-700 border-blue-200" };
 };
 
 export default function AllVendorsPage() {
@@ -195,6 +203,7 @@ export default function AllVendorsPage() {
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Tier</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Type</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Capacity / Load</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Coverage</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
           </TableRow></TableHeader>
@@ -311,18 +320,27 @@ export default function AllVendorsPage() {
                       
                       return capacity > 0 ? (
                         <div className="flex flex-col items-center gap-1.5 min-w-[100px] mx-auto">
-                          <div className="flex items-center justify-between w-full px-1">
-                            <span className="text-[10px] font-black text-slate-700">{load}/{capacity}</span>
-                            <span className={`text-[10px] font-bold ${loadPercent >= 90 ? "text-rose-600" : "text-slate-500"}`}>{loadPercent}%</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
-                            <div className={`h-full ${loadColor} transition-all duration-500`} style={{ width: `${loadPercent}%` }} />
-                          </div>
+                           <div className="flex items-center justify-between w-full px-1">
+                             <span className="text-[10px] font-black text-slate-700">{load}/{capacity}</span>
+                             <span className={`text-[10px] font-bold ${loadPercent >= 90 ? "text-rose-600" : "text-slate-500"}`}>{loadPercent}%</span>
+                           </div>
+                           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+                             <div className={`h-full ${loadColor} transition-all duration-500`} style={{ width: `${loadPercent}%` }} />
+                           </div>
+                           {loadPercent >= 95 && (
+                              <span className="text-[8px] font-black text-rose-600 mt-0.5 animate-pulse">LIMIT ACTIVE</span>
+                           )}
                         </div>
                       ) : (
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic">Not Set</span>
                       );
                     })()}
+                  </TableCell>
+                  <TableCell className="text-center">
+                     <div className="flex flex-col items-center gap-1 max-w-[150px] mx-auto">
+                        <p className="text-[10px] font-bold text-slate-700 truncate w-full">{v.vendorProfile?.areaCoverage || "Not Defined"}</p>
+                        <p className="text-[9px] text-slate-400">{v.vendorProfile?.city || city}</p>
+                     </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className={`${getStatusColor(status)} font-bold gap-1.5 px-2.5 py-1 text-[10px] shadow-sm`}>
@@ -333,7 +351,7 @@ export default function AllVendorsPage() {
                       {status.toUpperCase()}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right pr-6"><Button variant="ghost" size="sm" className="text-slate-500 hover:text-[#3E8940]" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${v.id}`); }}>View</Button></TableCell>
+                  <TableCell className="text-right pr-6"><Button variant="ghost" size="sm" className="text-slate-500 font-bold hover:bg-slate-100 hover:text-[#3E8940]" onClick={(e) => { e.stopPropagation(); router.push(`/vendors/${v.id}`); }}>View</Button></TableCell>
                 </TableRow>
               );
             }) : <TableRow><TableCell colSpan={11} className="h-32 text-center text-slate-500"><div className="flex flex-col items-center gap-2"><Search className="h-8 w-8 text-slate-300" /><p>No vendors found.</p></div></TableCell></TableRow>}

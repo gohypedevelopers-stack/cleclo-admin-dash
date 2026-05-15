@@ -131,8 +131,8 @@ interface VendorRecord {
 }
 
 const getVendorTier = (sla: number, rating: number) => {
-  if (sla >= 95 && rating >= 4.7) return { label: "🥇 Gold", color: "bg-amber-100 text-amber-800 border-amber-300" };
-  if (sla >= 85 && rating >= 4.0) return { label: "🥈 Silver", color: "bg-slate-100 text-slate-700 border-slate-300" };
+  if (sla > 95 && rating > 4.7) return { label: "🥇 Gold", color: "bg-amber-100 text-amber-800 border-amber-300" };
+  if (sla >= 85 && sla <= 95) return { label: "🥈 Silver", color: "bg-slate-100 text-slate-700 border-slate-300" };
   if (sla < 80) return { label: "⚠ Probation", color: "bg-red-100 text-red-700 border-red-300" };
   return { label: "Standard", color: "bg-blue-50 text-blue-600 border-blue-200" };
 };
@@ -383,9 +383,9 @@ function VendorsContent() {
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Orders / Revenue</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Commission</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Payout Due</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">SLA</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Order Fulfilment Rate</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Rating</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Issues</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%] text-center">Quality Control</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Capacity</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Coverage</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider text-right pr-6 w-[6%]">Actions</TableHead>
@@ -439,12 +439,16 @@ function VendorsContent() {
                         </div>
                       </div>
                     </TableCell>
-                    {/* Orders + Revenue */}
                     <TableCell>
-                      <p className="text-sm font-bold text-slate-900">{orders} <span className="text-slate-400 font-medium text-xs">orders</span></p>
-                      <p className="text-xs font-semibold text-emerald-600">{formatINR(revenue)}</p>
-                      <p className="text-[9px] text-slate-400">This month: {formatINR(revenueMonth)}</p>
-                      <p className="text-[9px] text-slate-400">AOV: {formatINR(avgOrderVal)}</p>
+                      <p className="text-sm font-bold text-slate-900">
+                        {orders} <span className="text-slate-400 font-medium text-[10px] uppercase">Orders</span> 
+                        <span className="mx-1 text-slate-300">|</span> 
+                        <span className="text-emerald-600">{formatINR(revenue)}</span> <span className="text-emerald-500/50 font-medium text-[9px] uppercase">Revenue</span>
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[9px] text-slate-400 font-medium">Month: <span className="text-slate-600 font-bold">{formatINR(revenueMonth)}</span></p>
+                        <p className="text-[9px] text-slate-400 font-medium">AOV: <span className="text-slate-600 font-bold">{formatINR(avgOrderVal)}</span></p>
+                      </div>
                     </TableCell>
                     {/* Commission */}
                     <TableCell>
@@ -468,9 +472,16 @@ function VendorsContent() {
                         <span className="text-xs font-bold text-slate-800">{rating > 0 ? rating.toFixed(1) : "—"}</span>
                       </div>
                     </TableCell>
-                    {/* Issue Rate */}
+                    {/* Quality Control (Issue & Damage) */}
                     <TableCell className="text-center">
-                      <Badge variant="outline" className={cn("font-bold text-[10px]", issueRate > 5 ? "text-red-600 border-red-200 bg-red-50" : issueRate > 2 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-emerald-600 border-emerald-200 bg-emerald-50")}>{issueRate > 0 ? `${issueRate.toFixed(1)}%` : "0%"}</Badge>
+                      <div className="flex flex-col items-center gap-1">
+                        <Badge variant="outline" className={cn("font-bold text-[9px] px-1.5 h-4 border-none", issueRate > 5 ? "text-red-600 bg-red-50" : "text-emerald-600 bg-emerald-50")}>
+                          IS: {issueRate > 0 ? `${issueRate.toFixed(1)}%` : "0%"}
+                        </Badge>
+                        <Badge variant="outline" className={cn("font-bold text-[9px] px-1.5 h-4 border-none", Number(vp?.damageRate) > 0.5 ? "text-rose-600 bg-rose-50" : "text-blue-600 bg-blue-50")}>
+                          DM: {vp?.damageRate ? `${vp.damageRate}%` : "0%"}
+                        </Badge>
+                      </div>
                     </TableCell>
                     {/* Capacity */}
                     <TableCell>
