@@ -182,13 +182,22 @@ export const adminCatalogApi = {
         if (!res.ok) throw new Error('Failed to delete item');
         return res.json();
     },
-    bulkUpload: async (items: any[]) => {
-        const res = await apiFetch(`${CATALOG_API_URL}/items/bulk-upload`, {
+    bulkCreateItems: async (items: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/bulk-create`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ items })
         });
-        if (!res.ok) throw new Error('Bulk upload failed');
+        if (!res.ok) throw new Error('Bulk creation failed');
+        return res.json();
+    },
+    bulkUpdateItems: async (updates: any[]) => {
+        const res = await apiFetch(`${CATALOG_API_URL}/items/bulk-update`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ updates })
+        });
+        if (!res.ok) throw new Error('Bulk update failed');
         return res.json();
     },
     bulkPriceUpdate: async (updates: any[]) => {
@@ -404,6 +413,14 @@ export const adminWalletApi = {
         });
         if (!res.ok) throw new Error('Failed to update reward');
         return res.json();
+    },
+    deleteReward: async (id: string) => {
+        const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-reward-rules/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('Failed to delete reward');
+        return true;
     },
     getLiabilitySummary: async () => {
         const res = await apiFetch(`${AUTH_API_URL}/wallet/wallet-liability/summary`, { headers: getAuthHeaders() });

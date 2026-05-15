@@ -25,6 +25,7 @@ import {
   BarChart3,
   ShieldCheck,
   MapPin,
+  Gift,
 } from "lucide-react";
 
 interface NavItem {
@@ -165,6 +166,11 @@ const managementItems: NavItem[] = [
     ],
   },
   {
+    title: "Location Settings",
+    href: "/master/locations",
+    icon: MapPin,
+  },
+  {
     title: "Orders",
     href: "/orders",
     icon: ClipboardList,
@@ -176,6 +182,11 @@ const financeItems: NavItem[] = [
     title: "Settlements",
     href: "/finance/settlements",
     icon: CreditCard,
+  },
+  {
+    title: "Rewards & Cashback",
+    href: "/finance/rewards",
+    icon: Gift,
   },
 ];
 

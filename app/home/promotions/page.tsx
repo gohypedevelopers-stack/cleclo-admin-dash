@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -364,16 +365,37 @@ export default function PromotionsPage() {
               <div><Label>Coupon Code / Title</Label><Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="mt-1" /></div>
               <div><Label>Discount (%)</Label><Input type="number" value={form.discount} onChange={e => setForm({...form, discount: e.target.value})} className="mt-1" /></div>
             </div>
-            
-            <div className="grid gap-4 md:grid-cols-3">
-              <div><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} className="mt-1" /></div>
-              <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} className="mt-1" /></div>
-              <div><Label>Rank</Label>
-                <Select value={form.priorityRank} onValueChange={v => setForm({...form, priorityRank: v})}>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Campaign Type</Label>
+                <Select value={form.type} onValueChange={v => setForm({...form, type: v})}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="1">1 (High)</SelectItem><SelectItem value="2">2 (Medium)</SelectItem><SelectItem value="3">3 (Low)</SelectItem></SelectContent>
+                  <SelectContent>
+                    {CAMPAIGN_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Priority Rank</Label>
+                <Select value={form.priorityRank} onValueChange={v => setForm({...form, priorityRank: v})}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 (Highest)</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5 (Lowest)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-2">
+              <div><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} className="mt-1" /></div>
+              <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} className="mt-1" /></div>
             </div>
 
             <div className="rounded-lg border border-slate-200 p-4">

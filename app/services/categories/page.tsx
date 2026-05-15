@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { adminCatalogApi } from "@/lib/admin-api";
+import { adminCatalogApi, adminLocationApi, adminVendorApi } from "@/lib/admin-api";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 type ServiceOption = {
   id: string;
@@ -48,6 +49,20 @@ type CategoryRecord = {
   isActive: boolean;
   subCategories?: Array<{ id: string }>;
   service?: ServiceOption;
+  targetCityCodes?: string[];
+  targetVendorIds?: string[];
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+};
+
+type CityOption = {
+  cityCode: string;
+  cityName: string;
+};
+
+type VendorOption = {
+  id: string;
+  label: string;
 };
 
 const icons = ["👔", "👕", "👖", "👗", "🧥", "👚", "🩳", "🧢", "🧣", "👜", "👟", "🧵"];
@@ -70,7 +85,16 @@ function CategoriesPageContent() {
     name: "",
     icon: "👔",
     serviceId: "",
+    targetCityCodes: [] as string[],
+    targetVendorIds: [] as string[],
+    availableFrom: "",
+    availableUntil: "",
   });
+
+  const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [selectedStateCode, setSelectedStateCode] = useState("");
+  const [states, setStates] = useState<{code: string, name: string}[]>([]);
 
   const loadCategories = async (serviceId?: string) => {
     const categories = await adminCatalogApi.getCategories(serviceId);
@@ -80,7 +104,18 @@ function CategoriesPageContent() {
   const initialize = async () => {
     try {
       setLoading(true);
-      const services = await adminCatalogApi.getServices();
+      const [services, statesData, vendorsData] = await Promise.all([
+        adminCatalogApi.getServices(),
+        adminCatalogApi.getStates ? adminCatalogApi.getStates() : Promise.resolve([]), // Fallback if not in catalog api
+        adminCatalogApi.getVendors ? adminCatalogApi.getVendors() : Promise.resolve([])
+      ]);
+
+      // Actually let's use the correct APIs
+      const [allStates, allVendors] = await Promise.all([
+        adminLocationApi.getStates(),
+        adminVendorApi.getVendors()
+      ]);
+
       const normalizedServices: ServiceOption[] = Array.isArray(services)
         ? services.map((service: any) => ({
             id: String(service.id),
@@ -90,6 +125,13 @@ function CategoriesPageContent() {
           }))
         : [];
       setServiceOptions(normalizedServices);
+      setStates(Array.isArray(allStates) ? allStates : []);
+      
+      const vList = Array.isArray(allVendors) ? allVendors : (allVendors as any)?.vendors || [];
+      setVendors(vList.map((v: any) => ({
+        id: v.id,
+        label: v.vendorProfile?.businessName || v.name || v.phone || "Unnamed"
+      })));
 
       let initialServiceId = "all";
       if (
@@ -119,6 +161,20 @@ function CategoriesPageContent() {
   useEffect(() => {
     initialize();
   }, [serviceIdFromUrl, serviceFromUrl]);
+
+  useEffect(() => {
+    if (selectedStateCode) {
+      adminLocationApi.getCitiesByState(selectedStateCode)
+        .then(data => {
+          const list = Array.isArray(data) ? data : (data as any)?.cities || [];
+          setCityOptions(list.map((c: any) => ({
+            cityCode: c.cityCode || c.code,
+            cityName: c.cityName || c.name
+          })));
+        })
+        .catch(console.error);
+    }
+  }, [selectedStateCode]);
 
   const selectedService =
     selectedServiceId === "all"
@@ -155,7 +211,15 @@ function CategoriesPageContent() {
     }
 
     setEditingId(null);
-    setNewCategory({ name: "", icon: "👔", serviceId: defaultServiceId });
+    setNewCategory({ 
+      name: "", 
+      icon: "👔", 
+      serviceId: defaultServiceId,
+      targetCityCodes: [],
+      targetVendorIds: [],
+      availableFrom: "",
+      availableUntil: "",
+    });
     setIsDialogOpen(true);
   };
 
@@ -165,6 +229,10 @@ function CategoriesPageContent() {
       name: category.name,
       icon: category.icon || "👔",
       serviceId: category.serviceId,
+      targetCityCodes: category.targetCityCodes || [],
+      targetVendorIds: category.targetVendorIds || [],
+      availableFrom: category.availableFrom ? new Date(category.availableFrom).toISOString().slice(0, 16) : "",
+      availableUntil: category.availableUntil ? new Date(category.availableUntil).toISOString().slice(0, 16) : "",
     });
     setIsDialogOpen(true);
   };
@@ -187,6 +255,10 @@ function CategoriesPageContent() {
           name: newCategory.name.trim(),
           icon: newCategory.icon,
           isActive: currentCategory?.isActive ?? true,
+          targetCityCodes: newCategory.targetCityCodes,
+          targetVendorIds: newCategory.targetVendorIds,
+          availableFrom: newCategory.availableFrom || null,
+          availableUntil: newCategory.availableUntil || null,
         });
         toast.success("Category updated");
       } else {
@@ -200,6 +272,10 @@ function CategoriesPageContent() {
           icon: newCategory.icon,
           isActive: true,
           displayOrder: serviceCategoryCount + 1,
+          targetCityCodes: newCategory.targetCityCodes,
+          targetVendorIds: newCategory.targetVendorIds,
+          availableFrom: newCategory.availableFrom || null,
+          availableUntil: newCategory.availableUntil || null,
         });
         toast.success("Category added");
       }
@@ -491,11 +567,12 @@ function CategoriesPageContent() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Category" : "Add New Category"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="grid gap-6 py-4 md:grid-cols-2">
+            <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Service</label>
               <Select
@@ -545,6 +622,98 @@ function CategoriesPageContent() {
                     {icon}
                   </button>
                 ))}
+              </div>
+            </div>
+            </div>
+
+            <div className="space-y-4 border-l pl-6">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                Visibility & Targeting
+              </h3>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">City-based visibility</label>
+                <div className="space-y-2">
+                  <Select value={selectedStateCode} onValueChange={setSelectedStateCode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {states.map(s => <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select onValueChange={(val) => {
+                    if (val && !newCategory.targetCityCodes.includes(val)) {
+                      setNewCategory(prev => ({ ...prev, targetCityCodes: [...prev.targetCityCodes, val] }));
+                    }
+                  }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Add City" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {cityOptions.map(c => <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newCategory.targetCityCodes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newCategory.targetCityCodes.map(code => (
+                      <Badge key={code} variant="secondary" className="gap-1 bg-blue-50 text-blue-700 border-blue-100">
+                        {code}
+                        <button onClick={() => setNewCategory(prev => ({ ...prev, targetCityCodes: prev.targetCityCodes.filter(c => c !== code) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Vendor-based availability</label>
+                <Select onValueChange={(val) => {
+                  if (val && !newCategory.targetVendorIds.includes(val)) {
+                    setNewCategory(prev => ({ ...prev, targetVendorIds: [...prev.targetVendorIds, val] }));
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add Vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {newCategory.targetVendorIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newCategory.targetVendorIds.map(id => (
+                      <Badge key={id} variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-100">
+                        {vendors.find(v => v.id === id)?.label || id}
+                        <button onClick={() => setNewCategory(prev => ({ ...prev, targetVendorIds: prev.targetVendorIds.filter(v => v !== id) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available From</label>
+                  <DateTimePicker 
+                    value={newCategory.availableFrom} 
+                    onChange={val => setNewCategory(prev => ({ ...prev, availableFrom: val }))}
+                    placeholder="Pick start time"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available Until</label>
+                  <DateTimePicker 
+                    value={newCategory.availableUntil} 
+                    onChange={val => setNewCategory(prev => ({ ...prev, availableUntil: val }))}
+                    placeholder="Pick end time"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -33,7 +33,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { adminCatalogApi } from "@/lib/admin-api";
+import { adminCatalogApi, adminLocationApi, adminVendorApi } from "@/lib/admin-api";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 type CategoryOption = {
   id: string;
@@ -57,6 +58,20 @@ type SubCategoryRecord = {
     name: string;
     serviceId?: string;
   };
+  targetCityCodes?: string[];
+  targetVendorIds?: string[];
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+};
+
+type CityOption = {
+  cityCode: string;
+  cityName: string;
+};
+
+type VendorOption = {
+  id: string;
+  label: string;
 };
 
 function SubCategoriesPageContent() {
@@ -76,15 +91,27 @@ function SubCategoriesPageContent() {
   const [newSubCategory, setNewSubCategory] = useState({
     name: "",
     categoryId: "",
+    targetCityCodes: [] as string[],
+    targetVendorIds: [] as string[],
+    availableFrom: "",
+    availableUntil: "",
   });
+
+  const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [selectedStateCode, setSelectedStateCode] = useState("");
+  const [states, setStates] = useState<{code: string, name: string}[]>([]);
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
 
-      const categoriesResponse = await adminCatalogApi.getCategories(
-        serviceIdFromUrl || undefined,
-      );
+      const [categoriesResponse, subCategoriesResponse, allStates, allVendors] = await Promise.all([
+        adminCatalogApi.getCategories(serviceIdFromUrl || undefined),
+        adminCatalogApi.getSubCategories(),
+        adminLocationApi.getStates(),
+        adminVendorApi.getVendors()
+      ]);
 
       let categories: CategoryOption[] = Array.isArray(categoriesResponse)
         ? categoriesResponse
@@ -98,6 +125,13 @@ function SubCategoriesPageContent() {
       }
 
       setCategoryOptions(categories);
+      setStates(Array.isArray(allStates) ? allStates : []);
+      
+      const vList = Array.isArray(allVendors) ? allVendors : (allVendors as any)?.vendors || [];
+      setVendors(vList.map((v: any) => ({
+        id: v.id,
+        label: v.vendorProfile?.businessName || v.name || v.phone || "Unnamed"
+      })));
 
       const isUrlCategoryValid =
         Boolean(categoryIdFromUrl) &&
@@ -108,9 +142,15 @@ function SubCategoriesPageContent() {
         : categories[0]?.id || "";
 
       setSelectedCategoryId(isUrlCategoryValid ? String(categoryIdFromUrl) : "all");
-      setNewSubCategory({ name: "", categoryId: initialCategoryId });
+      setNewSubCategory({ 
+        name: "", 
+        categoryId: initialCategoryId,
+        targetCityCodes: [],
+        targetVendorIds: [],
+        availableFrom: "",
+        availableUntil: "",
+      });
 
-      const subCategoriesResponse = await adminCatalogApi.getSubCategories();
       setSubCategoryList(
         Array.isArray(subCategoriesResponse) ? subCategoriesResponse : [],
       );
@@ -125,6 +165,20 @@ function SubCategoriesPageContent() {
   useEffect(() => {
     loadInitialData();
   }, [categoryIdFromUrl, serviceIdFromUrl, serviceFromUrl]);
+
+  useEffect(() => {
+    if (selectedStateCode) {
+      adminLocationApi.getCitiesByState(selectedStateCode)
+        .then(data => {
+          const list = Array.isArray(data) ? data : (data as any)?.cities || [];
+          setCityOptions(list.map((c: any) => ({
+            cityCode: c.cityCode || c.code,
+            cityName: c.cityName || c.name
+          })));
+        })
+        .catch(console.error);
+    }
+  }, [selectedStateCode]);
 
   const handleCategoryFilterChange = (value: string) => {
     setSelectedCategoryId(value);
@@ -185,6 +239,10 @@ function SubCategoriesPageContent() {
     setNewSubCategory({
       name: "",
       categoryId: getDefaultCategoryId(),
+      targetCityCodes: [],
+      targetVendorIds: [],
+      availableFrom: "",
+      availableUntil: "",
     });
     setIsDialogOpen(true);
   };
@@ -194,6 +252,10 @@ function SubCategoriesPageContent() {
     setNewSubCategory({
       name: subCategory.name,
       categoryId: subCategory.categoryId,
+      targetCityCodes: subCategory.targetCityCodes || [],
+      targetVendorIds: subCategory.targetVendorIds || [],
+      availableFrom: subCategory.availableFrom ? new Date(subCategory.availableFrom).toISOString().slice(0, 16) : "",
+      availableUntil: subCategory.availableUntil ? new Date(subCategory.availableUntil).toISOString().slice(0, 16) : "",
     });
     setIsDialogOpen(true);
   };
@@ -219,6 +281,10 @@ function SubCategoriesPageContent() {
         categoryId,
         isActive: true,
         displayOrder,
+        targetCityCodes: newSubCategory.targetCityCodes,
+        targetVendorIds: newSubCategory.targetVendorIds,
+        availableFrom: newSubCategory.availableFrom || null,
+        availableUntil: newSubCategory.availableUntil || null,
       });
 
       const selectedCategory = categoryOptions.find(
@@ -256,6 +322,10 @@ function SubCategoriesPageContent() {
       try {
         const updated = await adminCatalogApi.updateSubCategory(editingSubCategoryId, {
           name: newSubCategory.name.trim(),
+          targetCityCodes: newSubCategory.targetCityCodes,
+          targetVendorIds: newSubCategory.targetVendorIds,
+          availableFrom: newSubCategory.availableFrom || null,
+          availableUntil: newSubCategory.availableUntil || null,
         });
 
         setSubCategoryList((prev) =>
@@ -264,6 +334,10 @@ function SubCategoriesPageContent() {
               ? {
                   ...subCategory,
                   name: updated?.name ?? newSubCategory.name.trim(),
+                  targetCityCodes: newSubCategory.targetCityCodes,
+                  targetVendorIds: newSubCategory.targetVendorIds,
+                  availableFrom: newSubCategory.availableFrom || null,
+                  availableUntil: newSubCategory.availableUntil || null,
                 }
               : subCategory,
           ),
@@ -272,7 +346,14 @@ function SubCategoriesPageContent() {
         toast.success("Sub category updated");
         setIsDialogOpen(false);
         setEditingSubCategoryId(null);
-        setNewSubCategory({ name: "", categoryId: getDefaultCategoryId() });
+        setNewSubCategory({ 
+          name: "", 
+          categoryId: getDefaultCategoryId(),
+          targetCityCodes: [],
+          targetVendorIds: [],
+          availableFrom: "",
+          availableUntil: "",
+        });
         return;
       } catch (error) {
         console.error(error);
@@ -288,7 +369,14 @@ function SubCategoriesPageContent() {
 
     if (!created) return;
 
-    setNewSubCategory({ name: "", categoryId: getDefaultCategoryId() });
+    setNewSubCategory({ 
+      name: "", 
+      categoryId: getDefaultCategoryId(),
+      targetCityCodes: [],
+      targetVendorIds: [],
+      availableFrom: "",
+      availableUntil: "",
+    });
     setIsDialogOpen(false);
   };
 
@@ -521,17 +609,25 @@ function SubCategoriesPageContent() {
           setIsDialogOpen(open);
           if (!open) {
             setEditingSubCategoryId(null);
-            setNewSubCategory({ name: "", categoryId: getDefaultCategoryId() });
+            setNewSubCategory({ 
+              name: "", 
+              categoryId: getDefaultCategoryId(),
+              targetCityCodes: [],
+              targetVendorIds: [],
+              availableFrom: "",
+              availableUntil: "",
+            });
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingSubCategoryId ? "Edit Sub Category" : "Add New Sub Category"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="grid gap-6 py-4 md:grid-cols-2">
+            <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Category</label>
               <Select
@@ -568,6 +664,98 @@ function SubCategoriesPageContent() {
                 }
                 className="mt-1"
               />
+            </div>
+            </div>
+
+            <div className="space-y-4 border-l pl-6">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                Visibility & Targeting
+              </h3>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">City-based visibility</label>
+                <div className="space-y-2">
+                  <Select value={selectedStateCode} onValueChange={setSelectedStateCode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {states.map(s => <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select onValueChange={(val) => {
+                    if (val && !newSubCategory.targetCityCodes.includes(val)) {
+                      setNewSubCategory(prev => ({ ...prev, targetCityCodes: [...prev.targetCityCodes, val] }));
+                    }
+                  }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Add City" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {cityOptions.map(c => <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newSubCategory.targetCityCodes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newSubCategory.targetCityCodes.map(code => (
+                      <Badge key={code} variant="secondary" className="gap-1 bg-blue-50 text-blue-700 border-blue-100">
+                        {code}
+                        <button onClick={() => setNewSubCategory(prev => ({ ...prev, targetCityCodes: prev.targetCityCodes.filter(c => c !== code) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Vendor-based availability</label>
+                <Select onValueChange={(val) => {
+                  if (val && !newSubCategory.targetVendorIds.includes(val)) {
+                    setNewSubCategory(prev => ({ ...prev, targetVendorIds: [...prev.targetVendorIds, val] }));
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add Vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {newSubCategory.targetVendorIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newSubCategory.targetVendorIds.map(id => (
+                      <Badge key={id} variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-100">
+                        {vendors.find(v => v.id === id)?.label || id}
+                        <button onClick={() => setNewSubCategory(prev => ({ ...prev, targetVendorIds: prev.targetVendorIds.filter(v => v !== id) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available From</label>
+                  <DateTimePicker 
+                    value={newSubCategory.availableFrom} 
+                    onChange={val => setNewSubCategory(prev => ({ ...prev, availableFrom: val }))}
+                    placeholder="Pick start time"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available Until</label>
+                  <DateTimePicker 
+                    value={newSubCategory.availableUntil} 
+                    onChange={val => setNewSubCategory(prev => ({ ...prev, availableUntil: val }))}
+                    placeholder="Pick end time"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

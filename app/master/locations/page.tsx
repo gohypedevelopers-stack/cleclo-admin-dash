@@ -1,648 +1,241 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
-import { 
-  MapPin, 
-  Clock, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Save, 
+import {
   ArrowLeft,
+  Building2,
+  Clock,
+  MapPin,
+  Plus,
+  Save,
   Search,
-  Globe
+  Settings2,
+  Zap,
 } from "lucide-react";
-import { adminLocationApi } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
 
-type City = {
-  id: string;
-  cityName: string;
-  cityCode: string;
-  isEnabled: boolean;
-  displayOrder: number;
-  timezone: string;
-};
-
-type Area = {
-  id: string;
-  areaName: string;
-  areaCode: string;
-  cityCode: string;
-  isEnabled: boolean;
-  surgePercent: number;
-};
-
-type TimeSlot = {
-  id: string;
-  startTime: string;
-  endTime: string;
-  cityCode: string;
-  slotType: string;
-  dayOfWeek: number;
-  capacityLimit: number | null;
-  isActive: boolean;
-};
-
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-export default function LocationsPage() {
-  const searchParams = useSearchParams();
-  const urlSearchQuery = searchParams.get("search") || "";
-  const [cities, setCities] = useState<City[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const [activeTab, setActiveTab] = useState("cities");
-  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
-
-  const [isCityDialogOpen, setIsCityDialogOpen] = useState(false);
-  const [isAreaDialogOpen, setIsAreaDialogOpen] = useState(false);
-  const [isSlotDialogOpen, setIsSlotDialogOpen] = useState(false);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [cityForm, setCityForm] = useState({ cityName: "", cityCode: "", isEnabled: true, displayOrder: 0, timezone: "Asia/Kolkata" });
-  const [areaForm, setAreaForm] = useState({ areaName: "", areaCode: "", cityCode: "", surgePercent: 0, isEnabled: true });
-  const [slotForm, setSlotForm] = useState({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "pickup", dayOfWeek: 1, capacityLimit: 50, isActive: true });
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [c, a, s] = await Promise.all([
-        adminLocationApi.getCities(),
-        adminLocationApi.getAreas(),
-        adminLocationApi.getTimeSlots()
-      ]);
-      setCities(c);
-      setAreas(a);
-      setTimeSlots(s);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to load location data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    setSearchQuery(urlSearchQuery);
-  }, [urlSearchQuery]);
-
-  // --- City Handlers ---
-  const openAddCity = () => {
-    setEditingId(null);
-    setCityForm({ cityName: "", cityCode: "", isEnabled: true, displayOrder: 0, timezone: "Asia/Kolkata" });
-    setIsCityDialogOpen(true);
-  };
-
-  const openEditCity = (city: City) => {
-    setEditingId(city.id);
-    setCityForm({
-      cityName: city.cityName,
-      cityCode: city.cityCode,
-      isEnabled: city.isEnabled,
-      displayOrder: city.displayOrder,
-      timezone: city.timezone,
-    });
-    setIsCityDialogOpen(true);
-  };
-
-  const handleCitySubmit = async () => {
-    try {
-      if (editingId) {
-        await adminLocationApi.updateCity(editingId, cityForm);
-        toast.success("City updated");
-      } else {
-        await adminLocationApi.createCity(cityForm);
-        toast.success("City created");
-      }
-      setIsCityDialogOpen(false);
-      loadData();
-    } catch (e) {
-      toast.error("Failed to save city");
-    }
-  };
-
-  const deleteCity = async (id: string) => {
-    if (!confirm("Are you sure? This might affect areas and slots linked to this city.")) return;
-    try {
-      await adminLocationApi.deleteCity(id);
-      toast.success("City deleted");
-      loadData();
-    } catch (e) {
-      toast.error("Failed to delete city");
-    }
-  };
-
-  // --- Area Handlers ---
-  const openAddArea = () => {
-    setEditingId(null);
-    setAreaForm({ areaName: "", areaCode: "", cityCode: cities[0]?.cityCode || "", surgePercent: 0, isEnabled: true });
-    setIsAreaDialogOpen(true);
-  };
-
-  const openEditArea = (area: Area) => {
-    setEditingId(area.id);
-    setAreaForm({
-      areaName: area.areaName,
-      areaCode: area.areaCode,
-      cityCode: area.cityCode,
-      surgePercent: area.surgePercent,
-      isEnabled: area.isEnabled,
-    });
-    setIsAreaDialogOpen(true);
-  };
-
-  const handleAreaSubmit = async () => {
-    try {
-      if (editingId) {
-        await adminLocationApi.updateArea(editingId, areaForm);
-        toast.success("Area updated");
-      } else {
-        await adminLocationApi.createArea(areaForm);
-        toast.success("Area created");
-      }
-      setIsAreaDialogOpen(false);
-      loadData();
-    } catch (e) {
-      toast.error("Failed to save area");
-    }
-  };
-
-  const deleteArea = async (id: string) => {
-    try {
-      await adminLocationApi.deleteArea(id);
-      toast.success("Area deleted");
-      loadData();
-    } catch (e) {
-      toast.error("Failed to delete area");
-    }
-  };
-
-  // --- Slot Handlers ---
-  const openAddSlot = () => {
-    setEditingId(null);
-    setSlotForm({ startTime: "09:00", endTime: "11:00", cityCode: "all", slotType: "pickup", dayOfWeek: 1, capacityLimit: 50, isActive: true });
-    setIsSlotDialogOpen(true);
-  };
-
-  const openEditSlot = (slot: TimeSlot) => {
-    setEditingId(slot.id);
-    setSlotForm({ 
-      startTime: slot.startTime, 
-      endTime: slot.endTime, 
-      cityCode: slot.cityCode, 
-      slotType: slot.slotType, 
-      dayOfWeek: slot.dayOfWeek,
-      capacityLimit: slot.capacityLimit ?? 0,
-      isActive: slot.isActive 
-    });
-    setIsSlotDialogOpen(true);
-  };
-
-  const handleSlotSubmit = async () => {
-    try {
-      if (editingId) {
-        await adminLocationApi.updateTimeSlot(editingId, slotForm);
-        toast.success("Time slot updated");
-      } else {
-        await adminLocationApi.createTimeSlot(slotForm);
-        toast.success("Time slot created");
-      }
-      setIsSlotDialogOpen(false);
-      loadData();
-    } catch (e) {
-      toast.error("Failed to save time slot");
-    }
-  };
-
-  const deleteSlot = async (id: string) => {
-    try {
-      await adminLocationApi.deleteTimeSlot(id);
-      toast.success("Time slot deleted");
-      loadData();
-    } catch (e) {
-      toast.error("Failed to delete time slot");
-    }
-  };
-
-  const filteredCities = cities.filter(c => 
-    c.cityName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.cityCode.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredAreas = areas.filter(a => 
-    a.areaName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    a.areaCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.cityCode.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredSlots = timeSlots.filter(s => 
-    s.cityCode.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.slotType.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+export default function LocationSettingsPage() {
+  const [loading, setLoading] = useState(false);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8 pb-12">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <Button asChild variant="outline" size="sm" className="mb-3 w-fit gap-2">
-            <Link href="/master/items">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 gap-2 text-slate-500 hover:text-[#3E8940]">
+            <Link href="/app">
               <ArrowLeft className="h-4 w-4" />
-              Back to Items
+              Back to Dashboard
             </Link>
           </Button>
-          <h1 className="text-3xl text-black font-bold tracking-tight">Location Configuration</h1>
-          <p className="text-slate-500 mt-1">Manage cities, delivery areas, and pickup time slots</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search..." 
-              className="pl-9 bg-white" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 shadow-sm">
+              <MapPin className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Location Configuration</h1>
+              <p className="text-slate-500">Manage city-wise operations, time slots, and availability.</p>
+            </div>
           </div>
-          {activeTab === "cities" && (
-            <Button className="gap-2 bg-primary" onClick={openAddCity}>
-              <Plus className="h-4 w-4" />
-              Add City
-            </Button>
-          )}
-          {activeTab === "areas" && (
-            <Button className="gap-2 bg-primary" onClick={openAddArea}>
-              <Plus className="h-4 w-4" />
-              Add Area
-            </Button>
-          )}
-          {activeTab === "slots" && (
-            <Button className="gap-2 bg-primary" onClick={openAddSlot}>
-              <Plus className="h-4 w-4" />
-              Add Slot
-            </Button>
-          )}
+        </div>
+        <div className="flex gap-3">
+          <Button
+            className="gap-2 bg-[#3E8940] hover:bg-[#3E8940]/90 rounded-xl px-6 shadow-lg shadow-emerald-900/10"
+            onClick={() => {}}
+            disabled={loading}
+          >
+            <Save className="h-4 w-4" />
+            Save All Changes
+          </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="cities" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="bg-slate-100 p-1 rounded-xl w-fit">
-          <TabsTrigger value="cities" className="rounded-lg gap-2 data-[state=active]:bg-white">
-            <Globe className="h-4 w-4" />
-            Cities
+      {/* Tabs for different location management aspects */}
+      <Tabs defaultValue="cities" className="w-full">
+        <TabsList className="bg-white border border-slate-100 p-1 h-14 rounded-2xl shadow-sm mb-8">
+          <TabsTrigger value="cities" className="rounded-xl px-8 data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none">
+            <Building2 className="h-4 w-4 mr-2" />
+            Cities & Areas
           </TabsTrigger>
-          <TabsTrigger value="areas" className="rounded-lg gap-2 data-[state=active]:bg-white">
-            <MapPin className="h-4 w-4" />
-            Areas
-          </TabsTrigger>
-          <TabsTrigger value="slots" className="rounded-lg gap-2 data-[state=active]:bg-white">
-            <Clock className="h-4 w-4" />
+          <TabsTrigger value="slots" className="rounded-xl px-8 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:shadow-none">
+            <Clock className="h-4 w-4 mr-2" />
             Time Slots
+          </TabsTrigger>
+          <TabsTrigger value="surge" className="rounded-xl px-8 data-[state=active]:bg-rose-50 data-[state=active]:text-rose-700 data-[state=active]:shadow-none">
+            <Zap className="h-4 w-4 mr-2" />
+            Surge Pricing
+          </TabsTrigger>
+          <TabsTrigger value="services" className="rounded-xl px-8 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none">
+            <Settings2 className="h-4 w-4 mr-2" />
+            Service Availability
           </TabsTrigger>
         </TabsList>
 
-        {/* CITIES TAB */}
-        <TabsContent value="cities" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCities.map((city) => (
-              <div key={city.id} className="bg-white rounded-2xl border p-6 shadow-sm hover:shadow-md transition-all group">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Globe className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCity(city)}>
-                      <Edit className="h-4 w-4 text-slate-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600" onClick={() => deleteCity(city.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-black">{city.cityName}</h3>
-                  <p className="text-sm text-slate-500 font-mono">{city.cityCode}</p>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <Badge className={`${city.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
-                    {city.isEnabled ? "enabled" : "disabled"}
-                  </Badge>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Order</p>
-                    <p className="font-bold text-black">{city.displayOrder}</p>
-                  </div>
-                </div>
+        <TabsContent value="cities" className="mt-0">
+          <div className="grid gap-6">
+            {/* Search & Add */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input placeholder="Search city or area..." className="pl-10 h-12 rounded-xl bg-white border-slate-100 shadow-sm" />
               </div>
-            ))}
-            {filteredCities.length === 0 && !loading && (
-               <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed">
-                <p className="text-slate-500">No cities found. Use Add City to get started.</p>
-              </div>
-            )}
-            {loading && <div className="col-span-full text-center py-12 text-slate-400">Loading cities...</div>}
+              <Button className="h-12 bg-sky-600 hover:bg-sky-700 rounded-xl gap-2 px-6">
+                <Plus className="h-4 w-4" />
+                Add New City
+              </Button>
+            </div>
+
+            {/* City Cards */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {["Mumbai", "Delhi", "Bangalore", "Pune"].map((city) => (
+                <div key={city} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 font-bold">
+                        {city[0]}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{city}</h3>
+                        <p className="text-xs text-slate-500">Maharashtra, India</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-slate-400">Operational</span>
+                      <Switch defaultChecked className="data-[state=checked]:bg-sky-500" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+                      <span className="text-sm font-medium text-slate-600">Active Areas</span>
+                      <Badge variant="outline" className="bg-white">12 Areas</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+                      <span className="text-sm font-medium text-slate-600">Live Vendors</span>
+                      <Badge variant="outline" className="bg-white">45 Vendors</Badge>
+                    </div>
+                  </div>
+
+                  <Button variant="ghost" className="w-full mt-6 text-sky-600 hover:bg-sky-50 hover:text-sky-700 rounded-xl">
+                    Configure Area Settings
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         </TabsContent>
 
-        {/* AREAS TAB */}
-        <TabsContent value="areas" className="mt-6">
-           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b">
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Area Name</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Area Code</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">City Code</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Surge</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredAreas.map((area) => (
-                  <tr key={area.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
-                          <MapPin className="h-4 w-4" />
-                        </div>
-                        <span className="font-semibold text-black">{area.areaName}</span>
+        <TabsContent value="slots" className="mt-0">
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+             <h2 className="text-xl font-bold text-slate-900 mb-6">Pickup & Delivery Time Slots</h2>
+             <div className="grid gap-8">
+               <div className="space-y-4">
+                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Morning Slots (08:00 AM - 12:00 PM)</h3>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {["08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00"].map(slot => (
+                      <div key={slot} className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50">
+                        <span className="text-sm font-bold text-slate-700">{slot}</span>
+                        <Switch defaultChecked />
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant="outline" className="font-mono">{area.areaCode}</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant="outline" className="font-mono">{area.cityCode}</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                       <Badge className={`${area.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'} border-none`}>
-                        {area.isEnabled ? "enabled" : "disabled"}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-black">{area.surgePercent}%</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditArea(area)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => deleteArea(area.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                    ))}
+                 </div>
+               </div>
+
+               <div className="space-y-4">
+                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Evening Slots (04:00 PM - 09:00 PM)</h3>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {["04:00 - 05:00", "05:00 - 06:00", "06:00 - 07:00", "07:00 - 08:00"].map(slot => (
+                      <div key={slot} className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50">
+                        <span className="text-sm font-bold text-slate-700">{slot}</span>
+                        <Switch defaultChecked />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredAreas.length === 0 && !loading && (
-               <div className="py-12 text-center text-slate-500">No areas found.</div>
-            )}
+                    ))}
+                 </div>
+               </div>
+             </div>
+             
+             <div className="mt-10 p-6 rounded-2xl bg-amber-50 border border-amber-100">
+               <h4 className="font-bold text-amber-800 flex items-center gap-2">
+                 <Settings2 className="h-4 w-4" />
+                 Global Slot Configuration
+               </h4>
+               <p className="text-sm text-amber-700/70 mt-1">These slots apply to all operational cities by default unless overridden at city level.</p>
+             </div>
           </div>
         </TabsContent>
 
-        {/* SLOTS TAB */}
-        <TabsContent value="slots" className="mt-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredSlots.map((slot) => (
-              <div key={slot.id} className={`bg-white rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md ${!slot.isActive ? 'opacity-60' : ''}`}>
-                <div className="flex justify-between items-start mb-4">
-                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${slot.slotType === 'delivery' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                    <Clock className="h-5 w-5" />
-                  </div>
-                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditSlot(slot)}>
-                      <Edit className="h-3.5 w-3.5 text-slate-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-red-50 hover:text-red-600" onClick={() => deleteSlot(slot.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <p className="text-lg font-bold text-black">{slot.startTime} - {slot.endTime}</p>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{DAYS[slot.dayOfWeek]} {slot.slotType}</p>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <div>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tight">City</p>
-                    <Badge variant="outline" className="text-[10px] py-0">{slot.cityCode}</Badge>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tight">Capacity</p>
-                    <p className="font-bold text-green-600">{slot.capacityLimit ?? "Open"}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-             {filteredSlots.length === 0 && !loading && (
-               <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed">
-                <p className="text-slate-500">No time slots found.</p>
-              </div>
-            )}
+        <TabsContent value="surge" className="mt-0">
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+             <div className="flex items-center justify-between mb-8">
+               <div>
+                 <h2 className="text-xl font-bold text-slate-900">Area-wise Surge Pricing</h2>
+                 <p className="text-sm text-slate-500">Apply multiplier to base price for high-demand zones.</p>
+               </div>
+               <Switch defaultChecked className="data-[state=checked]:bg-rose-500" />
+             </div>
+
+             <div className="space-y-4">
+               {["Indiranagar (Bangalore)", "Koregaon Park (Pune)", "Bandra West (Mumbai)"].map((area) => (
+                 <div key={area} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-rose-100 bg-rose-50/20">
+                   <div className="flex items-center gap-4">
+                     <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                       <Zap className="h-5 w-5" />
+                     </div>
+                     <div>
+                       <h4 className="font-bold text-slate-800">{area}</h4>
+                       <span className="text-[10px] uppercase font-bold text-slate-400">High Demand Zone</span>
+                     </div>
+                   </div>
+                   <div className="flex items-center gap-6">
+                     <div className="flex items-center gap-3">
+                       <span className="text-xs font-medium text-slate-500">Multiplier</span>
+                       <Input type="number" defaultValue="1.5" className="h-10 w-20 rounded-lg text-center font-bold text-rose-600 border-rose-100" />
+                       <span className="text-lg font-bold text-rose-600">x</span>
+                     </div>
+                     <Switch defaultChecked className="data-[state=checked]:bg-rose-500" />
+                   </div>
+                 </div>
+               ))}
+             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="services" className="mt-0">
+           <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-bold text-slate-900 mb-6">Service Availability Matrix</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="pb-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider">Service Type</th>
+                      <th className="pb-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider text-center">Mumbai</th>
+                      <th className="pb-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider text-center">Delhi</th>
+                      <th className="pb-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider text-center">Bangalore</th>
+                      <th className="pb-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider text-center">Pune</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {["Dry Clean", "Laundry", "Shoe Cleaning", "Home Textile"].map(service => (
+                      <tr key={service} className="group hover:bg-slate-50/50 transition-all">
+                        <td className="py-4 font-bold text-slate-700">{service}</td>
+                        {[1, 2, 3, 4].map(i => (
+                          <td key={i} className="py-4 text-center">
+                            <Switch defaultChecked={i !== 4} className="data-[state=checked]:bg-emerald-500" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+           </div>
         </TabsContent>
       </Tabs>
-
-      {/* CITY DIALOG */}
-      <Dialog open={isCityDialogOpen} onOpenChange={setIsCityDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit City" : "Add New City"}</DialogTitle>
-            <DialogDescription>Configure an enabled service city for catalog availability.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>City Name</Label>
-                <Input placeholder="e.g. Bangalore" value={cityForm.cityName} onChange={e => setCityForm({...cityForm, cityName: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>City Code</Label>
-                <Input placeholder="e.g. BLR" value={cityForm.cityCode} onChange={e => setCityForm({...cityForm, cityCode: e.target.value.toUpperCase()})} disabled={!!editingId} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Display Order</Label>
-                <Input type="number" value={cityForm.displayOrder} onChange={e => setCityForm({...cityForm, displayOrder: Number(e.target.value)})} />
-              </div>
-              <div className="space-y-2">
-                <Label>Timezone</Label>
-                <Input value={cityForm.timezone} onChange={e => setCityForm({...cityForm, timezone: e.target.value})} />
-              </div>
-            </div>
-             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <Label>Service Enabled</Label>
-                <Switch checked={cityForm.isEnabled} onCheckedChange={v => setCityForm({...cityForm, isEnabled: v})} />
-             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCityDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-primary gap-2" onClick={handleCitySubmit}>
-              <Save className="h-4 w-4" />
-              {editingId ? "Update City" : "Create City"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* AREA DIALOG */}
-      <Dialog open={isAreaDialogOpen} onOpenChange={setIsAreaDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Area" : "Add New Area"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-             <div className="space-y-2">
-                <Label>City</Label>
-                <Select value={areaForm.cityCode} onValueChange={v => setAreaForm({...areaForm, cityCode: v})}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Select City" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cities.map(c => (
-                      <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName} ({c.cityCode})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Area Name</Label>
-                  <Input placeholder="e.g. Indiranagar" value={areaForm.areaName} onChange={e => setAreaForm({...areaForm, areaName: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Area Code</Label>
-                  <Input placeholder="e.g. BLR-IND" value={areaForm.areaCode} onChange={e => setAreaForm({...areaForm, areaCode: e.target.value.toUpperCase()})} disabled={!!editingId} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Surge Percent</Label>
-                <Input type="number" value={areaForm.surgePercent} onChange={e => setAreaForm({...areaForm, surgePercent: Number(e.target.value)})} />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <Label>Area Enabled</Label>
-                <Switch checked={areaForm.isEnabled} onCheckedChange={v => setAreaForm({...areaForm, isEnabled: v})} />
-              </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAreaDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-primary" onClick={handleAreaSubmit}>
-              {editingId ? "Update Area" : "Create Area"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* SLOT DIALOG */}
-      <Dialog open={isSlotDialogOpen} onOpenChange={setIsSlotDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Slot" : "Add Time Slot"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input type="time" value={slotForm.startTime} onChange={e => setSlotForm({...slotForm, startTime: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Time</Label>
-                  <Input type="time" value={slotForm.endTime} onChange={e => setSlotForm({...slotForm, endTime: e.target.value})} />
-                </div>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>City Scope</Label>
-                  <Select value={slotForm.cityCode} onValueChange={v => setSlotForm({...slotForm, cityCode: v})}>
-                    <SelectTrigger className="bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Cities</SelectItem>
-                      {cities.map(c => (
-                        <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Slot Type</Label>
-                  <Select value={slotForm.slotType} onValueChange={v => setSlotForm({...slotForm, slotType: v})}>
-                    <SelectTrigger className="bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pickup">Pickup</SelectItem>
-                      <SelectItem value="delivery">Delivery</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Day</Label>
-                  <Select value={String(slotForm.dayOfWeek)} onValueChange={v => setSlotForm({...slotForm, dayOfWeek: Number(v)})}>
-                    <SelectTrigger className="bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS.map((day, index) => (
-                        <SelectItem key={day} value={String(index)}>{day}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Capacity Limit</Label>
-                  <Input type="number" value={slotForm.capacityLimit} onChange={e => setSlotForm({...slotForm, capacityLimit: Number(e.target.value)})} />
-                </div>
-             </div>
-             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <Label>Active Status</Label>
-                <Switch checked={slotForm.isActive} onCheckedChange={v => setSlotForm({...slotForm, isActive: v})} />
-             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSlotDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-primary" onClick={handleSlotSubmit}>
-              {editingId ? "Update Slot" : "Create Slot"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

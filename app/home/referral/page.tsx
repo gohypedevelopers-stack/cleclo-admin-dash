@@ -15,13 +15,18 @@ import {
   ArrowLeft,
   History,
   Hash,
+  MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { adminReferralApi } from "@/lib/admin-api";
+import { adminReferralApi, adminLocationApi } from "@/lib/admin-api";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type ReferralCampaignVersion = {
   id: string;
@@ -31,6 +36,8 @@ type ReferralCampaignVersion = {
   refereeRewardAmount: number;
   minimumCartValue: number;
   maxReferralsPerUser?: number | null;
+  firstOrderRequired: boolean;
+  targetCityCodes: string[];
   isActive: boolean;
   createdAt: string;
   usedByUsersCount?: number;
@@ -44,7 +51,10 @@ export default function ReferralPage() {
     refereeReward: 100,
     minOrderValue: 200,
     maxReferrals: 10,
+    firstOrderRequired: true,
+    targetCityCodes: [] as string[],
   });
+  const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,6 +69,8 @@ export default function ReferralPage() {
       refereeReward: Number(campaign.refereeRewardAmount) || 0,
       minOrderValue: Number(campaign.minimumCartValue) || 0,
       maxReferrals: Number(campaign.maxReferralsPerUser) || 0,
+      firstOrderRequired: campaign.firstOrderRequired ?? true,
+      targetCityCodes: campaign.targetCityCodes || [],
     });
     setBannerImage(campaign.bannerImageUrl || null);
     setActiveCampaignId(campaign.id);
@@ -86,8 +98,18 @@ export default function ReferralPage() {
     }
   };
 
+  const loadCities = async () => {
+    try {
+      const cities = await adminLocationApi.getCities();
+      setAvailableCities(cities || []);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   useEffect(() => {
     loadCampaignHistory();
+    loadCities();
   }, []);
 
   const handleBannerImageChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -122,8 +144,8 @@ export default function ReferralPage() {
         minimumCartValue: settings.minOrderValue,
         maxReferralsPerUser: settings.maxReferrals || null,
         bannerImageUrl: bannerImage,
-        targetCityCodes: [],
-        firstOrderRequired: true,
+        targetCityCodes: settings.targetCityCodes,
+        firstOrderRequired: settings.firstOrderRequired,
         isActive: true,
       };
 
@@ -346,6 +368,97 @@ export default function ReferralPage() {
               />
             </div>
           </div>
+
+          <div className="mt-8 pt-8 border-t border-slate-100">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-semibold text-slate-700">First Order Condition</Label>
+                <p className="text-xs text-slate-500">Reward is only granted on the friend's first successful order</p>
+              </div>
+              <Switch 
+                checked={settings.firstOrderRequired}
+                onCheckedChange={(checked) => setSettings(s => ({ ...s, firstOrderRequired: checked }))}
+              />
+            </div>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-slate-100">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-semibold text-slate-700">Target Cities</Label>
+                </div>
+                {availableCities.length > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-primary hover:text-primary/80"
+                    onClick={() => {
+                      if (settings.targetCityCodes.length === availableCities.length) {
+                        setSettings(s => ({ ...s, targetCityCodes: [] }));
+                      } else {
+                        // Use cityCode if code is missing (backend field is cityCode)
+                        setSettings(s => ({ 
+                          ...s, 
+                          targetCityCodes: availableCities.map(c => (c as any).cityCode || (c as any).code) 
+                        }));
+                      }
+                    }}
+                  >
+                    {settings.targetCityCodes.length === availableCities.length ? "Deselect All" : "Select All"}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mb-4">Select cities where this referral campaign is active. Leave empty for all cities.</p>
+              
+              {availableCities.length === 0 ? (
+                <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center">
+                  <p className="text-sm text-slate-400">No cities configured in the system.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {availableCities.map((city, idx) => {
+                    const code = (city as any).cityCode || (city as any).code;
+                    const name = (city as any).cityName || (city as any).name;
+                    const isSelected = settings.targetCityCodes.includes(code);
+                    
+                    return (
+                      <div 
+                        key={code || idx} 
+                        className={cn(
+                          "flex items-center space-x-2 p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md",
+                          isSelected 
+                            ? "bg-primary/5 border-primary shadow-sm" 
+                            : "bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-200"
+                        )}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSettings(s => ({ ...s, targetCityCodes: s.targetCityCodes.filter(c => c !== code) }));
+                          } else {
+                            setSettings(s => ({ ...s, targetCityCodes: [...s.targetCityCodes, code] }));
+                          }
+                        }}
+                      >
+                        <Checkbox 
+                          id={`city-${code}`}
+                          checked={isSelected}
+                          onCheckedChange={() => {}} // Handled by div onClick
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <label 
+                          htmlFor={`city-${code}`}
+                          className="text-[13px] font-medium leading-none cursor-pointer flex-1"
+                        >
+                          {name}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border p-8">
@@ -423,9 +536,9 @@ export default function ReferralPage() {
             <div className="text-slate-500 text-sm">No referral history yet.</div>
           ) : (
             <div className="space-y-3">
-              {campaignHistory.map((campaign) => (
+              {campaignHistory.map((campaign, idx) => (
                 <div
-                  key={campaign.id}
+                  key={campaign.id || idx}
                   className={`rounded-xl border p-4 ${campaign.isActive ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-200"}`}
                 >
                   <div className="flex items-start justify-between gap-4 mb-3">
@@ -443,6 +556,8 @@ export default function ReferralPage() {
                     <p>New User: ₹{campaign.refereeRewardAmount}</p>
                     <p>Min Order: ₹{campaign.minimumCartValue}</p>
                     <p>Max/User: {campaign.maxReferralsPerUser ?? "No limit"}</p>
+                    <p>First Order: {campaign.firstOrderRequired ? "Yes" : "No"}</p>
+                    <p className="col-span-2">Cities: {campaign.targetCityCodes?.length > 0 ? campaign.targetCityCodes.join(", ") : "All Cities"}</p>
                     <p>Used Users: {campaign.usedByUsersCount ?? 0}</p>
                     <p>Redemptions: {campaign.redemptionsCount ?? 0}</p>
                     <p>Successful: {campaign.successfulRedemptionsCount ?? 0}</p>

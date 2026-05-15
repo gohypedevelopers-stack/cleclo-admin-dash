@@ -55,6 +55,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { adminCatalogApi, adminLocationApi, adminVendorApi } from "@/lib/admin-api";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 type CityOption = {
   cityCode: string;
@@ -95,9 +96,13 @@ type ItemRecord = {
   subCategoryId: string;
   isActive: boolean;
   subCategory?: SubCategoryRecord;
-  customerPrice?: number;
-  vendorShare?: number;
-  gstPercent?: number;
+  customerPrice: number;
+  vendorShare: number;
+  gstPercent: number;
+  targetCityCodes?: string[];
+  targetVendorIds?: string[];
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 const serviceColors: Record<string, string> = {
@@ -183,6 +188,13 @@ function ItemsPageContent() {
   const [newItem, setNewItem] = useState({
     name: "",
     subCategoryId: "",
+    customerPrice: "0",
+    vendorShare: "0",
+    gstPercent: "18",
+    targetCityCodes: [] as string[],
+    targetVendorIds: [] as string[],
+    availableFrom: "",
+    availableUntil: "",
   });
 
   // Feature Modal States
@@ -415,7 +427,17 @@ function ItemsPageContent() {
         : subCategoryList[0]?.id || "";
 
     setEditingId(null);
-    setNewItem({ name: "", subCategoryId: defaultSubCategoryId });
+    setNewItem({ 
+      name: "", 
+      subCategoryId: defaultSubCategoryId,
+      customerPrice: "0",
+      vendorShare: "0",
+      gstPercent: "18",
+      targetCityCodes: [],
+      targetVendorIds: [],
+      availableFrom: "",
+      availableUntil: "",
+    });
     setIsDialogOpen(true);
   };
 
@@ -424,6 +446,13 @@ function ItemsPageContent() {
     setNewItem({
       name: item.name,
       subCategoryId: item.subCategoryId,
+      customerPrice: String(item.customerPrice || 0),
+      vendorShare: String(item.vendorShare || 0),
+      gstPercent: String(item.gstPercent || 18),
+      targetCityCodes: item.targetCityCodes || [],
+      targetVendorIds: item.targetVendorIds || [],
+      availableFrom: item.availableFrom ? new Date(item.availableFrom).toISOString().slice(0, 16) : "",
+      availableUntil: item.availableUntil ? new Date(item.availableUntil).toISOString().slice(0, 16) : "",
     });
     setIsDialogOpen(true);
   };
@@ -475,6 +504,13 @@ function ItemsPageContent() {
           subCategoryId: newItem.subCategoryId,
           skuCode: existing?.skuCode || generateCode(newItem.subCategoryId),
           isActive: existing?.isActive ?? true,
+          customerPrice: Number(newItem.customerPrice),
+          vendorShare: Number(newItem.vendorShare),
+          gstPercent: Number(newItem.gstPercent),
+          targetCityCodes: newItem.targetCityCodes,
+          targetVendorIds: newItem.targetVendorIds,
+          availableFrom: newItem.availableFrom || null,
+          availableUntil: newItem.availableUntil || null,
         });
 
         toast.success("Item updated");
@@ -483,9 +519,14 @@ function ItemsPageContent() {
           name: newItem.name.trim(),
           subCategoryId: newItem.subCategoryId,
           skuCode: generateCode(newItem.subCategoryId),
-          customerPrice: 0,
-          vendorShare: 0,
+          customerPrice: Number(newItem.customerPrice),
+          vendorShare: Number(newItem.vendorShare),
+          gstPercent: Number(newItem.gstPercent),
           isActive: true,
+          targetCityCodes: newItem.targetCityCodes,
+          targetVendorIds: newItem.targetVendorIds,
+          availableFrom: newItem.availableFrom || null,
+          availableUntil: newItem.availableUntil || null,
         });
 
         toast.success("Item added");
@@ -498,6 +539,13 @@ function ItemsPageContent() {
         subCategoryId: selectedSubCategoryId !== "all"
           ? selectedSubCategoryId
           : subCategoryList[0]?.id || "",
+        customerPrice: "0",
+        vendorShare: "0",
+        gstPercent: "18",
+        targetCityCodes: [],
+        targetVendorIds: [],
+        availableFrom: "",
+        availableUntil: "",
       });
 
       await loadData();
@@ -729,6 +777,9 @@ function ItemsPageContent() {
                     Code
                   </TableHead>
                   <TableHead className="text-xs font-bold uppercase text-primary py-4">
+                    Price
+                  </TableHead>
+                  <TableHead className="text-xs font-bold uppercase text-primary py-4">
                     Status
                   </TableHead>
                   <TableHead className="text-xs font-bold uppercase text-primary py-4 text-right pr-6">
@@ -780,6 +831,11 @@ function ItemsPageContent() {
                         </span>
                       </TableCell>
                       <TableCell>
+                        <span className="font-semibold text-slate-700">
+                          ₹{item.customerPrice || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell>
                         <Switch
                           checked={item.isActive}
                           onCheckedChange={() => toggleItem(item.id, item.isActive)}
@@ -822,11 +878,12 @@ function ItemsPageContent() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Item" : "Add New Item"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="grid gap-6 py-4 md:grid-cols-2">
+            <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Item Name</label>
               <Input
@@ -882,6 +939,150 @@ function ItemsPageContent() {
                   : generateCode(newItem.subCategoryId)}
               </p>
             </div>
+
+            <div className="space-y-4 p-4 rounded-xl border bg-slate-50/50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Percent className="h-4 w-4 text-primary" />
+                Pricing & Margin Preview
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Customer Price (₹)</label>
+                  <Input 
+                    type="number" 
+                    value={newItem.customerPrice} 
+                    onChange={e => setNewItem(prev => ({ ...prev, customerPrice: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Vendor Share (₹)</label>
+                  <Input 
+                    type="number" 
+                    value={newItem.vendorShare} 
+                    onChange={e => setNewItem(prev => ({ ...prev, vendorShare: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">GST (%)</label>
+                <Input 
+                  type="number" 
+                  value={newItem.gstPercent} 
+                  onChange={e => setNewItem(prev => ({ ...prev, gstPercent: e.target.value }))}
+                />
+              </div>
+
+              <div className="pt-2 border-t space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Platform Commission:</span>
+                  <span className={`font-bold ${Number(newItem.customerPrice) - Number(newItem.vendorShare) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ₹{Math.max(0, Number(newItem.customerPrice) - Number(newItem.vendorShare))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 text-[10px] uppercase">Margin:</span>
+                  <span className="font-medium">
+                    {Number(newItem.customerPrice) > 0 
+                      ? (((Number(newItem.customerPrice) - Number(newItem.vendorShare)) / Number(newItem.customerPrice)) * 100).toFixed(1) 
+                      : 0}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            </div>
+
+            <div className="space-y-4 border-l pl-6">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                Visibility & Targeting
+              </h3>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">City-based visibility</label>
+                <div className="space-y-2">
+                  <Select value={selectedStateCode} onValueChange={setSelectedStateCode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {states.map(s => <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select onValueChange={(val) => {
+                    if (val && !newItem.targetCityCodes.includes(val)) {
+                      setNewItem(prev => ({ ...prev, targetCityCodes: [...prev.targetCityCodes, val] }));
+                    }
+                  }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Add City" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {cityOptions.map(c => <SelectItem key={c.cityCode} value={c.cityCode}>{c.cityName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newItem.targetCityCodes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newItem.targetCityCodes.map(code => (
+                      <Badge key={code} variant="secondary" className="gap-1 bg-blue-50 text-blue-700 border-blue-100">
+                        {code}
+                        <button onClick={() => setNewItem(prev => ({ ...prev, targetCityCodes: prev.targetCityCodes.filter(c => c !== code) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Vendor-based availability</label>
+                <Select onValueChange={(val) => {
+                  if (val && !newItem.targetVendorIds.includes(val)) {
+                    setNewItem(prev => ({ ...prev, targetVendorIds: [...prev.targetVendorIds, val] }));
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add Vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.businessName || v.contactName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {newItem.targetVendorIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newItem.targetVendorIds.map(id => (
+                      <Badge key={id} variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-100">
+                        {vendors.find(v => v.id === id)?.businessName || id}
+                        <button onClick={() => setNewItem(prev => ({ ...prev, targetVendorIds: prev.targetVendorIds.filter(v => v !== id) }))}>
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available From</label>
+                  <DateTimePicker 
+                    value={newItem.availableFrom} 
+                    onChange={val => setNewItem(prev => ({ ...prev, availableFrom: val }))}
+                    placeholder="Pick start time"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-tight">Available Until</label>
+                  <DateTimePicker 
+                    value={newItem.availableUntil} 
+                    onChange={val => setNewItem(prev => ({ ...prev, availableUntil: val }))}
+                    placeholder="Pick end time"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -914,19 +1115,76 @@ function ItemsPageContent() {
             <DialogTitle>Bulk Upload (CSV)</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-slate-500 cursor-pointer hover:bg-slate-50 transition-colors">
+            <div 
+              className="border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-slate-500 cursor-pointer hover:bg-slate-50 transition-colors relative"
+              onClick={() => document.getElementById('csv-upload-input')?.click()}
+            >
+              <Input 
+                id="csv-upload-input"
+                type="file" 
+                accept=".csv" 
+                className="hidden" 
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  
+                  const reader = new FileReader();
+                  reader.onload = async (event) => {
+                    const text = event.target?.result as string;
+                    const rows = text.split('\n').map(row => row.split(','));
+                    // Header validation: name, price, share, gst
+                    const headers = rows[0].map(h => h.trim().toLowerCase());
+                    const dataRows = rows.slice(1).filter(r => r.length >= 2 && r[0].trim());
+                    
+                    if (dataRows.length === 0) return toast.error("No valid data rows found in CSV");
+
+                    try {
+                      const itemsToCreate = dataRows.map(row => ({
+                        name: row[headers.indexOf('name')]?.trim() || row[0]?.trim(),
+                        customerPrice: Number(row[headers.indexOf('price')] || row[1] || 0),
+                        vendorShare: Number(row[headers.indexOf('share')] || row[2] || 0),
+                        gstPercent: Number(row[headers.indexOf('gst')] || row[3] || 18),
+                        subCategoryId: selectedSubCategoryId !== "all" ? selectedSubCategoryId : subCategoryList[0]?.id,
+                        isActive: true,
+                        skuCode: generateCode(selectedSubCategoryId !== "all" ? selectedSubCategoryId : subCategoryList[0]?.id)
+                      }));
+
+                      await adminCatalogApi.bulkCreateItems(itemsToCreate);
+                      toast.success(`Successfully uploaded ${itemsToCreate.length} items`);
+                      setIsBulkUploadOpen(false);
+                      loadData();
+                    } catch (err) {
+                      toast.error("Failed to process CSV data");
+                    }
+                  };
+                  reader.readAsText(file);
+                }}
+              />
               <Upload className="h-8 w-8 mb-2" />
               <p className="font-medium text-slate-700">Click to upload or drag and drop</p>
-              <p className="text-sm">CSV files only (max 5MB)</p>
+              <p className="text-sm">CSV columns: Name, Price, Share, GST</p>
             </div>
             <div className="flex justify-between items-center bg-blue-50 text-blue-700 p-3 rounded-lg text-sm">
               <span>Need a template?</span>
-              <Button variant="link" className="p-0 h-auto text-blue-700 font-semibold">Download CSV Template</Button>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-blue-700 font-semibold"
+                onClick={() => {
+                  const csvContent = "data:text/csv;charset=utf-8,Name,Price,Share,GST\nHoodie,500,400,18\nT-Shirt,300,240,18";
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", "item_template.csv");
+                  document.body.appendChild(link);
+                  link.click();
+                }}
+              >
+                Download CSV Template
+              </Button>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsBulkUploadOpen(false)}>Cancel</Button>
-            <Button className="bg-[#3E8940] hover:bg-[#3E8940]/90">Upload and Process</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1250,29 +1508,53 @@ function ItemsPageContent() {
           <DialogHeader>
             <DialogTitle>Tax Settings (GST %)</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Default GST Percentage (%)</label>
-              <Input type="number" defaultValue="18" />
-              <p className="text-xs text-slate-500 mt-1">This will apply to all newly created items unless specified otherwise.</p>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            const gst = Number(formData.get("gst"));
+            const applyTo = formData.get("applyTo");
+
+            try {
+              if (applyTo === "all") {
+                await adminCatalogApi.bulkUpdateItems(filteredItems.map(i => ({ id: i.id, gstPercent: gst })));
+                toast.success(`Applied ${gst}% GST to all ${filteredItems.length} items`);
+              } else if (applyTo === "zero") {
+                const targets = filteredItems.filter(i => (i.gstPercent || 0) === 0);
+                await adminCatalogApi.bulkUpdateItems(targets.map(i => ({ id: i.id, gstPercent: gst })));
+                toast.success(`Applied ${gst}% GST to ${targets.length} items`);
+              } else {
+                toast.success("Default GST preference saved");
+              }
+              setIsTaxSettingsOpen(false);
+              loadData();
+            } catch (err) {
+              toast.error("Failed to update tax settings");
+            }
+          }}>
+            <div className="py-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Default GST Percentage (%)</label>
+                <Input name="gst" type="number" defaultValue="18" />
+                <p className="text-xs text-slate-500 mt-1">This will apply to all newly created items unless specified otherwise.</p>
+              </div>
+              <div className="p-4 border rounded-lg bg-slate-50">
+                <h4 className="font-semibold text-sm mb-2">Apply to existing items</h4>
+                <p className="text-sm text-slate-600 mb-3">You can forcefully apply this GST setting to existing items.</p>
+                <Select name="applyTo" defaultValue="none">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Do not apply to existing items</SelectItem>
+                    <SelectItem value="all">Apply to all existing items ({filteredItems.length})</SelectItem>
+                    <SelectItem value="zero">Apply only to items with 0% GST</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="p-4 border rounded-lg bg-slate-50">
-              <h4 className="font-semibold text-sm mb-2">Apply to existing items</h4>
-              <p className="text-sm text-slate-600 mb-3">You can forcefully apply this GST setting to existing items.</p>
-              <Select defaultValue="none">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Do not apply to existing items</SelectItem>
-                  <SelectItem value="all">Apply to all existing items</SelectItem>
-                  <SelectItem value="zero">Apply only to items with 0% GST</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTaxSettingsOpen(false)}>Cancel</Button>
-            <Button className="bg-[#3E8940] hover:bg-[#3E8940]/90">Save Tax Settings</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsTaxSettingsOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-[#3E8940] hover:bg-[#3E8940]/90">Save Tax Settings</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

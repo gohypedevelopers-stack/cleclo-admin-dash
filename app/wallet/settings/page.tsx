@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Wallet, Save, Gift, Plus, TrendingUp, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
+import { Wallet, Save, Gift, Plus, TrendingUp, Sparkles, AlertCircle, ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -296,15 +296,16 @@ export default function WalletSettingsPage() {
                         Rs.
                         </span>
                         <Input
-                        type="number"
-                        value={settings.minAddAmount}
-                        onChange={(e) =>
+                          type="number"
+                          value={settings.minAddAmount === 0 ? "" : settings.minAddAmount}
+                          placeholder="0"
+                          onChange={(e) =>
                             setSettings((s) => ({
-                            ...s,
-                            minAddAmount: parseInt(e.target.value) || 0,
+                              ...s,
+                              minAddAmount: parseInt(e.target.value) || 0,
                             }))
-                        }
-                        className="pl-12 h-12 text-lg font-semibold"
+                          }
+                          className="pl-12 h-12 text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                     </div>
                     </div>
@@ -316,15 +317,16 @@ export default function WalletSettingsPage() {
                         Rs.
                         </span>
                         <Input
-                        type="number"
-                        value={settings.maxAddAmount}
-                        onChange={(e) =>
+                          type="number"
+                          value={settings.maxAddAmount === 0 ? "" : settings.maxAddAmount}
+                          placeholder="0"
+                          onChange={(e) =>
                             setSettings((s) => ({
-                            ...s,
-                            maxAddAmount: parseInt(e.target.value) || 0,
+                              ...s,
+                              maxAddAmount: parseInt(e.target.value) || 0,
                             }))
-                        }
-                        className="pl-12 h-12 text-lg font-semibold"
+                          }
+                          className="pl-12 h-12 text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                     </div>
                     </div>
@@ -356,60 +358,101 @@ export default function WalletSettingsPage() {
                 </div>
 
                 {settings.bonusEnabled && (
-                    <div className="space-y-3">
-                    {settings.bonuses.map((bonus) => (
+                  <div className="space-y-4">
+                    {settings.bonuses
+                      .filter((b) => b.ruleType === "recharge_bonus")
+                      .map((bonus) => (
                         <div
-                        key={bonus.id}
-                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
+                          key={bonus.id}
+                          className={`group flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
                             bonus.isActive
-                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
-                            : "bg-slate-50 border-slate-200"
-                        }`}
+                              ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+                              : "bg-slate-50 border-slate-200"
+                          }`}
                         >
-                        <div className="flex items-center gap-6">
-                            <div className="text-center min-w-[80px]">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">
-                                Add
-                            </p>
-                            <p className="text-xl font-bold text-black">
-                                {formatMoney(bonus.minRechargeValue || 0)}+
-                            </p>
+                          <div className="flex flex-1 items-center gap-6 lg:gap-12">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Add</span>
+                              <div className="flex items-center gap-1 group/input relative">
+                                <span className="text-lg font-bold text-slate-800">Rs.</span>
+                                <div className="relative">
+                                  <Input
+                                    type="number"
+                                    value={bonus.minRechargeValue === 0 ? "" : (bonus.minRechargeValue || 0)}
+                                    placeholder="0"
+                                    onChange={(e) => handleUpdateRule(bonus.id, { minRechargeValue: parseInt(e.target.value) || 0 })}
+                                    className="h-10 w-24 rounded-lg border-emerald-100/50 bg-white text-lg font-bold text-slate-800 focus:border-[#3E8940] focus:ring-1 focus:ring-[#3E8940] transition-all px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-slate-100 flex items-center justify-center shadow-sm">
+                                    <Gift className="h-2 w-2 text-slate-500" />
+                                  </div>
+                                </div>
+                                <span className="text-lg font-bold text-slate-800">+</span>
+                              </div>
                             </div>
+
                             <div className="text-3xl text-slate-300">{"->"}</div>
-                            <div className="text-center min-w-[80px]">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">
-                                Get
-                            </p>
-                            <p className="text-xl font-bold text-green-600">
-                                {bonus.rewardMode === 'percentage' ? `${bonus.rewardValue}%` : `+${formatMoney(bonus.rewardValue)}`}
-                            </p>
+
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Get</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      value={bonus.rewardValue === 0 ? "" : (bonus.rewardValue || 0)}
+                                      placeholder="0"
+                                      onChange={(e) => handleUpdateRule(bonus.id, { rewardValue: parseInt(e.target.value) || 0 })}
+                                      className="h-10 w-16 rounded-lg border-emerald-100/50 bg-white text-lg font-bold text-emerald-600 focus:border-[#3E8940] focus:ring-1 focus:ring-[#3E8940] transition-all px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-slate-100 flex items-center justify-center shadow-sm">
+                                      <TrendingUp className="h-2 w-2 text-emerald-500" />
+                                    </div>
+                                  </div>
+                                  <span className="text-lg font-bold text-emerald-600">%</span>
+                                </div>
+                                <Badge className="bg-emerald-100 text-emerald-700 border-none font-medium px-2 py-0 h-5 text-[9px] uppercase tracking-wider">
+                                  bonus tier
+                                </Badge>
+                              </div>
                             </div>
-                            <Badge
-                            className={`text-xs ${
-                                bonus.isActive
-                                ? "bg-green-100 text-green-700"
-                                : "bg-slate-100 text-slate-500"
-                            } border-none`}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all rounded-full border border-slate-100"
+                              onClick={async () => {
+                                try {
+                                  await adminWalletApi.deleteReward(bonus.id);
+                                  loadBackend();
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }}
                             >
-                            bonus tier
-                            </Badge>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <div className="h-8 w-px bg-slate-100 mx-1" />
+                            <Switch
+                              checked={bonus.isActive}
+                              onCheckedChange={() => toggleBonus(bonus.id, bonus.isActive)}
+                              className="data-[state=checked]:bg-[#3E8940]"
+                            />
+                          </div>
                         </div>
-                        <Switch
-                            checked={bonus.isActive}
-                            onCheckedChange={() => toggleBonus(bonus.id, bonus.isActive)}
-                        />
-                        </div>
-                    ))}
+                      ))}
 
                     <Button
-                        variant="outline"
-                        onClick={() => handleCreateRule("recharge_bonus")}
-                        className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary"
+                      variant="outline"
+                      onClick={() => handleCreateRule("recharge_bonus")}
+                      className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary rounded-2xl"
                     >
-                        <Plus className="h-4 w-4" />
-                        Add Default Bonus Tier
+                      <Plus className="h-4 w-4" />
+                      Add Default Bonus Tier
                     </Button>
-                    </div>
+                  </div>
                 )}
                 </div>
                 {/* Auto Cashback Rules */}
@@ -430,68 +473,100 @@ export default function WalletSettingsPage() {
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    {settings.bonuses.filter(b => b.ruleType === "order_cashback").map((bonus) => (
-                        <div
+                <div className="space-y-4">
+                  {settings.bonuses
+                    .filter((b) => b.ruleType === "order_cashback")
+                    .map((bonus) => (
+                      <div
                         key={bonus.id}
-                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
-                            bonus.isActive
+                        className={`group flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
+                          bonus.isActive
                             ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
                             : "bg-slate-50 border-slate-200"
                         }`}
-                        >
-                        <div className="flex items-center gap-6">
-                            <div className="text-center min-w-[80px]">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">
-                                Orders Above
-                            </p>
-                            <Input 
-                                type="number" 
-                                value={bonus.minOrderValue || 0}
-                                onChange={(e) => handleUpdateRule(bonus.id, { minOrderValue: parseInt(e.target.value) || 0 })}
-                                className="w-24 text-center mt-1"
-                            />
+                      >
+                        <div className="flex flex-1 items-center gap-6 lg:gap-12">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Orders Above</span>
+                            <div className="flex items-center gap-1 group/input relative">
+                              <span className="text-lg font-bold text-slate-800">Rs.</span>
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  value={bonus.minOrderValue === 0 ? "" : (bonus.minOrderValue || 0)}
+                                  placeholder="0"
+                                  onChange={(e) => handleUpdateRule(bonus.id, { minOrderValue: parseInt(e.target.value) || 0 })}
+                                  className="h-10 w-24 rounded-lg border-emerald-100/50 bg-white text-lg font-bold text-slate-800 focus:border-[#3E8940] focus:ring-1 focus:ring-[#3E8940] transition-all px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                                <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-slate-100 flex items-center justify-center shadow-sm">
+                                  <Sparkles className="h-2 w-2 text-emerald-500" />
+                                </div>
+                              </div>
+                              <span className="text-lg font-bold text-slate-800">+</span>
                             </div>
-                            <div className="text-3xl text-slate-300">{"->"}</div>
-                            <div className="text-center min-w-[80px]">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">
+                          </div>
+
+                          <div className="text-3xl text-slate-300">{"->"}</div>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cashback</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <div className="relative">
+                                  <Input
+                                    type="number"
+                                    value={bonus.rewardValue === 0 ? "" : (bonus.rewardValue || 0)}
+                                    placeholder="0"
+                                    onChange={(e) => handleUpdateRule(bonus.id, { rewardValue: parseInt(e.target.value) || 0 })}
+                                    className="h-10 w-16 rounded-lg border-emerald-100/50 bg-white text-lg font-bold text-emerald-600 focus:border-[#3E8940] focus:ring-1 focus:ring-[#3E8940] transition-all px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-slate-100 flex items-center justify-center shadow-sm">
+                                    <TrendingUp className="h-2 w-2 text-emerald-500" />
+                                  </div>
+                                </div>
+                                <span className="text-lg font-bold text-emerald-600">%</span>
+                              </div>
+                              <Badge className="bg-emerald-100 text-emerald-700 border-none font-medium px-2 py-0 h-5 text-[9px] uppercase tracking-wider">
                                 Cashback
-                            </p>
-                            <div className="flex items-center mt-1">
-                              <Input 
-                                  type="number" 
-                                  value={bonus.rewardValue || 0}
-                                  onChange={(e) => handleUpdateRule(bonus.id, { rewardValue: parseInt(e.target.value) || 0 })}
-                                  className="w-20 text-center text-green-600 font-bold"
-                              />
-                              <span className="ml-1 text-green-600 font-bold">{bonus.rewardMode === 'percentage' ? '%' : 'Rs.'}</span>
+                              </Badge>
                             </div>
-                            </div>
-                            <Badge
-                            className={`text-xs ${
-                                bonus.isActive
-                                ? "bg-green-100 text-green-700"
-                                : "bg-slate-100 text-slate-500"
-                            } border-none`}
-                            >
-                            Cashback
-                            </Badge>
+                          </div>
                         </div>
-                        <Switch
+
+                        <div className="flex items-center gap-3">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all rounded-full border border-slate-100"
+                            onClick={async () => {
+                              try {
+                                await adminWalletApi.deleteReward(bonus.id);
+                                loadBackend();
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <div className="h-8 w-px bg-slate-100 mx-1" />
+                          <Switch
                             checked={bonus.isActive}
                             onCheckedChange={() => toggleBonus(bonus.id, bonus.isActive)}
-                        />
+                            className="data-[state=checked]:bg-[#3E8940]"
+                          />
                         </div>
+                      </div>
                     ))}
 
-                    <Button
-                        variant="outline"
-                        onClick={() => handleCreateRule("order_cashback")}
-                        className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Add Cashback Rule
-                    </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleCreateRule("order_cashback")}
+                    className="w-full gap-2 border-dashed border-2 h-14 text-slate-500 hover:text-primary hover:border-primary rounded-2xl"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Cashback Rule
+                  </Button>
                 </div>
                 </div>
 
@@ -538,9 +613,10 @@ export default function WalletSettingsPage() {
                                 <Label className="text-sm whitespace-nowrap">Expires in (Days):</Label>
                                 <Input 
                                   type="number" 
-                                  value={bonus.expiryDays || 0}
+                                  value={bonus.expiryDays === 0 ? "" : bonus.expiryDays}
+                                  placeholder="0"
                                   onChange={(e) => handleUpdateRule(bonus.id, { expiryDays: parseInt(e.target.value) || 0 })}
-                                  className="w-24"
+                                  className="w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
                           </div>
