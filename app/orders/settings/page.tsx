@@ -7,6 +7,8 @@ import {
   RefreshCcw,
   AlertCircle,
   CheckCircle,
+  ShieldCheck,
+  Bike,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +148,45 @@ export default function OrderSettingsPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Rider Dispatch Capacity Safeguards */}
+      <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-black flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-[#3E8940]" /> Rider Dispatch Safeguards
+          </h2>
+          <p className="text-sm text-slate-500">
+            Prevent order assignment bottlenecks by enforcing real-time workload limits
+          </p>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div>
+              <p className="font-medium text-black">Workload Capacity Safeguard</p>
+              <p className="text-xs text-slate-500">
+                Automatically exclude overloaded riders (Active Orders ≥ Max Capacity) from new automated dispatches
+              </p>
+            </div>
+            <Switch
+              checked={true}
+              disabled={true}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div>
+              <p className="font-medium text-black">Default Rider Max Capacity</p>
+              <p className="text-xs text-slate-500">
+                Default order limit assigned to newly onboarded fleet personnel
+              </p>
+            </div>
+            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-xs">
+              8 Orders Max
+            </Badge>
+          </div>
+        </div>
       </div>
 
       {/* Manual Override Info */}

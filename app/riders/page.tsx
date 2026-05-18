@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
-import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, ShieldCheck, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,60 +62,18 @@ function RidersContent() {
   const fetchRiders = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
-      const res = await apiFetch(`${AUTH_API_URL}/users`, { headers: getAuthHeaders() });
+      const res = await apiFetch(`${AUTH_API_URL}/riders`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load riders");
       const data = await res.json();
-      const all = Array.isArray(data) ? data : data.users || [];
-      const types = ["Full-Time", "Part-Time", "Contract", "Senior", "New Joiner", "High Performer"];
-      const zones = ["Gurgaon Sector 29", "Noida Sector 62", "Delhi CP", "Bangalore Indiranagar", "Mumbai BKC"];
-      const outlets = ["Masterclean Experience Store", "Cleclo Hub - South", "Express Point Center"];
-
-      const mappedRiders = all.filter((u: any) => u.role === "rider").map((r: any, idx: number) => {
-        const wallet = r.walletBalance || (Math.floor(Math.random() * 5000));
-        const deliveries = r.totalOrders || Math.floor(Math.random() * 500);
-        const deliveriesToday = Math.floor(Math.random() * 15);
-        const activeOrders = Math.floor(Math.random() * 5);
-        const maxCapacity = 8;
-        const vendors = ["Clean Express", "Fresh Laundry", "Quick Wash Pro", "Mumbai Premium Laundry", "Express Clean Services"];
-        const availability = ["online", "on_delivery", "offline"][Math.floor(Math.random() * 3)];
-        const earningsWeek = Math.floor(Math.random() * 8000) + 1000;
-        const failedPickups = Math.floor(Math.random() * 4);
-        const lateDeliveryPct = Math.floor(Math.random() * 12);
-        return {
-          ...r,
-          walletBalance: wallet,
-          riderProfile: r.riderProfile || {
-            type: types[idx % types.length],
-            deliveries,
-            deliveriesMonth: Math.floor(deliveries * 0.3),
-            onTimePct: Math.floor(Math.random() * 15) + 85,
-            rating: (Math.random() * 1.5 + 3.5).toFixed(1),
-            ratingTrend: Math.random() > 0.5 ? "up" : "down",
-            cancellationPct: Math.floor(Math.random() * 5),
-            deliveriesToday,
-            activeOrders,
-            maxCapacity,
-            complaints: Math.floor(Math.random() * 3),
-            zone: zones[idx % zones.length],
-            cluster: ["NCR", "Mumbai Metro", "Bangalore"][idx % 3],
-            outlet: outlets[idx % outlets.length],
-            assignedVendor: vendors[idx % vendors.length],
-            lastActive: Math.random() > 0.7 ? "Online Now" : `${Math.floor(Math.random() * 10) + 1}h ago`,
-            availability: r.isBlocked ? "suspended" : availability,
-            incidents: Math.floor(Math.random() * 4),
-            damageReports: Math.floor(Math.random() * 2),
-            activeDays: Math.floor(Math.random() * 25) + 5,
-            activeHours: Math.floor(Math.random() * 160) + 40,
-            costPerDelivery: wallet > 0 && deliveries > 0 ? (wallet / deliveries).toFixed(1) : "45.0",
-            earningsWeek,
-            earningsPending: Math.floor(earningsWeek * 0.4),
-            incentivesPending: Math.floor(Math.random() * 500),
-            failedPickups,
-            lateDeliveryPct,
-            avgPickupDelay: Math.floor(Math.random() * 12) + 2,
-          }
-        };
-      });
+      const mappedRiders = (data.riders || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        phone: r.phone,
+        status: r.status,
+        isBlocked: r.status === "blocked",
+        riderProfile: r.riderProfile || {}
+      }));
       setRiders(mappedRiders);
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
   }, []);
@@ -191,6 +149,19 @@ function RidersContent() {
         </Card>
       </div>
 
+      {/* Dispatch system safeguard info */}
+      <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-4 flex items-start gap-3">
+        <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+          <ShieldCheck className="h-5 w-5 text-[#3E8940]" />
+        </div>
+        <div>
+          <p className="font-bold text-slate-800 text-sm">Automated Dispatch Capacity Safeguard Active</p>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            The automated order dispatch system dynamically evaluates rider capacity. If a rider's <span className="font-semibold text-slate-700">Active Orders</span> meet or exceed their configured <span className="font-semibold text-slate-700">Max Capacity</span>, they are flagged as <span className="font-bold text-red-600">OVERLOADED</span> and are automatically excluded from new automated assignments to safeguard fulfillment SLAs.
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex items-center gap-4 flex-1 max-w-2xl">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Search by name, zone, phone..." className="pl-10 bg-slate-50 rounded-xl" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div>
@@ -224,7 +195,7 @@ function RidersContent() {
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Late Delivery %</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Failed Pickups</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Avg Pickup Delay</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Earnings (Week)</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Earnings/Settlement</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="w-[50px] pr-4"></TableHead>
           </TableRow></TableHeader>
@@ -269,8 +240,13 @@ function RidersContent() {
                 {/* Assigned Area */}
                 <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1"><MapPin className="h-3 w-3 text-slate-400" /> {p.zone}</p>
-                    <p className="text-[9px] text-blue-500 font-semibold">{p.cluster}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight leading-none mb-1">Logistics Assignment</p>
+                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                       <span className="text-blue-500 font-black text-[9px] uppercase">Zone:</span> {p.zone}
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                       <span className="text-slate-400 font-black text-[9px] uppercase">Cluster:</span> {p.cluster}
+                    </p>
                   </div>
                 </TableCell>
 
@@ -287,10 +263,14 @@ function RidersContent() {
                   </div>
                 </TableCell>
 
-                {/* Active Orders */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <p className="text-sm font-bold text-slate-900">{p.activeOrders}</p>
-                  <p className="text-[9px] text-slate-400">capacity: {p.maxCapacity}</p>
+                  <div className="flex flex-col items-center">
+                    <p className={cn("text-sm font-bold", p.activeOrders >= p.maxCapacity ? "text-red-600" : "text-slate-900")}>
+                      {p.activeOrders} <span className="text-slate-400 font-normal">/ {p.maxCapacity}</span>
+                    </p>
+                    <p className="text-[9px] text-slate-400">Load Factor: {Math.round((p.activeOrders / (p.maxCapacity || 1)) * 100)}%</p>
+                    {p.activeOrders >= p.maxCapacity && <Badge className="text-[7px] bg-red-100 text-red-700 border-none px-1 h-3 uppercase">Overloaded</Badge>}
+                  </div>
                 </TableCell>
 
                 {/* Customer Rating */}
@@ -325,9 +305,24 @@ function RidersContent() {
                   <p className={cn("text-sm font-bold", p.avgPickupDelay > 10 ? "text-red-600" : "text-emerald-600")}>{p.avgPickupDelay} min</p>
                 </TableCell>
 
-                {/* Earnings (This Week) */}
+                {/* Earnings/Settlement */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <p className="font-bold text-[#3E8940] text-sm">{formatINR(p.earningsWeek)}</p>
+                  <div className="bg-slate-50/30 rounded-xl p-2 inline-block min-w-[120px]">
+                    <p className="font-black text-[#3E8940] text-sm mb-0.5">
+                      {formatINR((p.earningsPending || 0) + (p.incentivesPending || 0))}
+                    </p>
+                    <p className="text-[8px] uppercase tracking-wider font-bold text-slate-400 mb-1.5">Net Settlement Due</p>
+                    <div className="flex items-center justify-between gap-3 px-1 border-t border-slate-200/40 pt-1.5">
+                       <div className="text-left">
+                         <p className="text-[7px] uppercase font-bold text-slate-400 leading-none">Earnings</p>
+                         <p className="text-[10px] font-bold text-slate-700">{formatINR(p.earningsPending || 0)}</p>
+                       </div>
+                       <div className="text-right">
+                         <p className="text-[7px] uppercase font-bold text-indigo-400 leading-none">Incentives</p>
+                         <p className="text-[10px] font-bold text-indigo-600">{formatINR(p.incentivesPending || 0)}</p>
+                       </div>
+                    </div>
+                  </div>
                 </TableCell>
 
                 {/* Status */}

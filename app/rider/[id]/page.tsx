@@ -4,11 +4,12 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Mail, Phone, Wallet, Calendar, ShieldCheck, Bike, FileText, MapPin, Star, Clock, CheckCircle, AlertTriangle, Loader2, Ban } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Wallet, Calendar, ShieldCheck, Bike, FileText, MapPin, Star, Clock, CheckCircle, AlertTriangle, Loader2, Ban, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 
@@ -42,13 +43,21 @@ export default function RiderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [maxCapacityInput, setMaxCapacityInput] = useState("8");
+  const [isUpdatingCapacity, setIsUpdatingCapacity] = useState(false);
+
   const fetchRider = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const res = await apiFetch(`${AUTH_API_URL}/users/${riderId}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Rider not found");
-      setRider(await res.json());
+      const data = await res.json();
+      data.isBlocked = data.status === "blocked";
+      setRider(data);
+      if (data?.riderProfile?.maxCapacity != null) {
+        setMaxCapacityInput(data.riderProfile.maxCapacity.toString());
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -57,6 +66,42 @@ export default function RiderDetailPage() {
   }, [riderId]);
 
   useEffect(() => { fetchRider(); }, [fetchRider]);
+
+  const handleUpdateCapacity = async () => {
+    setIsUpdatingCapacity(true);
+    try {
+      const rp = rider?.riderProfile || {};
+      const res = await apiFetch(`${AUTH_API_URL}/users/${riderId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: rider.name,
+          email: rider.email,
+          phone: rider.phone,
+          userType: rider.role,
+          riderProfile: {
+            maxCapacity: parseInt(maxCapacityInput),
+            type: rp.type,
+            zone: rp.zone,
+            cluster: rp.cluster,
+            assignedVendor: rp.assignedVendor,
+            earningsWeek: rp.earningsWeek,
+            deliveryFees: rp.deliveryFees,
+            incentives: rp.incentives,
+            penalties: rp.penalties,
+            bonuses: rp.bonuses
+          }
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update capacity");
+      toast.success("Rider capacity updated successfully");
+      fetchRider();
+    } catch (err: any) {
+      toast.error("Update Failed", { description: err.message });
+    } finally {
+      setIsUpdatingCapacity(false);
+    }
+  };
 
   const handleBlock = async () => {
     try {
@@ -113,7 +158,7 @@ export default function RiderDetailPage() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{rider.name}</h2>
-                  <div className="flex items-center gap-1 text-slate-500 text-sm"><MapPin className="h-3 w-3" /> {rider.addresses?.[0]?.city || "—"}</div>
+                  <div className="flex items-center gap-1 text-slate-500 text-sm"><MapPin className="h-3 w-3" /> {rp.zone || rider.addresses?.[0]?.city || "—"}</div>
                 </div>
               </div>
               <div className="space-y-3 mt-6">
@@ -149,6 +194,54 @@ export default function RiderDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Fleet & Capacity Configuration */}
+          <Card className="shadow-sm border-slate-200 rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-slate-500" /> Administrative Controls
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase">Max Order Capacity</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max="20"
+                    value={maxCapacityInput}
+                    onChange={(e) => setMaxCapacityInput(e.target.value)}
+                    className="bg-white border-slate-200 focus:border-[#3E8940] rounded-xl h-9 text-slate-800 font-bold"
+                  />
+                  <Button 
+                    size="sm" 
+                    className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white rounded-xl h-9 font-bold transition-all"
+                    onClick={handleUpdateCapacity}
+                    disabled={isUpdatingCapacity}
+                  >
+                    {isUpdatingCapacity ? "..." : "Update"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Current Load: <span className="font-bold text-slate-600">{rp.activeOrders || 0}</span> orders active.
+                </p>
+              </div>
+
+              <div className="h-px bg-slate-100 my-2" />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Zone</label>
+                  <p className="text-xs font-semibold text-slate-700 mt-0.5">{rp.zone || "Not Assigned"}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Cluster</label>
+                  <p className="text-xs font-semibold text-slate-700 mt-0.5">{rp.cluster || "NCR"}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right: Stats & Documents */}
@@ -180,6 +273,62 @@ export default function RiderDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Earnings Breakdown */}
+          <Card className="shadow-sm border-slate-200 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2"><Wallet className="h-5 w-5 text-[#3E8940]" /> Earnings Breakdown</CardTitle>
+                <Badge className="bg-indigo-100 text-indigo-700 border-none font-bold">This Week</Badge>
+              </div>
+              <CardDescription>Detailed incentive and penalty structure</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x border-b">
+                <div className="p-6">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Gross Earnings</p>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Weekly Total</span>
+                      <span className="text-lg font-bold text-slate-900">{formatINR(rp.earningsWeek || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Delivery Fees</span>
+                      <span className="text-sm font-semibold text-slate-700">{formatINR(rp.deliveryFees || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 bg-slate-50/30">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Incentives & Penalties</p>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600 flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Incentives</span>
+                      <span className="text-sm font-bold text-emerald-600">+{formatINR(rp.incentives || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600 flex items-center gap-1.5"><Star className="h-3.5 w-3.5 text-blue-500" /> Bonuses</span>
+                      <span className="text-sm font-bold text-blue-600">+{formatINR(rp.bonuses || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
+                      <span className="text-sm text-slate-600 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-red-500" /> Penalties</span>
+                      <span className="text-sm font-bold text-red-600">-{formatINR(rp.penalties || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 bg-emerald-50/50 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase leading-none mb-1">Net Payout Ready</p>
+                  <p className="text-xs text-emerald-600/70">Calculated after all adjustments</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-black text-[#3E8940]">
+                    {formatINR((rp.earningsWeek || 0) + (rp.incentives || 0) + (rp.bonuses || 0) - (rp.penalties || 0))}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Documents */}
           <Card className="shadow-sm border-slate-200 rounded-2xl">

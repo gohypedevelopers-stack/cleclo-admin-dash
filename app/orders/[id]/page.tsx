@@ -3,10 +3,12 @@
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Package, Star, Clock, Truck, CheckCircle2, AlertCircle, Timer, User, Phone, MapPin, IndianRupee, Calendar, MoreVertical, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Package, Star, Clock, Truck, CheckCircle2, AlertCircle, Timer, User, Phone, MapPin, IndianRupee, Calendar, MoreVertical, Loader2, AlertTriangle, RefreshCw, Search, Bike } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
 
@@ -64,6 +66,51 @@ export default function AdminOrderDetailPage() {
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [riders, setRiders] = useState<any[]>([]);
+  const [isRidersLoading, setIsRidersLoading] = useState(false);
+  const [assignmentSearch, setAssignmentSearch] = useState("");
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const fetchRidersForAssignment = async () => {
+    setIsRidersLoading(true);
+    try {
+      const res = await apiFetch(`${process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth"}/riders`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch riders");
+      const data = await res.json();
+      setRiders(data.riders || []);
+    } catch (err: any) {
+      toast.error("Failed to fetch riders", { description: err.message });
+    } finally {
+      setIsRidersLoading(false);
+    }
+  };
+
+  const handleAssignRider = async (riderId: string) => {
+    setIsAssigning(true);
+    try {
+      const res = await apiFetch(`${ORDER_API_URL}/${orderId}/assign-rider`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ riderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || "Failed to assign rider");
+      toast.success("Rider assigned successfully");
+      setIsAssignModalOpen(false);
+      fetchOrder();
+    } catch (err: any) {
+      toast.error("Assignment Failed", { description: err.message });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const filteredRiders = riders.filter(r => 
+    r.name?.toLowerCase().includes(assignmentSearch.toLowerCase()) ||
+    r.riderProfile?.zone?.toLowerCase().includes(assignmentSearch.toLowerCase())
+  );
 
   const fetchOrder = useCallback(async () => {
     setIsLoading(true);
@@ -223,7 +270,20 @@ export default function AdminOrderDetailPage() {
 
           {/* Staff Assignment */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h3 className="font-bold text-black flex items-center gap-2 mb-4"><Timer className="h-4 w-4 text-amber-500" /> Staff Assignment</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-black flex items-center gap-2"><Timer className="h-4 w-4 text-amber-500" /> Staff Assignment</h3>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs font-bold text-[#3E8940] border-[#3E8940]/30 hover:bg-green-50 rounded-lg transition-colors"
+                onClick={() => {
+                  fetchRidersForAssignment();
+                  setIsAssignModalOpen(true);
+                }}
+              >
+                Assign Rider
+              </Button>
+            </div>
             <div className="space-y-3">
               {[{ label: "Pickup", person: pickupPerson }, { label: "Delivery", person: deliveryPerson }].map((s, i) => (
                 <div key={i} className="flex items-center justify-between p-3 border rounded-xl hover:bg-slate-50 transition-colors">
@@ -268,6 +328,98 @@ export default function AdminOrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Assign Rider Dialog */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 border-none shadow-2xl bg-white">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Bike className="h-5 w-5 text-[#3E8940]" /> Assign Rider
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs">
+              Select an available rider to allocate to order {displayId}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4 space-y-4">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-[#3E8940] transition-colors" />
+              <Input
+                placeholder="Search riders by name or zone..."
+                className="pl-10 bg-slate-50 rounded-xl"
+                value={assignmentSearch}
+                onChange={(e) => setAssignmentSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="max-h-[350px] overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
+              {isRidersLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#3E8940]" />
+                  <p className="text-xs text-slate-500 font-medium">Loading fleet availability...</p>
+                </div>
+              ) : filteredRiders.length > 0 ? (
+                filteredRiders.map((r) => {
+                  const rp = r.riderProfile || {};
+                  const isOverloaded = rp.activeOrders >= (rp.maxCapacity || 8);
+                  const loadPercentage = Math.round((rp.activeOrders / (rp.maxCapacity || 8)) * 100);
+                  
+                  return (
+                    <div 
+                      key={r.id} 
+                      className={cn(
+                        "p-3 rounded-xl border flex items-center justify-between transition-all",
+                        isOverloaded 
+                          ? "bg-red-50/30 border-red-100 opacity-80" 
+                          : "bg-slate-50 hover:bg-slate-100/80 border-slate-100"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-slate-900 text-sm">{r.name}</p>
+                          {isOverloaded && (
+                            <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold text-[8px] h-4 uppercase">
+                              Overloaded
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                          <span>Zone: {rp.zone || "No Zone"}</span>
+                          <span>•</span>
+                          <span className={cn(
+                            "font-bold",
+                            isOverloaded ? "text-red-600" : loadPercentage > 75 ? "text-amber-600" : "text-emerald-600"
+                          )}>
+                            Load: {rp.activeOrders}/{rp.maxCapacity || 8} Orders ({loadPercentage}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        disabled={isOverloaded || isAssigning}
+                        className={cn(
+                          "h-8 text-xs font-bold rounded-lg px-3",
+                          isOverloaded 
+                            ? "bg-slate-100 text-slate-400 hover:bg-slate-100 border-none cursor-not-allowed" 
+                            : "bg-[#3E8940] hover:bg-[#3E8940]/90 text-white"
+                        )}
+                        onClick={() => handleAssignRider(r.id)}
+                      >
+                        {isOverloaded ? "Cap Reached" : "Assign"}
+                      </Button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-slate-500 text-xs font-medium">
+                  No riders matching search query.
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
