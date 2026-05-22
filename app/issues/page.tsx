@@ -187,25 +187,54 @@ const getFilterStyles = (isActive: boolean, activeColor: string = "bg-[#3E8940]/
       : "bg-slate-50 text-slate-500 hover:bg-slate-100"
   );
 
+const mapUrlTypeToFilterVal = (urlType: string | null): string => {
+  if (!urlType) return "all";
+  const lower = urlType.toLowerCase();
+  if (lower.includes("delay")) return "Pickup Delay";
+  if (lower.includes("damage")) return "Item Damaged";
+  if (lower.includes("no show") || lower.includes("noshow") || lower.includes("no-show")) return "Customer No-Show";
+  return urlType;
+};
+
 function IssuesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get("search") || "";
+  const urlType = searchParams.get("type");
+  const urlStatus = searchParams.get("status");
+  const urlSeverity = searchParams.get("severity");
+
   const [data, setData] = React.useState<IssuesData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = React.useState(urlSearchQuery);
-  const [severityFilter, setSeverityFilter] = React.useState("all");
+  const [severityFilter, setSeverityFilter] = React.useState(() => urlSeverity || "all");
   const [cityFilter, setCityFilter] = React.useState("all");
   const [vendorFilter, setVendorFilter] = React.useState("all");
-  const [typeFilter, setTypeFilter] = React.useState("all");
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [typeFilter, setTypeFilter] = React.useState(() => mapUrlTypeToFilterVal(urlType));
+  const [statusFilter, setStatusFilter] = React.useState(() => urlStatus || "all");
   const [dateRangeFilter, setDateRangeFilter] = React.useState("all");
   const [assignedToFilter, setAssignedToFilter] = React.useState("all");
   const [refundStatusFilter, setRefundStatusFilter] = React.useState("all");
 
   const [selectedIssue, setSelectedIssue] = React.useState<IssueRecord | null>(null);
+
+  React.useEffect(() => {
+    const nextType = searchParams.get("type");
+    const nextStatus = searchParams.get("status");
+    const nextSeverity = searchParams.get("severity");
+
+    if (nextType !== null) {
+      setTypeFilter(mapUrlTypeToFilterVal(nextType));
+    }
+    if (nextStatus !== null) {
+      setStatusFilter(nextStatus);
+    }
+    if (nextSeverity !== null) {
+      setSeverityFilter(nextSeverity);
+    }
+  }, [searchParams]);
   const [actionLoading, setActionLoading] = React.useState(false);
 
   // Resolve dialog state

@@ -11,6 +11,8 @@ import {
   MapPin,
   Phone,
   CheckCircle,
+  CheckCircle2,
+  AlertCircle,
   Clock,
   Ban,
   CreditCard,
@@ -37,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -125,16 +128,33 @@ interface VendorRecord {
     area?: string;
     cluster?: string;
     agreementSignedAt?: string;
+    damageRate?: string;
   };
   addresses?: Array<{ city?: string; area?: string; fullAddress?: string }>;
   _count?: { ordersAsVendor?: number };
 }
 
-const getVendorTier = (sla: number, rating: number) => {
-  if (sla > 95 && rating > 4.7) return { label: "🥇 Gold", color: "bg-amber-100 text-amber-800 border-amber-300" };
-  if (sla >= 85 && sla <= 95) return { label: "🥈 Silver", color: "bg-slate-100 text-slate-700 border-slate-300" };
-  if (sla < 80) return { label: "⚠ Probation", color: "bg-red-100 text-red-700 border-red-300" };
-  return { label: "Standard", color: "bg-blue-50 text-blue-600 border-blue-200" };
+const getVendorTier = (v: any) => {
+  // Use performanceTier from backend if available, otherwise calculate locally
+  if (v.vendorProfile?.performanceTier) {
+    const tier = v.vendorProfile.performanceTier;
+    return {
+      label: tier.label,
+      emoji: tier.badge.split(' ')[0],
+      color: tier.color + " border-transparent"
+    };
+  }
+
+  const sla = v.vendorProfile?.slaScore ?? 0;
+  const rating = v.vendorProfile?.rating ?? 0;
+  
+  if (sla > 95 && rating > 4.7) 
+    return { label: "Gold", emoji: "🥇", color: "bg-amber-100 text-amber-700 border-amber-200" };
+  if (sla >= 85 && sla <= 95) 
+    return { label: "Silver", emoji: "🥈", color: "bg-slate-100 text-slate-700 border-slate-200" };
+  if (sla < 80) 
+    return { label: "Probation", emoji: "⚠️", color: "bg-red-100 text-red-700 border-red-200" };
+  return { label: "Standard", emoji: "⭐", color: "bg-blue-100 text-blue-700 border-blue-200" };
 };
 
 const formatINR = (amount: number) =>
@@ -146,13 +166,14 @@ const getStatusLabel = (vendor: VendorRecord) => {
   return "Active";
 };
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "Active": return "bg-emerald-100 text-emerald-700";
-    case "Pending": return "bg-amber-100 text-amber-700";
-    case "Suspended": return "bg-red-100 text-red-700";
-    default: return "bg-gray-100 text-gray-700";
-  }
+const getStatusColor = (s: string) => { 
+  switch (s) { 
+    case "Active": return "bg-green-100 text-green-700 border-green-200"; 
+    case "Live but No Orders": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "Verification Pending": return "bg-amber-100 text-amber-700 border-amber-200"; 
+    case "Suspended": return "bg-red-100 text-red-700 border-red-200"; 
+    default: return "bg-gray-100 text-gray-700"; 
+  } 
 };
 
 const formatDate = (dateStr: string) => {
@@ -172,6 +193,7 @@ function VendorsContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
     const status = searchParams.get("status");
@@ -183,10 +205,15 @@ function VendorsContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`${AUTH_API_URL}/vendors`, { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error("Failed to load vendors");
-      const data = await res.json();
-      setVendors(Array.isArray(data) ? data : data.vendors || []);
+      const [vendorsRes, statsRes] = await Promise.all([
+        apiFetch(`${AUTH_API_URL}/vendors`, { headers: getAuthHeaders() }),
+        apiFetch(`${AUTH_API_URL}/dashboard/stats`, { headers: getAuthHeaders() }),
+      ]);
+      if (!vendorsRes.ok || !statsRes.ok) throw new Error("Failed to load vendors data");
+      const vendorsData = await vendorsRes.json();
+      const statsData = await statsRes.json();
+      setVendors(Array.isArray(vendorsData) ? vendorsData : vendorsData.vendors || []);
+      setStats(statsData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -268,6 +295,31 @@ function VendorsContent() {
   const totalActive = vendors.filter((v) => getStatusLabel(v) === "Active").length;
   const totalPending = vendors.filter((v) => getStatusLabel(v) === "Pending").length;
   const totalSuspended = vendors.filter((v) => getStatusLabel(v) === "Suspended").length;
+  const totalHighRisk = vendors.filter((v) => 
+    (v.vendorProfile?.issueRate || 0) > 10 || 
+    (v.vendorProfile?.slaScore || 100) < 80 || 
+    v.isBlocked || 
+    getStatusLabel(v) === "Suspended"
+  ).length;
+
+  const activeVendorsList = vendors.filter(v => getStatusLabel(v) === "Active");
+  
+  const totalOrders = vendors.reduce((sum, v) => sum + (v.vendorProfile?.totalOrders || 0), 0);
+  const totalRevenue = vendors.reduce((sum, v) => sum + (v.vendorProfile?.totalRevenue || 0), 0);
+  const totalCommission = vendors.reduce((sum, v) => sum + (v.vendorProfile?.commissionEarned || 0), 0);
+  const totalPayoutPending = vendors.reduce((sum, v) => sum + (v.vendorProfile?.payoutPending || 0), 0);
+  
+  const avgSla = activeVendorsList.length > 0
+    ? activeVendorsList.reduce((sum, v) => sum + (v.vendorProfile?.slaScore || 0), 0) / activeVendorsList.length
+    : 0;
+    
+  const avgRating = activeVendorsList.length > 0
+    ? activeVendorsList.reduce((sum, v) => sum + (v.vendorProfile?.rating || 0), 0) / activeVendorsList.length
+    : 0;
+
+  const avgIssueRate = activeVendorsList.length > 0
+    ? activeVendorsList.reduce((sum, v) => sum + (v.vendorProfile?.issueRate || 0), 0) / activeVendorsList.length
+    : 0;
 
   if (isLoading && vendors.length === 0) {
     return (
@@ -311,41 +363,137 @@ function VendorsContent() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {[
-          { label: "Total Vendors", value: vendors.length, filter: "all", color: "bg-[#2170FF]", icon: Store, note: "From live database" },
-          { label: "Active Vendors", value: totalActive, filter: "active", color: "bg-[#00B633]", icon: CheckCircle, note: "Approved & unblocked" },
-          { label: "Pending Review", value: totalPending, filter: "pending", color: "bg-[#FF8A00]", icon: Clock, note: "Needs attention" },
-          { label: "Blocked", value: totalSuspended, filter: "suspended", color: "bg-[#FF002E]", icon: Ban, note: "Suspended" },
+          { label: "Total Vendors", value: `${vendors.length}`, filter: "all", color: "bg-[#2170FF]", icon: Store, note: "Overall platform partners" },
+          { label: "Total Orders", value: `${totalOrders}`, filter: "all", color: "bg-teal-600", icon: Package, note: "Overall orders serviced" },
+          { 
+            label: "Vendor Risk Indicator", 
+            value: `⚠ ${totalPending} / 🚨 ${totalHighRisk}`, 
+            filter: "pending", 
+            color: (totalPending > 0 || totalHighRisk > 0) ? "bg-gradient-to-br from-[#FF002E] to-red-700 ring-2 ring-red-400 animate-pulse border-none" : "bg-emerald-600", 
+            icon: ShieldCheck, 
+            note: "Operational risk tracking", 
+            isRisk: true 
+          },
+          { 
+            label: "Composite Vendor Score", 
+            value: `${(((avgSla) + (avgRating / 5 * 100) + (100 - avgIssueRate)) / 3).toFixed(0)}%`, 
+            filter: "active", 
+            color: "bg-[#00B633]", 
+            icon: Star, 
+            note: "Composite vendor metric", 
+            isScore: true 
+          },
+          { label: "Total Vendor Revenue", value: formatINR(totalRevenue), filter: "all", color: "bg-blue-600", icon: IndianRupee, note: "Gross merchant revenue" },
+          { label: "Platform Commission Earned", value: formatINR(totalCommission), filter: "all", color: "bg-indigo-600", icon: TrendingUp, note: "Net commission generated" },
+          { 
+            label: "Commission Earned (This Month)", 
+            value: formatINR(stats?.commissionThisMonth || 0), 
+            trend: stats?.commissionTrend,
+            filter: "all", 
+            color: "from-emerald-600 to-emerald-700 bg-gradient-to-br", 
+            icon: TrendingUp, 
+            note: "Platform net revenue this month" 
+          },
+          { label: "Total Pending Payout", value: formatINR(totalPayoutPending), filter: "all", color: "bg-violet-600", icon: CreditCard, note: "Pending settle to partners" },
+          { label: "Avg SLA %", value: `${Math.round(avgSla)}%`, filter: "active", color: "bg-[#3E8940]", icon: Award, note: "Order fulfilment rate" },
+          { label: "Avg Issue Rate", value: `${avgIssueRate.toFixed(1)}%`, filter: "active", color: "bg-[#FF002E]", icon: AlertTriangle, note: "Incident issue rate" },
         ].map((stat) => (
           <div 
             key={stat.label} 
-            className={`${stat.color} rounded-2xl shadow-lg p-6 hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden text-white`}
-            onClick={() => setStatusFilter(stat.filter)}
+            className={`${stat.color} rounded-2xl shadow-lg p-5 hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden text-white flex flex-col justify-between min-h-[130px]`}
+            onClick={() => stat.filter !== "all" && setStatusFilter(stat.filter)}
           >
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">{stat.label}</p>
-                <div className="bg-white/20 p-2 rounded-full backdrop-blur-md">
-                  <stat.icon className="h-5 w-5 text-white" />
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-80">{stat.label}</p>
+                <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-md">
+                  <stat.icon className="h-4 w-4 text-white" />
                 </div>
               </div>
-              <p className="text-4xl font-bold mb-2">{stat.value}</p>
-              <div className="flex items-center gap-1.5 opacity-80">
-                {stat.label === "Active Vendors" ? <Zap className="h-3 w-3" /> : stat.label === "Pending Review" ? <Clock className="h-3 w-3" /> : stat.label === "Blocked" ? <Ban className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
-                <p className="text-[10px] font-medium">{stat.note}</p>
-              </div>
+              {stat.isRisk ? (
+                <div className="flex flex-col gap-1 text-[10px] font-black text-white mt-1 leading-snug">
+                  <div>⚠ Under Review: {totalPending}</div>
+                  <div>🚨 High Risk: {totalHighRisk}</div>
+                </div>
+              ) : (
+                <p className="text-2xl font-black mb-1">
+                  {stat.value}
+                  {stat.trend !== undefined && stat.trend !== null && (
+                    <span className="ml-1.5 text-xs font-semibold opacity-90">
+                      ({stat.trend >= 0 ? "+" : ""}{Math.round(stat.trend)}%)
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+            <div className="relative z-10 flex flex-col gap-1 opacity-80 mt-2 border-t border-white/10 pt-1.5">
+              {stat.isScore ? (
+                <div className="flex flex-col text-[8.5px] font-bold text-white/95 leading-snug">
+                  <div className="flex justify-between">
+                    <span>SLA: {Math.round(avgSla)}%</span>
+                    <span>Rating: {avgRating.toFixed(1)}</span>
+                  </div>
+                  <span>Issue Rate: {avgIssueRate.toFixed(1)}%</span>
+                </div>
+              ) : stat.isRisk ? (
+                <p className="text-[9px] font-medium leading-none">Review Required / Risk Alert</p>
+              ) : (
+                <p className="text-[9px] font-medium leading-none">{stat.note}</p>
+              )}
             </div>
             {/* Glossy overlay effect */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
-            
-            {statusFilter === stat.filter && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/40" />
-            )}
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-xl" />
           </div>
         ))}
       </div>
 
+      {/* Settlement Status Snapshot */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="bg-white border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settlements Due</p>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{formatINR(stats?.settlementsDue || 0)}</p>
+              </div>
+            </div>
+            <Badge className="bg-amber-100 text-amber-700 border-none font-bold text-[9px]">AWAITING</Badge>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-[#3E8940] group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settlements Completed</p>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{formatINR(stats?.settlementsCompleted || 0)}</p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-100 text-[#3E8940] border-none font-bold text-[9px]">SETTLED</Badge>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 group-hover:scale-110 transition-transform">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overdue</p>
+                <p className="text-lg font-black text-rose-600 mt-0.5">{formatINR(stats?.settlementsOverdue || 0)}</p>
+              </div>
+            </div>
+            <Badge className="bg-rose-100 text-rose-700 border-none font-bold text-[9px] animate-pulse">CRITICAL</Badge>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border shadow-sm">
@@ -378,17 +526,16 @@ function VendorsContent() {
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <Table className="min-w-[1200px] w-full">
           <TableHeader>
-            <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 pl-6 tracking-wider w-[16%]">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Orders / Revenue</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Commission</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Payout Due</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Order Fulfilment Rate</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[7%] text-center">Rating</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%] text-center">Quality Control</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[9%]">Capacity</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider w-[10%]">Coverage</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-slate-500 py-4 tracking-wider text-right pr-6 w-[6%]">Actions</TableHead>
+            <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b">
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Vendor</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Rating</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Total Orders</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Total Revenue</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Commission Earned</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Pending Payout</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Refund Amount</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
+              <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -397,118 +544,113 @@ function VendorsContent() {
                 const vp = vendor.vendorProfile;
                 const displayName = vp?.businessName || vendor.name || "Unknown";
                 const status = getStatusLabel(vendor);
+                
+                const isApproved = vp?.isApproved;
+                const orders = vp?.totalOrders || 0;
+                let displayStatus = "Verification Pending";
+                if (vendor.isBlocked) displayStatus = "Suspended";
+                else if (isApproved && orders > 0) displayStatus = "Active";
+                else if (isApproved && orders === 0) displayStatus = "Live but No Orders";
+
                 const revenue = vp?.totalRevenue || 0;
                 const revenueMonth = vp?.revenueThisMonth || 0;
-                const orders = vp?.totalOrders || 0;
                 const commission = vp?.commissionEarned || 0;
                 const commRate = vp?.commissionRate || 18;
                 const payout = vp?.payoutPending || 0;
+                const refundAmount = vp?.refundAmount || 0;
                 const sla = vp?.slaScore || 0;
                 const rating = vp?.rating || 0;
-                const issueRate = vp?.issueRate || 0;
-                const capacity = vp?.dailyCapacity || 0;
-                const load = vp?.currentLoad || 0;
-                const loadPct = capacity > 0 ? Math.round((load / capacity) * 100) : 0;
-                const avgOrderVal = orders > 0 ? Math.round(revenue / orders) : 0;
                 const city = vp?.city || vendor.addresses?.[0]?.city || "—";
-                const area = vp?.area || vendor.addresses?.[0]?.area || "";
-                const coverage = vp?.areaCoverage || "";
-                const tier = getVendorTier(sla, rating);
-                const agreementDate = vp?.agreementSignedAt;
+                const tier = getVendorTier(vendor);
 
                 return (
-                  <TableRow key={vendor.id} className="hover:bg-slate-50 cursor-pointer group" onClick={() => router.push(`/vendors/${vendor.id}`)}>
-                    {/* Vendor Name + Tier + Status */}
+                  <TableRow key={vendor.id} className="hover:bg-slate-50/80 cursor-pointer group" onClick={() => router.push(`/vendors/${vendor.id}`)}>
+                    {/* Vendor Name + Tier */}
                     <TableCell className="py-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-orange-50 text-orange-600 font-bold text-xs">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-black text-sm truncate">{displayName}</p>
-                            <Badge className={`${tier.color} border text-[7px] h-4 px-1 font-black`}>{tier.label}</Badge>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <Badge className={`${getStatusColor(status)} border-none font-bold text-[8px] px-1.5 py-0`}>{status.toUpperCase()}</Badge>
+                        <Avatar className="h-10 w-10 border shadow-sm">
+                          <AvatarFallback className={`font-bold ${status === "Pending" ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-700"}`}>
+                            {displayName.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-semibold text-slate-900 group-hover:text-[#3E8940] transition-colors text-sm">{displayName}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-[10px] text-slate-400">{vp?.ownerName || vendor.name}</span>
+                            <Badge variant="outline" className={`${tier.color} border font-black text-[8px] h-4 px-1 shadow-sm`}>
+                              <span>{tier.emoji}</span>
+                              <span>{tier.label.toUpperCase()}</span>
+                            </Badge>
                             <span className="text-[10px] text-slate-400">· {city}</span>
                           </div>
-                          {agreementDate && (
-                            <p className="text-[9px] text-slate-400 mt-0.5 flex items-center gap-0.5">
-                              <CalendarClock className="h-2.5 w-2.5" /> Agreement: {formatDate(agreementDate)}
-                            </p>
-                          )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <p className="text-sm font-bold text-slate-900">
-                        {orders} <span className="text-slate-400 font-medium text-[10px] uppercase">Orders</span> 
-                        <span className="mx-1 text-slate-300">|</span> 
-                        <span className="text-emerald-600">{formatINR(revenue)}</span> <span className="text-emerald-500/50 font-medium text-[9px] uppercase">Revenue</span>
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-[9px] text-slate-400 font-medium">Month: <span className="text-slate-600 font-bold">{formatINR(revenueMonth)}</span></p>
-                        <p className="text-[9px] text-slate-400 font-medium">AOV: <span className="text-slate-600 font-bold">{formatINR(avgOrderVal)}</span></p>
-                      </div>
-                    </TableCell>
-                    {/* Commission */}
-                    <TableCell>
-                      <p className="text-sm font-bold text-purple-700">{formatINR(commission)}</p>
-                      <p className="text-[9px] text-slate-400">{commRate}% rate</p>
-                    </TableCell>
-                    {/* Payout Due */}
-                    <TableCell>
-                      <p className={cn("text-sm font-bold", payout > 0 ? "text-orange-600" : "text-slate-400")}>{formatINR(payout)}</p>
-                      {payout > 10000 && <p className="text-[9px] text-red-500 font-semibold">⚠️ High</p>}
-                    </TableCell>
-                    {/* SLA */}
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={cn("font-bold text-[10px]", sla >= 90 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : sla >= 80 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{sla > 0 ? `${sla}%` : "—"}</Badge>
-                      {sla > 0 && sla < 80 && <p className="text-[8px] text-red-500 font-bold mt-0.5">⚠️ Breach</p>}
-                    </TableCell>
+
                     {/* Rating */}
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-0.5">
-                        <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                        <span className="text-xs font-bold text-slate-800">{rating > 0 ? rating.toFixed(1) : "—"}</span>
-                      </div>
-                    </TableCell>
-                    {/* Quality Control (Issue & Damage) */}
-                    <TableCell className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <Badge variant="outline" className={cn("font-bold text-[9px] px-1.5 h-4 border-none", issueRate > 5 ? "text-red-600 bg-red-50" : "text-emerald-600 bg-emerald-50")}>
-                          IS: {issueRate > 0 ? `${issueRate.toFixed(1)}%` : "0%"}
-                        </Badge>
-                        <Badge variant="outline" className={cn("font-bold text-[9px] px-1.5 h-4 border-none", Number(vp?.damageRate) > 0.5 ? "text-rose-600 bg-rose-50" : "text-blue-600 bg-blue-50")}>
-                          DM: {vp?.damageRate ? `${vp.damageRate}%` : "0%"}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    {/* Capacity */}
-                    <TableCell>
-                      {capacity > 0 ? (
-                        <div>
-                          <div className="flex items-center gap-1 mb-1">
-                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className={cn("h-full rounded-full", loadPct > 90 ? "bg-red-500" : loadPct > 70 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${Math.min(loadPct, 100)}%` }} />
-                            </div>
-                            <span className="text-[9px] text-slate-500 font-bold">{loadPct}%</span>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        {rating > 0 ? (
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 rounded-lg border border-slate-100">
+                            <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                            <span className="text-xs font-bold text-slate-800">{rating.toFixed(1)}</span>
                           </div>
-                          <p className="text-[9px] text-slate-400">{load}/{capacity} orders</p>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">—</span>
-                      )}
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">No Rating</span>
+                        )}
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">SLA: {sla > 0 ? `${sla}%` : "0%"}</span>
+                      </div>
                     </TableCell>
-                    {/* Coverage */}
-                    <TableCell>
-                      <p className="text-[11px] text-slate-700 font-medium truncate max-w-[120px]">{city}{area ? `, ${area}` : ""}</p>
-                      {coverage && <p className="text-[9px] text-slate-400 truncate max-w-[120px]">{coverage}</p>}
+
+                    {/* Total Orders */}
+                    <TableCell className="text-center">
+                      <p className="text-sm font-bold text-slate-800">{orders}</p>
+                      <p className="text-[9px] text-slate-400 uppercase font-medium">Orders</p>
                     </TableCell>
+
+                    {/* Total Revenue */}
+                    <TableCell className="text-center">
+                      <p className="text-sm font-bold text-emerald-700">{formatINR(revenue)}</p>
+                      <p className="text-[9px] text-slate-400">Month: {formatINR(revenueMonth)}</p>
+                    </TableCell>
+
+                    {/* Commission Earned */}
+                    <TableCell className="text-center">
+                      <p className="text-sm font-bold text-blue-600">{commission > 0 ? formatINR(commission) : "—"}</p>
+                      <p className="text-[9px] text-slate-400">{commRate}% rate</p>
+                    </TableCell>
+
+                    {/* Pending Payout */}
+                    <TableCell className="text-center">
+                      <p className={cn("text-sm font-bold", payout > 0 ? "text-orange-600" : "text-slate-400")}>
+                        {payout > 0 ? formatINR(payout) : "—"}
+                      </p>
+                      {payout > 10000 && <p className="text-[8px] text-red-500 font-semibold uppercase tracking-tighter">⚠️ High</p>}
+                    </TableCell>
+
+                    {/* Refund Amount */}
+                    <TableCell className="text-center">
+                      <p className={cn("text-sm font-bold", refundAmount > 0 ? "text-rose-600" : "text-slate-400")}>
+                        {refundAmount > 0 ? formatINR(refundAmount) : "—"}
+                      </p>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={`${getStatusColor(displayStatus)} font-bold gap-1.5 px-2.5 py-1 text-[10px] shadow-sm`}>
+                        {displayStatus === "Active" && <CheckCircle className="h-3 w-3" />}
+                        {displayStatus === "Verification Pending" && <Clock className="h-3 w-3" />}
+                        {displayStatus === "Live but No Orders" && <Zap className="h-3 w-3" />}
+                        {displayStatus === "Suspended" && <Ban className="h-3 w-3" />}
+                        {displayStatus.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+
                     {/* Actions */}
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-black" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-black">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -559,7 +701,12 @@ function VendorsContent() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-slate-500">No vendors found.</TableCell>
+                <TableCell colSpan={9} className="h-32 text-center text-slate-500">
+                  <div className="flex flex-col items-center gap-2">
+                    <Search className="h-8 w-8 text-slate-300" />
+                    <p>No vendors found.</p>
+                  </div>
+                </TableCell>
               </TableRow>
             )}
           </TableBody>

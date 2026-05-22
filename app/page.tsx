@@ -46,6 +46,7 @@ import {
   Ban,
   CircleDot,
   FileCheck,
+  Check,
 } from "lucide-react";
 import {
   Dialog,
@@ -524,7 +525,7 @@ export default function AdminDashboardPage() {
   };
 
   const orders = data?.primaryTable.type === "orders" ? (data.primaryTable.rows as DashboardOrderRow[]) : [];
-  const settlements = data?.primaryTable.type === "settlements" ? (data.primaryTable.rows as DashboardSettlementRow[]) : [];
+  const settlements = (data?.settlements || []) as DashboardSettlementRow[];
 
   const paginatedOrders = React.useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -540,8 +541,10 @@ export default function AdminDashboardPage() {
       if (issueTypeFilter !== "all") {
         const type = issue.type?.toLowerCase() || "";
         if (issueTypeFilter === "damage" && !type.includes("damage")) return false;
-        if (issueTypeFilter === "noshow" && !type.includes("no show")) return false;
+        if (issueTypeFilter === "noshow" && !(type.includes("no show") || type.includes("no-show"))) return false;
         if (issueTypeFilter === "complaint" && !type.includes("complaint")) return false;
+        if (issueTypeFilter === "delay" && !type.includes("delay")) return false;
+        if (issueTypeFilter === "refund" && !(issue.refundStatus === "Processing" || issue.refundStatus === "Completed")) return false;
       }
       if (issueStatusFilter !== "all") {
         if (issueStatusFilter === "open" && issue.status !== "Open") return false;
@@ -562,6 +565,48 @@ export default function AdminDashboardPage() {
       return true;
     }).length;
   }, [data, issueTypeFilter, issueStatusFilter, issueCityFilter, issueVendorFilter, issueDateFilter, adminRole]);
+
+  const settlementDueTotal = React.useMemo(() => {
+    return settlements
+      .filter((s) => s.status === "Pending" || s.status === "Processing")
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+  }, [settlements]);
+
+  const settlementCompletedTotal = React.useMemo(() => {
+    return settlements
+      .filter((s) => s.status === "Completed")
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+  }, [settlements]);
+
+  const settlementOverdueTotal = React.useMemo(() => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return settlements
+      .filter((s) => (s.status === "Pending" || s.status === "Processing") && s.createdAt && new Date(s.createdAt) < sevenDaysAgo)
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+  }, [settlements]);
+
+  const issueBreakdown = React.useMemo(() => {
+    if (!data?.issueDigest) return { delay: 0, damage: 0, noshow: 0, refund: 0, total: 0 };
+    let delay = 0, damage = 0, noshow = 0, refund = 0;
+    data.issueDigest.forEach(issue => {
+      const type = issue.type?.toLowerCase() || "";
+      if (type.includes("delay")) delay++;
+      if (type.includes("damage")) damage++;
+      if (type.includes("no show") || type.includes("no-show")) noshow++;
+      if (issue.refundStatus === "Processing" || issue.refundStatus === "Completed") refund++;
+    });
+    const total = delay + damage + noshow + refund || 1;
+    return { delay, damage, noshow, refund, total };
+  }, [data]);
+
+  const handleToggleIssueFilter = (category: string) => {
+    if (issueTypeFilter === category) {
+      setIssueTypeFilter("all");
+    } else {
+      setIssueTypeFilter(category);
+    }
+  };
 
   // Loading state
   if (isLoading && !data) {
@@ -1107,8 +1152,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {data.approvals?
-                    .filter(v => {
+                  {data.approvals?.filter(v => {
                       if (vendorCommissionFilter !== "all" && !v.commissionModel.includes(vendorCommissionFilter)) return false;
                       if (vendorAgreementFilter !== "all") {
                         if (vendorAgreementFilter === "signed" && !v.agreementSigned) return false;
@@ -1253,8 +1297,8 @@ export default function AdminDashboardPage() {
                 {/* Monthly Issue Analytics Mini-Section */}
                 <div className="grid grid-cols-6 gap-2 mb-3">
                   {[
-                    { label: 'Damage Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => i.type.toLowerCase().includes('damage')).length / orders.length) * 100) : 0}%`, color: 'text-red-600', bg: 'bg-red-50' },
-                    { label: 'No-Show Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => i.type.toLowerCase().includes('show')).length / orders.length) * 100) : 0}%`, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Damage Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => (i.type || '').toLowerCase().includes('damage')).length / orders.length) * 100) : 0}%`, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'No-Show Rate', value: `${orders.length ? Math.round((data.issueDigest.filter(i => (i.type || '').toLowerCase().includes('show')).length / orders.length) * 100) : 0}%`, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Refund Risk', value: `${data.issueDigest.filter(i => i.refundStatus === 'Processing' || i.refundStatus === 'Completed').length}`, color: 'text-blue-600', bg: 'bg-blue-50' },
                     { label: 'Top Vendor', value: (() => {
                       const counts: Record<string, number> = {};
@@ -1302,6 +1346,121 @@ export default function AdminDashboardPage() {
                   </div>
                 )}
 
+                {/* Interactive Issue Breakdown Chart */}
+                <div className="mb-4 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Issue Breakdown</span>
+                    <span className="text-[10px] font-bold text-slate-500">{issueBreakdown.delay + issueBreakdown.damage + issueBreakdown.noshow + issueBreakdown.refund} Segmented Issues</span>
+                  </div>
+                  
+                  {/* Stacked Percentage Bar */}
+                  <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden flex shadow-inner mb-3">
+                    {issueBreakdown.delay > 0 && (
+                      <button
+                        onClick={() => handleToggleIssueFilter("delay")}
+                        style={{ width: `${(issueBreakdown.delay / issueBreakdown.total) * 100}%` }}
+                        className={cn(
+                          "h-full bg-orange-500 transition-all hover:opacity-85 relative",
+                          issueTypeFilter === "delay" ? "ring-2 ring-orange-600 ring-offset-1 z-10 scale-y-110" : ""
+                        )}
+                        title={`Delay: ${issueBreakdown.delay}`}
+                      />
+                    )}
+                    {issueBreakdown.damage > 0 && (
+                      <button
+                        onClick={() => handleToggleIssueFilter("damage")}
+                        style={{ width: `${(issueBreakdown.damage / issueBreakdown.total) * 100}%` }}
+                        className={cn(
+                          "h-full bg-red-500 transition-all hover:opacity-85 relative",
+                          issueTypeFilter === "damage" ? "ring-2 ring-red-600 ring-offset-1 z-10 scale-y-110" : ""
+                        )}
+                        title={`Damage: ${issueBreakdown.damage}`}
+                      />
+                    )}
+                    {issueBreakdown.noshow > 0 && (
+                      <button
+                        onClick={() => handleToggleIssueFilter("noshow")}
+                        style={{ width: `${(issueBreakdown.noshow / issueBreakdown.total) * 100}%` }}
+                        className={cn(
+                          "h-full bg-amber-500 transition-all hover:opacity-85 relative",
+                          issueTypeFilter === "noshow" ? "ring-2 ring-amber-600 ring-offset-1 z-10 scale-y-110" : ""
+                        )}
+                        title={`No Show: ${issueBreakdown.noshow}`}
+                      />
+                    )}
+                    {issueBreakdown.refund > 0 && (
+                      <button
+                        onClick={() => handleToggleIssueFilter("refund")}
+                        style={{ width: `${(issueBreakdown.refund / issueBreakdown.total) * 100}%` }}
+                        className={cn(
+                          "h-full bg-blue-500 transition-all hover:opacity-85 relative",
+                          issueTypeFilter === "refund" ? "ring-2 ring-blue-600 ring-offset-1 z-10 scale-y-110" : ""
+                        )}
+                        title={`Refund: ${issueBreakdown.refund}`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Legend Grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      onClick={() => handleToggleIssueFilter("delay")}
+                      className={cn(
+                        "flex flex-col items-center p-1.5 rounded-lg border text-center transition-all",
+                        issueTypeFilter === "delay" ? "bg-orange-50 border-orange-200" : "bg-white border-slate-100 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Delay</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">{issueBreakdown.delay}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleToggleIssueFilter("damage")}
+                      className={cn(
+                        "flex flex-col items-center p-1.5 rounded-lg border text-center transition-all",
+                        issueTypeFilter === "damage" ? "bg-red-50 border-red-200" : "bg-white border-slate-100 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Damage</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">{issueBreakdown.damage}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleToggleIssueFilter("noshow")}
+                      className={cn(
+                        "flex flex-col items-center p-1.5 rounded-lg border text-center transition-all",
+                        issueTypeFilter === "noshow" ? "bg-amber-50 border-amber-200" : "bg-white border-slate-100 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">No Show</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">{issueBreakdown.noshow}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleToggleIssueFilter("refund")}
+                      className={cn(
+                        "flex flex-col items-center p-1.5 rounded-lg border text-center transition-all",
+                        issueTypeFilter === "refund" ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Refund</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">{issueBreakdown.refund}</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Issue Filters Row */}
                 <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
                   <Select value={issueTypeFilter} onValueChange={setIssueTypeFilter}>
@@ -1310,8 +1469,10 @@ export default function AdminDashboardPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="delay">Delay</SelectItem>
                       <SelectItem value="damage">Damage</SelectItem>
                       <SelectItem value="noshow">No Show</SelectItem>
+                      <SelectItem value="refund">Refund</SelectItem>
                       <SelectItem value="complaint">Complaint</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1361,13 +1522,14 @@ export default function AdminDashboardPage() {
                   </Button>
                 </div>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {data.issueDigest?
-                    .filter(issue => {
+                  {data.issueDigest?.filter(issue => {
                       if (issueTypeFilter !== "all") {
                         const type = issue.type?.toLowerCase() || "";
                         if (issueTypeFilter === "damage" && !type.includes("damage")) return false;
-                        if (issueTypeFilter === "noshow" && !type.includes("no show")) return false;
+                        if (issueTypeFilter === "noshow" && !(type.includes("no show") || type.includes("no-show"))) return false;
                         if (issueTypeFilter === "complaint" && !type.includes("complaint")) return false;
+                        if (issueTypeFilter === "delay" && !type.includes("delay")) return false;
+                        if (issueTypeFilter === "refund" && !(issue.refundStatus === "Processing" || issue.refundStatus === "Completed")) return false;
                       }
                       if (issueStatusFilter !== "all") {
                         if (issueStatusFilter === "open" && issue.status !== "Open") return false;
@@ -1534,6 +1696,56 @@ export default function AdminDashboardPage() {
       {(adminRole === "operations_admin" || adminRole === "super_admin") && data?.riders && (
         <div className="mb-6">
           <RiderPerformanceSnapshot riders={data.riders} />
+        </div>
+      )}
+
+      {/* Settlement Status Snapshot Panel */}
+      {(adminRole === "finance_admin" || adminRole === "super_admin") && settlements.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+          {/* Settlements Due Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+              <Clock className="h-16 w-16 text-[#3E8940]" />
+            </div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-green-50 text-[#3E8940]">
+                <Clock className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settlements Due</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-900">{formatINR(settlementDueTotal)}</h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">Awaiting release in settlement queue</p>
+          </div>
+
+          {/* Settlements Completed Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+              <CheckCircle className="h-16 w-16 text-emerald-500" />
+            </div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settlements Completed</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-900">{formatINR(settlementCompletedTotal)}</h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">Successfully transferred to partners</p>
+          </div>
+
+          {/* Overdue Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all duration-300 group relative overflow-hidden border-l-4 border-l-red-500">
+            <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+              <AlertTriangle className="h-16 w-16 text-red-500" />
+            </div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-red-50 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{"Overdue (>7 Days)"}</span>
+            </div>
+            <h3 className="text-2xl font-black text-red-600">{formatINR(settlementOverdueTotal)}</h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">Pending payments requiring intervention</p>
+          </div>
         </div>
       )}
 

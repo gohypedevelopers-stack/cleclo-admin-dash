@@ -50,7 +50,7 @@ export interface DashboardKpi {
     title: string;
     value: string | number;
     accent: string;
-    note: string;
+    note?: string;
 }
 
 export interface DashboardOrderRow {
@@ -154,6 +154,7 @@ export interface DashboardOverview {
     subtitle: string;
     period: string;
     periodLabel: string;
+    settlements?: DashboardSettlementRow[];
     filters: {
         timeRangeOptions: { value: string; label: string }[];
         vendors: string[];

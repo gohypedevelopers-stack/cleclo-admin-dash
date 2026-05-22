@@ -202,6 +202,7 @@ export default function LocationSettingsPage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredCities.map((city) => (
               <div key={city.cityCode} className="group relative flex flex-col rounded-3xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-sky-200 transition-all">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -245,6 +246,7 @@ export default function LocationSettingsPage() {
                   </Button>
                 </div>
               </div>
+            ))}
           </div>
         </TabsContent>
 

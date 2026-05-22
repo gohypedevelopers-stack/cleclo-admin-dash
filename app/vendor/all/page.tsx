@@ -23,6 +23,7 @@ const formatINR = (n: number) => new Intl.NumberFormat("en-IN", { style: "curren
 const getStatusColor = (s: string) => { 
   switch (s) { 
     case "Active": return "bg-green-100 text-green-700 border-green-200"; 
+    case "Onboarding": return "bg-cyan-100 text-cyan-700 border-cyan-200";
     case "Live but No Orders": return "bg-blue-100 text-blue-700 border-blue-200";
     case "Verification Pending": return "bg-amber-100 text-amber-700 border-amber-200"; 
     case "Suspended": return "bg-red-100 text-red-700 border-red-200"; 
@@ -30,8 +31,30 @@ const getStatusColor = (s: string) => {
   } 
 };
 
+const isJoinedWithinDays = (createdAt?: string, days = 7) => {
+  if (!createdAt) return false;
+  const joinedAt = new Date(createdAt).getTime();
+  return Number.isFinite(joinedAt) && Date.now() - joinedAt < days * 24 * 60 * 60 * 1000;
+};
+
+const getVendorLocationValue = (v: any, key: "city" | "area" | "cluster") => {
+  if (key === "cluster") return v.vendorProfile?.cluster || v.addresses?.[0]?.cluster || "";
+  return v.vendorProfile?.[key] || v.addresses?.[0]?.[key] || "";
+};
+
+const getVendorOperationalStatus = (v: any) => {
+  const totalOrders = v.vendorProfile?.totalOrders ?? v._count?.ordersAsVendor ?? 0;
+  const isApproved = Boolean(v.vendorProfile?.isApproved);
+
+  if (v.isBlocked) return { label: "Suspended", value: "suspended" };
+  if (!isApproved && isJoinedWithinDays(v.createdAt)) return { label: "Onboarding", value: "onboarding" };
+  if (!isApproved) return { label: "Verification Pending", value: "verification_pending" };
+  if (totalOrders === 0) return { label: "Live but No Orders", value: "live_no_orders" };
+  return { label: "Active", value: "active" };
+};
+
 const getVendorTier = (v: any) => {
-  // Use performanceTier from backend if available, otherwise calculate locally
+  // Use performanceTier from backend if available, otherwise calculate locally from operational and financial signals.
   if (v.vendorProfile?.performanceTier) {
     const tier = v.vendorProfile.performanceTier;
     return {
@@ -43,12 +66,14 @@ const getVendorTier = (v: any) => {
 
   const sla = v.vendorProfile?.slaScore ?? 0;
   const rating = v.vendorProfile?.rating ?? 0;
+  const issueRate = v.vendorProfile?.issueRate ?? 0;
+  const revenue = v.vendorProfile?.revenueThisMonth ?? v.vendorProfile?.totalRevenue ?? 0;
   
-  if (sla > 95 && rating > 4.7) 
+  if (sla >= 95 && rating >= 4.7 && issueRate <= 2 && revenue >= 300000) 
     return { label: "Gold", emoji: "🥇", color: "bg-amber-100 text-amber-700 border-amber-200" };
-  if (sla >= 85 && sla <= 95) 
+  if (sla >= 85 && rating >= 4.2 && issueRate <= 5 && revenue >= 100000) 
     return { label: "Silver", emoji: "🥈", color: "bg-slate-100 text-slate-700 border-slate-200" };
-  if (sla < 80) 
+  if (sla < 80 || rating < 3.5 || issueRate >= 8) 
     return { label: "Probation", emoji: "⚠️", color: "bg-red-100 text-red-700 border-red-200" };
   return { label: "Standard", emoji: "⭐", color: "bg-blue-100 text-blue-700 border-blue-200" };
 };
@@ -83,19 +108,20 @@ export default function AllVendorsPage() {
 
   const filtered = useMemo(() => {
     const filteredByStatus = statusFilter === "all" ? vendors : vendors.filter(v => {
-      const status = v.isBlocked ? "suspended" : !v.vendorProfile?.isApproved ? "pending" : "active";
+      const status = getVendorOperationalStatus(v).value;
+      if (statusFilter === "pending") return status === "verification_pending" || status === "onboarding";
       return status === statusFilter;
     });
 
     return filteredByStatus.filter(v => {
       const name = (v.vendorProfile?.businessName || v.name).toLowerCase();
       const phone = (v.phone || "").toLowerCase();
+      const owner = (v.vendorProfile?.ownerName || "").toLowerCase();
+      const city = String(getVendorLocationValue(v, "city") || "all").toLowerCase();
+      const area = String(getVendorLocationValue(v, "area") || "all").toLowerCase();
+      const cluster = String(getVendorLocationValue(v, "cluster") || "all").toLowerCase();
       const query = searchQuery.toLowerCase();
-      const matchesSearch = name.includes(query) || phone.includes(query);
-
-      const city = (v.vendorProfile?.city || "all").toLowerCase();
-      const area = (v.vendorProfile?.area || "all").toLowerCase();
-      const cluster = (v.vendorProfile?.cluster || "all").toLowerCase();
+      const matchesSearch = name.includes(query) || owner.includes(query) || phone.includes(query) || city.includes(query) || area.includes(query);
 
       const matchesCity = cityFilter === "all" || city === cityFilter.toLowerCase();
       const matchesArea = areaFilter === "all" || area === areaFilter.toLowerCase();
@@ -113,9 +139,9 @@ export default function AllVendorsPage() {
   const totalCommission = vendors.reduce((s, v) => s + (v.vendorProfile?.commissionEarned || 0), 0);
   const totalPayoutDue = vendors.reduce((s, v) => s + (v.vendorProfile?.payoutPending || 0), 0);
   const totalRefunds = vendors.reduce((s, v) => s + (v.vendorProfile?.refundAmount || 0), 0);
-  const uniqueCities = useMemo(() => Array.from(new Set(vendors.map(v => v.vendorProfile?.city).filter(Boolean))), [vendors]);
-  const uniqueAreas = useMemo(() => Array.from(new Set(vendors.map(v => v.vendorProfile?.area).filter(Boolean))), [vendors]);
-  const uniqueClusters = useMemo(() => Array.from(new Set(vendors.map(v => v.vendorProfile?.cluster).filter(Boolean))), [vendors]);
+  const uniqueCities = useMemo(() => Array.from(new Set(vendors.map(v => getVendorLocationValue(v, "city")).filter(Boolean))).sort(), [vendors]);
+  const uniqueAreas = useMemo(() => Array.from(new Set(vendors.map(v => getVendorLocationValue(v, "area")).filter(Boolean))).sort(), [vendors]);
+  const uniqueClusters = useMemo(() => Array.from(new Set(vendors.map(v => getVendorLocationValue(v, "cluster")).filter(Boolean))).sort(), [vendors]);
   const avgSla = vendors.length > 0 ? Math.round(vendors.reduce((s, v) => s + (v.vendorProfile?.slaScore || 0), 0) / Math.max(vendors.length, 1)) : 0;
 
   if (isLoading && vendors.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading vendors...</p></div>;
@@ -144,10 +170,11 @@ export default function AllVendorsPage() {
         <div className="bg-white rounded-xl border p-4">
           <p className="text-2xl font-bold text-orange-600">{formatINR(totalPayoutDue)}</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Payout Due</p>
+          <p className="text-xs text-slate-500 mt-0.5">Refunds: {formatINR(totalRefunds)}</p>
         </div>
         <div className="bg-white rounded-xl border p-4">
           <p className="text-2xl font-bold text-indigo-600">{avgSla}%</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Avg SLA Score</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Avg On-Time SLA</p>
         </div>
         <div className="bg-white rounded-xl border p-4">
           <p className="text-2xl font-bold text-purple-600">{activeCount}</p>
@@ -165,7 +192,14 @@ export default function AllVendorsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40 rounded-xl bg-slate-50 border-none"><Filter className="h-4 w-4 mr-2 text-slate-500" /><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent><SelectItem value="all">All Status</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="pending">Verification Pending</SelectItem><SelectItem value="suspended">Suspended</SelectItem></SelectContent>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="onboarding">Onboarding</SelectItem>
+              <SelectItem value="verification_pending">Verification Pending</SelectItem>
+              <SelectItem value="live_no_orders">Live but No Orders</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
+            </SelectContent>
           </Select>
           
           <Select value={cityFilter} onValueChange={setCityFilter}>
@@ -199,10 +233,11 @@ export default function AllVendorsPage() {
         <Table>
           <TableHeader><TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b">
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Vendor</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Revenue This Month</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Avg Order Value</TableHead>
-            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Refund Amount</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Orders / Revenue</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Commission Earned</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Pending Payout</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Refund Amount</TableHead>
+            <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center whitespace-nowrap">Avg Order Value</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Performance Index</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Tier</TableHead>
             <TableHead className="text-xs font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Type</TableHead>
@@ -215,15 +250,10 @@ export default function AllVendorsPage() {
           <TableBody>
             {filtered.length > 0 ? filtered.map((v) => {
               const name = v.vendorProfile?.businessName || v.name;
-              const totalOrders = v.vendorProfile?.totalOrders || 0;
-              const isApproved = v.vendorProfile?.isApproved;
+              const totalOrders = v.vendorProfile?.totalOrders ?? v._count?.ordersAsVendor ?? 0;
+              const status = getVendorOperationalStatus(v).label;
               
-              let status = "Verification Pending";
-              if (v.isBlocked) status = "Suspended";
-              else if (isApproved && totalOrders > 0) status = "Active";
-              else if (isApproved && totalOrders === 0) status = "Live but No Orders";
-              
-              const city = v.addresses?.[0]?.city || "—";
+              const city = getVendorLocationValue(v, "city") || "—";
               const revenue = v.vendorProfile?.totalRevenue || 0;
               const commission = v.vendorProfile?.commissionEarned || 0;
               const payoutDue = v.vendorProfile?.payoutPending || 0;
@@ -248,12 +278,18 @@ export default function AllVendorsPage() {
                   <TableCell>
                     <div className="text-center">
                       <p className="text-sm font-bold text-emerald-700">{formatINR(v.vendorProfile?.revenueThisMonth || 0)}</p>
-                      <p className="text-[10px] text-slate-400">Total: {formatINR(revenue)}</p>
+                      <p className="text-[10px] text-slate-400">{totalOrders} orders · Total: {formatINR(revenue)}</p>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <p className="text-sm font-bold text-slate-700 text-center">
-                      {formatINR(totalOrders > 0 ? (revenue / totalOrders) : 0)}
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-blue-600">{commission > 0 ? formatINR(commission) : "—"}</p>
+                      <p className="text-[10px] text-slate-400">{commRate}% rate</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className={`text-sm font-bold text-center ${payoutDue > 0 ? "text-orange-600" : "text-slate-400"}`}>
+                      {payoutDue > 0 ? formatINR(payoutDue) : "—"}
                     </p>
                   </TableCell>
                   <TableCell>
@@ -262,10 +298,9 @@ export default function AllVendorsPage() {
                     </p>
                   </TableCell>
                   <TableCell>
-                    <div className="text-center">
-                      <p className="text-sm font-bold text-blue-600">{commission > 0 ? formatINR(commission) : "—"}</p>
-                      <p className="text-[10px] text-slate-400">{commRate}% rate</p>
-                    </div>
+                    <p className="text-sm font-bold text-slate-700 text-center">
+                      {formatINR(totalOrders > 0 ? (revenue / totalOrders) : 0)}
+                    </p>
                   </TableCell>
                   <TableCell className="text-center py-3">
                     <div className="flex flex-col items-center gap-1">
@@ -278,7 +313,7 @@ export default function AllVendorsPage() {
                       
                       <div className="flex flex-col gap-0.5 mt-0.5">
                         <div className="flex items-center justify-between gap-3 min-w-[80px]">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">SLA:</span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">On-Time:</span>
                           <span className={`text-[10px] font-black ${sla >= 90 ? "text-emerald-600" : sla >= 80 ? "text-amber-600" : "text-rose-600"}`}>
                             {sla > 0 ? `${sla}%` : "0%"}
                           </span>
@@ -360,6 +395,7 @@ export default function AllVendorsPage() {
                   <TableCell className="text-center">
                     <Badge variant="outline" className={`${getStatusColor(status)} font-bold gap-1.5 px-2.5 py-1 text-[10px] shadow-sm`}>
                       {status === "Active" && <CheckCircle className="h-3 w-3" />}
+                      {status === "Onboarding" && <Clock className="h-3 w-3" />}
                       {status === "Verification Pending" && <Clock className="h-3 w-3" />}
                       {status === "Live but No Orders" && <Zap className="h-3 w-3" />}
                       {status === "Suspended" && <Ban className="h-3 w-3" />}
@@ -404,7 +440,7 @@ export default function AllVendorsPage() {
                   </TableCell>
                 </TableRow>
               );
-            }) : <TableRow><TableCell colSpan={11} className="h-32 text-center text-slate-500"><div className="flex flex-col items-center gap-2"><Search className="h-8 w-8 text-slate-300" /><p>No vendors found.</p></div></TableCell></TableRow>}
+            }) : <TableRow><TableCell colSpan={14} className="h-32 text-center text-slate-500"><div className="flex flex-col items-center gap-2"><Search className="h-8 w-8 text-slate-300" /><p>No vendors found.</p></div></TableCell></TableRow>}
           </TableBody>
         </Table>
         <div className="flex items-center justify-between p-4 border-t bg-slate-50/50 text-xs text-slate-500"><p>Showing <strong>{filtered.length}</strong> vendors</p></div>

@@ -12,6 +12,8 @@ import {
   Trash2,
   Wallet,
   Zap,
+  Package,
+  BarChart3,
 } from "lucide-react";
 import { adminWalletApi } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";

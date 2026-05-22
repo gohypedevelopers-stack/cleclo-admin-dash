@@ -226,12 +226,19 @@ export default function VendorDashboardPage() {
     .slice(0, 4);
 
   const growthData = [
-    { month: "Aug", vendors: 1 },
-    { month: "Sep", vendors: 2 },
-    { month: "Oct", vendors: 3 },
-    { month: "Nov", vendors: Math.max(3, vendors.length - 2) },
-    { month: "Dec", vendors: Math.max(4, vendors.length - 1) },
-    { month: "Jan", vendors: vendors.length },
+    { month: "Aug", registered: 4, active: 2, approved: 2, pending: 1, rejected: 1 },
+    { month: "Sep", registered: 6, active: 3, approved: 3, pending: 2, rejected: 1 },
+    { month: "Oct", registered: 8, active: 4, approved: 4, pending: 3, rejected: 1 },
+    { month: "Nov", registered: 10, active: 5, approved: 5, pending: 4, rejected: 1 },
+    { month: "Dec", registered: 12, active: 6, approved: 6, pending: 4, rejected: 2 },
+    { 
+      month: "Jan", 
+      registered: Math.max(14, vendors.length), 
+      active: activeVendors.length, 
+      approved: activeVendors.length, 
+      pending: pendingVendors.length, 
+      rejected: vendors.filter(v => v.status === "blocked" || v.isBlocked).length 
+    },
   ];
 
   return (
@@ -360,47 +367,64 @@ export default function VendorDashboardPage() {
       </div>
 
       {/* Strategic KPI Grid */}
-      <div className="grid gap-4 md:grid-cols-5 sm:grid-cols-1">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {[
+          {
+            key: "vendors",
+            label: "Total Vendors",
+            value: stats?.totalVendors || 0,
+            description: "Overall platform partners",
+            icon: Users,
+            grad: "from-[#2170FF] to-[#2170FF]/90",
+          },
+          {
+            key: "total_orders",
+            label: "Total Orders",
+            value: stats?.totalOrders || 0,
+            description: "Platform volume to date",
+            icon: ClipboardList,
+            grad: "from-teal-600 to-teal-700",
+          },
           {
             key: "risk",
             label: "Vendor Risk Indicator",
             value: `⚠ ${stats?.verificationPending || 0} / 🚨 ${stats?.highRiskVendors || 0}`,
-            description: "Review Required / High Risk Alert",
+            description: "Review Required / Risk Alert",
             icon: ShieldCheck,
-            grad: (stats?.verificationPending || 0) > 0 || (stats?.highRiskVendors || 0) > 0 ? "from-red-600 to-red-700" : "from-emerald-500 to-emerald-600",
-            pulse: (stats?.verificationPending || 0) > 0 || (stats?.highRiskVendors || 0) > 0,
-            sub: `Review: ${stats?.verificationPending || 0} | Risk: ${stats?.highRiskVendors || 0}`
+            grad: ((stats?.verificationPending || 0) > 0 || (stats?.highRiskVendors || 0) > 0) ? "from-[#FF002E] to-red-700 animate-pulse ring-2 ring-red-400 border-none shadow-lg text-white" : "from-emerald-500 to-emerald-600",
+            isRisk: true,
+          },
+          {
+            key: "performance",
+            label: "Composite Vendor Score",
+            value: `${(((stats?.avgSla || 0) + ((stats?.avgRating || 0) / 5 * 100) + (100 - (stats?.avgIssueRate || 0))) / 3).toFixed(0)}%`,
+            description: "Composite metric based on SLA, Rating, Issue Rate",
+            icon: Star,
+            grad: "from-amber-500 to-orange-600",
+            isScore: true,
           },
           {
             key: "revenue",
-            label: "Total Revenue Generated",
+            label: "Total Vendor Revenue",
             value: `₹${Number(stats?.totalRevenue || 0).toLocaleString("en-IN")}`,
             description: "Gross merchandise value",
             icon: Wallet,
             grad: "from-blue-600 to-blue-700",
           },
           {
-            key: "aov",
-            label: "Platform Avg Order Value",
-            value: `₹${Number(stats?.avgOrderValue || 0).toLocaleString("en-IN")}`,
-            description: "Overall efficiency metric",
-            icon: IndianRupee,
-            grad: "from-cyan-600 to-cyan-700",
-          },
-          {
-            key: "commission_total",
+            key: "commission",
             label: "Platform Commission Earned",
             value: `₹${Number(stats?.commissionEarned || 0).toLocaleString("en-IN")}`,
-            description: "Cumulative earnings to date",
+            description: "Cumulative platform commission",
             icon: BarChart3,
             grad: "from-indigo-600 to-indigo-700",
           },
           {
-            key: "commission",
+            key: "commission_this_month",
             label: "Commission Earned (This Month)",
             value: `₹${Number(stats?.commissionThisMonth || 0).toLocaleString("en-IN")}`,
-            description: `${(stats?.commissionTrend || 0) >= 0 ? "+" : ""}${Number(stats?.commissionTrend || 0).toFixed(1)}% vs last month`,
+            trend: stats?.commissionTrend,
+            description: "Platform net revenue this month",
             icon: TrendingUp,
             grad: "from-emerald-600 to-emerald-700",
           },
@@ -408,60 +432,68 @@ export default function VendorDashboardPage() {
             key: "payout",
             label: "Total Pending Payout",
             value: `₹${Number(stats?.payoutPending || 0).toLocaleString("en-IN")}`,
-            description: "Awaiting settlement",
+            description: "Awaiting settlement cycle",
             icon: CreditCard,
             grad: "from-violet-600 to-violet-700",
           },
           {
             key: "sla",
-            label: "Order Fulfilment Rate",
+            label: "Avg SLA %",
             value: `${Math.round(stats?.avgSla || 0)}%`,
-            description: "Fulfilment vs Commitment",
+            description: "Order fulfilment rate",
             icon: CheckCircle,
-            grad: "from-teal-600 to-teal-700",
+            grad: "from-[#3E8940] to-[#3E8940]/90",
           },
           {
             key: "issues",
-            label: "Quality Intelligence",
-            value: `IR: ${Number(stats?.avgIssueRate || 0).toFixed(1)}% | DR: ${Number(stats?.avgDamageRate || 0).toFixed(1)}%`,
-            description: "Issue Rate (IR) vs Damage Rate (DR)",
+            label: "Avg Issue Rate",
+            value: `${Number(stats?.avgIssueRate || 0).toFixed(1)}%`,
+            description: "Average partner issue rate",
             icon: AlertTriangle,
-            grad: "from-rose-600 to-rose-700",
-          },
-          {
-            key: "vendors",
-            label: "Total Vendors",
-            value: stats?.totalVendors || 0,
-            description: "Overall platform partners",
-            icon: Users,
-            grad: "from-slate-700 to-slate-800",
-          },
-          {
-            key: "score",
-            label: "Composite Partner Health",
-            value: `${(((stats?.avgRating || 0) / 5 * 100 + (stats?.avgSla || 0) + (100 - (stats?.avgIssueRate || 0))) / 3).toFixed(0)}%`,
-            description: `Fulfilment: ${Math.round(stats?.avgSla || 0)}% | Rating: ${Number(stats?.avgRating || 0).toFixed(1)} | Issue: ${Number(stats?.avgIssueRate || 0).toFixed(1)}%`,
-            icon: Star,
-            grad: "from-amber-500 to-orange-600",
+            grad: "from-[#FF002E] to-[#FF002E]/90",
           },
         ].map((kpi) => (
           <Card
             key={kpi.key}
-            className={`bg-gradient-to-br ${kpi.grad} text-white border-none shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer ${kpi.pulse ? "ring-2 ring-red-400 ring-offset-2 animate-pulse" : ""}`}
+            className={`bg-gradient-to-br ${kpi.grad} text-white border-none shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer`}
           >
             <CardContent className="p-4 flex flex-col justify-between h-full min-h-[120px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-white/70 text-[9px] font-bold uppercase tracking-wider">{kpi.label}</p>
-                  <p className="text-xl font-bold mt-1 tracking-tight">{kpi.value}</p>
+                  {kpi.isRisk ? (
+                    <div className="flex flex-col gap-1 text-[10px] font-black text-white mt-1 leading-snug">
+                      <div>⚠ Under Review: {stats?.verificationPending || 0}</div>
+                      <div>🚨 High Risk: {stats?.highRiskVendors || 0}</div>
+                    </div>
+                  ) : (
+                    <p className="text-xl font-bold mt-1 tracking-tight">
+                      {kpi.value}
+                      {kpi.trend !== undefined && kpi.trend !== null && (
+                        <span className="ml-1.5 text-xs font-semibold opacity-90">
+                          ({kpi.trend >= 0 ? "+" : ""}{Math.round(kpi.trend)}%)
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
                 <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
                   <kpi.icon className="h-5 w-5" />
                 </div>
               </div>
-              <p className="text-white/80 text-[10px] mt-3 font-medium flex items-center gap-1.5 truncate">
-                {kpi.description}
-              </p>
+              {kpi.isRisk ? (
+                <p className="text-[9px] font-medium leading-none mt-2.5 pt-2 border-t border-white/20">Review Required / Risk Alert</p>
+              ) : kpi.isScore ? (
+                <div className="mt-2.5 pt-2 border-t border-white/20 flex justify-between text-[10px] font-bold text-white/95">
+                  <span>SLA: {Math.round(stats?.avgSla || 0)}%</span>
+                  <span>Rating: {Number(stats?.avgRating || 0).toFixed(1)}</span>
+                  <span>Issue: {Number(stats?.avgIssueRate || 0).toFixed(1)}%</span>
+                </div>
+              ) : (
+                <p className="text-white/80 text-[10px] mt-3 font-medium flex items-center gap-1.5 truncate">
+                  {kpi.description}
+                </p>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -481,14 +513,22 @@ export default function VendorDashboardPage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1.5">
-                   <div className="h-2 w-2 rounded-full bg-blue-500" />
-                   <span className="text-[10px] font-bold text-slate-600">REGISTERED</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                   <span className="text-[8px] font-bold text-slate-500 uppercase">Registered</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                   <div className="h-2 w-2 rounded-full bg-[#3E8940]" />
-                   <span className="text-[10px] font-bold text-[#3E8940]">ACTIVE</span>
+                <div className="flex items-center gap-1">
+                   <div className="h-1.5 w-1.5 rounded-full bg-[#3E8940]" />
+                   <span className="text-[8px] font-bold text-[#3E8940] uppercase">Approved</span>
+                </div>
+                <div className="flex items-center gap-1">
+                   <div className="h-1.5 w-1.5 bg-amber-500 rounded-full" />
+                   <span className="text-[8px] font-bold text-amber-600 uppercase">Pending</span>
+                </div>
+                <div className="flex items-center gap-1">
+                   <div className="h-1.5 w-1.5 bg-red-500 rounded-full" />
+                   <span className="text-[8px] font-bold text-red-600 uppercase">Rejected</span>
                 </div>
               </div>
             </div>
@@ -499,7 +539,7 @@ export default function VendorDashboardPage() {
                 <ComposedChart data={stats?.growthData || growthData}>
                   <defs>
                     <linearGradient id="activeGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3E8940" stopOpacity={0.2}/>
+                      <stop offset="5%" stopColor="#3E8940" stopOpacity={0.15}/>
                       <stop offset="95%" stopColor="#3E8940" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
@@ -517,25 +557,48 @@ export default function VendorDashboardPage() {
                   <Tooltip 
                     cursor={{ fill: '#f1f5f9' }}
                     content={({ active, payload, label }) => {
-                      if (active && payload && payload.length >= 2) {
-                        const reg = payload[0].value as number;
-                        const act = payload[1].value as number;
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const registered = data.registered || 0;
+                        const approved = data.approved || data.active || 0;
+                        const pending = data.pending || 0;
+                        const rejected = data.rejected || 0;
+
                         return (
-                          <div className="bg-white border border-slate-100 shadow-xl rounded-xl p-3 text-xs space-y-2">
-                            <p className="font-bold text-slate-800 border-b pb-1">{label} Overview</p>
-                            <div className="space-y-1.5">
+                          <div className="bg-white border border-slate-100 shadow-xl rounded-xl p-3 text-xs space-y-2 min-w-[180px]">
+                            <div className="border-b pb-1 flex justify-between items-center">
+                              <span className="font-bold text-slate-800">{label} Overview</span>
+                              <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-none text-[8px] font-bold px-1 py-0.5">
+                                Quality Funnel
+                              </Badge>
+                            </div>
+                            <div className="space-y-1">
                               <div className="flex justify-between gap-4">
-                                <span className="text-slate-500">Registered</span>
-                                <span className="font-bold text-blue-600">{reg}</span>
+                                <span className="text-slate-500 font-medium">Registered:</span>
+                                <span className="font-bold text-blue-600">{registered}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 border-t border-slate-50 pt-1">
+                                <span className="text-[#3E8940] font-semibold flex items-center gap-1 text-[10px]">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-[#3E8940]" /> Approved:
+                                </span>
+                                <span className="font-bold text-[#3E8940]">{approved}</span>
                               </div>
                               <div className="flex justify-between gap-4">
-                                <span className="text-slate-500">Approved (Active)</span>
-                                <span className="font-bold text-[#3E8940]">{act}</span>
+                                <span className="text-amber-600 font-semibold flex items-center gap-1 text-[10px]">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Pending:
+                                </span>
+                                <span className="font-bold text-amber-600">{pending}</span>
                               </div>
-                              <div className="flex justify-between gap-4 border-t pt-1">
-                                <span className="text-slate-500">Efficiency</span>
-                                <span className="font-bold text-slate-700">
-                                  {reg > 0 ? Math.round((act / reg) * 100) : 0}%
+                              <div className="flex justify-between gap-4">
+                                <span className="text-red-600 font-semibold flex items-center gap-1 text-[10px]">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-red-500" /> Rejected:
+                                </span>
+                                <span className="font-bold text-red-600">{rejected}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 border-t border-slate-100 pt-1 font-bold">
+                                <span className="text-slate-700">Readiness Rate:</span>
+                                <span className="text-slate-800">
+                                  {registered > 0 ? Math.round((approved / registered) * 100) : 0}%
                                 </span>
                               </div>
                             </div>
@@ -545,9 +608,11 @@ export default function VendorDashboardPage() {
                       return null;
                     }}
                   />
-                  <Bar dataKey="registered" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} />
-                  <Area type="monotone" dataKey="active" fill="url(#activeGrad)" stroke="#3E8940" strokeWidth={2} />
-                  <Line type="monotone" dataKey="active" stroke="#3E8940" strokeWidth={2} dot={{ r: 3, fill: '#3E8940' }} />
+                  <Bar dataKey="registered" fill="#93c5fd" opacity={0.4} radius={[4, 4, 0, 0]} barSize={24} name="Registered" />
+                  <Area type="monotone" dataKey="approved" fill="url(#activeGrad)" stroke="#3E8940" strokeWidth={2.5} name="Approved" />
+                  <Line type="monotone" dataKey="approved" stroke="#3E8940" strokeWidth={2.5} dot={{ r: 3, fill: '#3E8940' }} name="Approved" />
+                  <Line type="monotone" dataKey="pending" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 2, fill: '#f59e0b' }} name="Pending" />
+                  <Line type="monotone" dataKey="rejected" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 2, fill: '#ef4444' }} name="Rejected" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -606,15 +671,17 @@ export default function VendorDashboardPage() {
 
             <div className="h-[1px] bg-slate-100 w-full" />
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 w-full min-w-0">
               <Select value={filterCity} onValueChange={setFilterCity}>
-                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-2 overflow-hidden">
+                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors w-full min-w-0 overflow-hidden truncate">
+                  <div className="flex items-center gap-2 overflow-hidden truncate min-w-0 w-full">
                     <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-                    <SelectValue placeholder="City" />
+                    <span className="truncate block text-left min-w-0 w-full">
+                      <SelectValue placeholder="City" />
+                    </span>
                   </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl" position="popper" sideOffset={4}>
                   <SelectItem value="all" className="text-[10px]">All Cities</SelectItem>
                   {filterOptions.cities.map(c => (
                     <SelectItem key={c} value={c} className="text-[10px]">{c}</SelectItem>
@@ -623,13 +690,15 @@ export default function VendorDashboardPage() {
               </Select>
 
               <Select value={filterVendor} onValueChange={setFilterVendor}>
-                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-2 overflow-hidden">
+                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors w-full min-w-0 overflow-hidden truncate">
+                  <div className="flex items-center gap-2 overflow-hidden truncate min-w-0 w-full">
                     <Store className="h-3 w-3 text-slate-400 shrink-0" />
-                    <SelectValue placeholder="Vendor" />
+                    <span className="truncate block text-left min-w-0 w-full">
+                      <SelectValue placeholder="Vendor" />
+                    </span>
                   </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl" position="popper" sideOffset={4}>
                   <SelectItem value="all" className="text-[10px]">All Vendors</SelectItem>
                   {filterOptions.vendors.map(v => (
                     <SelectItem key={v.id} value={v.id} className="text-[10px]">{v.name}</SelectItem>
@@ -638,13 +707,15 @@ export default function VendorDashboardPage() {
               </Select>
 
               <Select value={filterService} onValueChange={setFilterService}>
-                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-2 overflow-hidden">
+                <SelectTrigger className="h-9 text-[10px] bg-white border-slate-200 rounded-xl hover:bg-slate-50 transition-colors w-full min-w-0 overflow-hidden truncate">
+                  <div className="flex items-center gap-2 overflow-hidden truncate min-w-0 w-full">
                     <Zap className="h-3 w-3 text-slate-400 shrink-0" />
-                    <SelectValue placeholder="Service" />
+                    <span className="truncate block text-left min-w-0 w-full">
+                      <SelectValue placeholder="Service" />
+                    </span>
                   </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl" position="popper" sideOffset={4}>
                   <SelectItem value="all" className="text-[10px]">All Services</SelectItem>
                   {filterOptions.serviceTypes.map(s => (
                     <SelectItem key={s} value={s} className="text-[10px]">{s}</SelectItem>
@@ -732,17 +803,21 @@ export default function VendorDashboardPage() {
       </div>
 
       {/* Issue Breakdown & Quality Dashboard */}
-      <Card className="shadow-sm hover:shadow-md transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader 
+          className="flex flex-row items-center justify-between p-5 pb-2 cursor-pointer group hover:bg-slate-50/50 transition-colors duration-200"
+          onClick={() => router.push("/issues")}
+        >
           <div>
-            <CardTitle className="text-sm font-bold text-slate-800">
+            <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5 group-hover:text-[#3E8940] transition-colors">
               Issue Breakdown
+              <ArrowRight className="h-3.5 w-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-[#3E8940] duration-200" />
             </CardTitle>
             <p className="text-xs text-slate-500 font-medium">
               Quality insights • Performance friction points
             </p>
           </div>
-          <Badge className="bg-rose-50 text-rose-700 border-none font-bold text-[10px]">
+          <Badge className="bg-rose-50 text-rose-700 border-none font-bold text-[10px] group-hover:bg-rose-100 transition-colors duration-200">
             ACTION REQUIRED
           </Badge>
         </CardHeader>
@@ -782,29 +857,46 @@ export default function VendorDashboardPage() {
                   barSize={40}
                 >
                   {(stats?.issueBreakdown || []).map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={['#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'][index % 4]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={['#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'][index % 4]} 
+                      onClick={() => router.push(`/issues?type=${entry.name}`)}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                    />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
           <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-50">
-            <div className="flex items-center gap-2">
+            <button 
+              onClick={() => router.push("/issues?type=Delay")}
+              className="flex items-center gap-2 hover:bg-slate-50 px-2.5 py-1.5 rounded-full transition-all cursor-pointer border border-transparent hover:border-slate-100"
+            >
               <div className="h-2 w-2 rounded-full bg-[#f43f5e]" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Delay</span>
-            </div>
-            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Delay</span>
+            </button>
+            <button 
+              onClick={() => router.push("/issues?type=Damage")}
+              className="flex items-center gap-2 hover:bg-slate-50 px-2.5 py-1.5 rounded-full transition-all cursor-pointer border border-transparent hover:border-slate-100"
+            >
               <div className="h-2 w-2 rounded-full bg-[#f59e0b]" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Damage</span>
-            </div>
-            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Damage</span>
+            </button>
+            <button 
+              onClick={() => router.push("/issues?type=No Show")}
+              className="flex items-center gap-2 hover:bg-slate-50 px-2.5 py-1.5 rounded-full transition-all cursor-pointer border border-transparent hover:border-slate-100"
+            >
               <div className="h-2 w-2 rounded-full bg-[#3b82f6]" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">No Show</span>
-            </div>
-            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">No Show</span>
+            </button>
+            <button 
+              onClick={() => router.push("/issues?type=Refund")}
+              className="flex items-center gap-2 hover:bg-slate-50 px-2.5 py-1.5 rounded-full transition-all cursor-pointer border border-transparent hover:border-slate-100"
+            >
               <div className="h-2 w-2 rounded-full bg-[#8b5cf6]" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Refund</span>
-            </div>
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Refund</span>
+            </button>
           </div>
         </CardContent>
       </Card>

@@ -104,11 +104,7 @@ function CategoriesPageContent() {
   const initialize = async () => {
     try {
       setLoading(true);
-      const [services, statesData, vendorsData] = await Promise.all([
-        adminCatalogApi.getServices(),
-        adminCatalogApi.getStates ? adminCatalogApi.getStates() : Promise.resolve([]), // Fallback if not in catalog api
-        adminCatalogApi.getVendors ? adminCatalogApi.getVendors() : Promise.resolve([])
-      ]);
+      const services = await adminCatalogApi.getServices();
 
       // Actually let's use the correct APIs
       const [allStates, allVendors] = await Promise.all([
