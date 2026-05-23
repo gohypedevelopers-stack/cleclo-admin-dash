@@ -112,7 +112,7 @@ export default function VendorAnalyticsPage() {
   const customerAnalytics = useMemo(() => {
     const userMap: Record<string, any> = {};
     orders.forEach(o => {
-      if (!userMap[o.userId]) userMap[o.userId] = { count: 0, revenue: 0, lastOrder: new Date(0), name: o.user?.name || "Customer" };
+      if (!userMap[o.userId]) userMap[o.userId] = { count: 0, revenue: 0, lastOrder: new Date(0), name: o.user?.name || `Customer ${o.userId ? o.userId.toString().substring(o.userId.toString().length - 4).toUpperCase() : "1001"}` };
       userMap[o.userId].count++;
       userMap[o.userId].revenue += o.totalAmount || 0;
       const d = new Date(o.createdAt);
@@ -151,7 +151,31 @@ export default function VendorAnalyticsPage() {
     const periodSettlements = settlements.filter(s => { const d = new Date(s.createdAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
     const totalPaidThisMonth = periodSettlements.filter(s => s.status === "PAID").reduce((s, p) => s + (p.amount || 0), 0);
     const pendingSettlement = settlements.filter(s => ["pending", "processing"].includes(String(s.status).toLowerCase())).reduce((s, p) => s + (p.amount || 0), 0);
-    return { totalPaidThisMonth, pendingSettlement, avgSettlementTime: "24-48h" };
+    
+    const paidSettlements = settlements.filter(s => s.status === "PAID" && s.createdAt && (s.updatedAt || s.settledAt || s.processedAt));
+    let avgSettlementTime = "24-48h";
+    if (paidSettlements.length > 0) {
+      let totalHours = 0;
+      let validCount = 0;
+      paidSettlements.forEach(s => {
+        const end = new Date(s.updatedAt || s.settledAt || s.processedAt);
+        const start = new Date(s.createdAt);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs >= 0) {
+          totalHours += (diffMs / (1000 * 60 * 60));
+          validCount++;
+        }
+      });
+      if (validCount > 0) {
+        const avgHours = Math.round(totalHours / validCount);
+        if (avgHours < 1) avgSettlementTime = "< 1h";
+        else if (avgHours < 24) avgSettlementTime = `${avgHours}h`;
+        else if (avgHours <= 48) avgSettlementTime = "24-48h";
+        else avgSettlementTime = `${Math.round(avgHours / 24)}d`;
+      }
+    }
+
+    return { totalPaidThisMonth, pendingSettlement, avgSettlementTime };
   }, [settlements]);
 
   const trendData = useMemo(() => {
@@ -305,21 +329,23 @@ export default function VendorAnalyticsPage() {
       {/* Customer Analytics Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-3"><div className="h-5 w-1 bg-violet-500 rounded-full" /><h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Customer Analytics</h2></div>
-        <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
-          <div className="space-y-4 lg:col-span-1 flex flex-col">
-            <KpiCard title="Repeat Rate" value={`${customerAnalytics.repeatRate}%`} icon={UserCheck} color="text-violet-600" iconBg="bg-violet-50" subText="Loyalty" />
-            <KpiCard title="Avg Order Value" value={formatINR(Number(customerAnalytics.avgOrderValue))} icon={TrendingUp} color="text-emerald-600" iconBg="bg-emerald-50" subText="AOV" />
-            <KpiCard title="Churn Rate" value={`${customerAnalytics.churnRate}%`} icon={UserMinus} color="text-rose-600" iconBg="bg-rose-50" subText="Estimated" />
-          </div>
-          <Card className="md:col-span-2 shadow-sm border-slate-100 rounded-3xl overflow-hidden bg-white">
-            <CardHeader className="border-b border-slate-50 py-4 px-6 flex flex-row items-center justify-between"><CardTitle className="text-sm font-black uppercase">Top 10 Customers</CardTitle><Users className="h-4 w-4 text-slate-300" /></CardHeader>
-            <CardContent className="p-0">
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <KpiCard title="Repeat Rate" value={`${customerAnalytics.repeatRate}%`} icon={UserCheck} color="text-violet-600" iconBg="bg-violet-50" subText="Loyalty" />
+          <KpiCard title="Avg Order Value" value={formatINR(Number(customerAnalytics.avgOrderValue))} icon={TrendingUp} color="text-emerald-600" iconBg="bg-emerald-50" subText="AOV" />
+          <KpiCard title="Churn Rate" value={`${customerAnalytics.churnRate}%`} icon={UserMinus} color="text-rose-600" iconBg="bg-rose-50" subText="Estimated" />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="md:col-span-2 shadow-sm border-slate-100 rounded-3xl overflow-hidden bg-white flex flex-col">
+            <CardHeader className="border-b border-slate-50 py-5 px-6 flex flex-row items-center justify-between"><CardTitle className="text-sm font-black uppercase">Top 10 Customers</CardTitle><Users className="h-4 w-4 text-slate-300" /></CardHeader>
+            <CardContent className="p-0 flex-1">
               <div className="max-h-[350px] overflow-y-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead><tr className="bg-slate-50/50 sticky top-0 z-10"><th className="px-6 py-3 text-[9px] font-black uppercase text-slate-400">Name</th><th className="px-6 py-3 text-[9px] font-black uppercase text-slate-400">Orders</th><th className="px-6 py-3 text-[9px] font-black uppercase text-slate-400 text-right">Revenue</th></tr></thead>
+                  <thead><tr className="bg-slate-50/50 sticky top-0 z-10"><th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400">Name</th><th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-center">Orders</th><th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">Revenue</th></tr></thead>
                   <tbody className="divide-y divide-slate-50">
                     {customerAnalytics.top10.map((u, i) => (
-                      <tr key={i} className="hover:bg-slate-50/30 transition-colors"><td className="px-6 py-3 text-xs font-black text-slate-800">{u.name}</td><td className="px-6 py-3 text-xs font-bold text-slate-500">{u.count}</td><td className="px-6 py-3 text-xs font-black text-emerald-600 text-right">{formatINR(u.revenue)}</td></tr>
+                      <tr key={i} className="hover:bg-slate-50/30 transition-colors"><td className="px-6 py-4 text-xs font-black text-slate-800 flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-bold text-[10px]">{u.name.substring(0, 2).toUpperCase()}</div>{u.name}</td><td className="px-6 py-4 text-xs font-bold text-slate-500 text-center">{u.count}</td><td className="px-6 py-4 text-xs font-black text-emerald-600 text-right">{formatINR(u.revenue)}</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -330,28 +356,28 @@ export default function VendorAnalyticsPage() {
           {/* REVENUE SPLIT SECTION WITH UPDATED HEADING */}
           <Card className="shadow-sm border-slate-100 rounded-3xl bg-white flex flex-col items-center justify-between p-6 text-center">
             <CardHeader className="pb-2 w-full">
-              <CardTitle className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-50 pb-2">Revenue Segmentation</CardTitle>
+              <CardTitle className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-50 pb-4">Revenue Segmentation</CardTitle>
             </CardHeader>
-            <div className="flex-1 flex flex-col items-center justify-center relative w-full">
+            <div className="flex-1 flex flex-col items-center justify-center relative w-full my-4">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-[10px] font-black text-slate-400 uppercase">Rev.</span>
-                <span className="text-lg font-black text-slate-800 uppercase">Split</span>
+                <span className="text-xl font-black text-slate-800 uppercase">Split</span>
               </div>
-              <div className="h-[180px] w-full">
+              <div className="h-[220px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={customerAnalytics.customerSplit} cx="50%" cy="50%" innerRadius={65} outerRadius={85} paddingAngle={6} dataKey="value" stroke="none">
+                    <Pie data={customerAnalytics.customerSplit} cx="50%" cy="50%" innerRadius={75} outerRadius={95} paddingAngle={6} dataKey="value" stroke="none">
                       {customerAnalytics.customerSplit.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)'}} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 mt-4 w-full border-t border-slate-50 pt-4">
+            <div className="grid grid-cols-2 gap-4 mt-auto w-full border-t border-slate-50 pt-5">
               {customerAnalytics.customerSplit.map(item => (
-                <div key={item.name} className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{item.name}</span>
+                <div key={item.name} className="flex flex-col items-center bg-slate-50/50 p-3 rounded-2xl">
+                  <div className="flex items-center gap-2 mb-1"><div className="h-2 w-2 rounded-full" style={{backgroundColor: item.fill}} /><span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{item.name}</span></div>
                   <span className="text-sm font-black text-slate-900">{formatINR(item.value)}</span>
                 </div>
               ))}
@@ -386,37 +412,45 @@ export default function VendorAnalyticsPage() {
 
       {/* Settlements & Health Station */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden group">
-          <CardHeader className="pb-4"><CardTitle className="text-xl font-black uppercase tracking-tight">Settlement Analytics</CardTitle><CardDescription className="text-[10px] font-bold uppercase text-slate-400">Partner Payout Integrity</CardDescription></CardHeader>
-          <CardContent className="space-y-6">
+        <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden group flex flex-col">
+          <CardHeader className="pb-4"><CardTitle className="text-xl font-black uppercase tracking-tight text-slate-600">Settlement Analytics</CardTitle><CardDescription className="text-[10px] font-bold uppercase text-slate-400">Partner Payout Integrity</CardDescription></CardHeader>
+          <CardContent className="space-y-6 flex-1 flex flex-col justify-between">
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 shadow-sm"><p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Paid (Month)</p><div className="text-xl font-black text-emerald-700">{formatINR(settlementStats.totalPaidThisMonth)}</div></div>
-              <div className="p-5 bg-amber-50/50 rounded-3xl border border-amber-100/50 shadow-sm"><p className="text-[9px] font-black text-amber-600 uppercase mb-2">Overdue</p><div className="text-xl font-black text-amber-700">{formatINR(settlementStats.pendingSettlement)}</div></div>
+              <div className="p-5 bg-emerald-50/80 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden transition-all">
+                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 opacity-20"><Wallet className="h-16 w-16 text-emerald-400 -rotate-12 stroke-[1.5]" /></div>
+                <div className="flex items-center gap-2 mb-3 relative z-10"><div className="p-1.5 bg-emerald-100/80 rounded-lg"><Wallet className="h-3.5 w-3.5 text-emerald-700" /></div><p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Paid (Month)</p></div>
+                <div className="text-2xl font-black text-emerald-800 tracking-tight relative z-10">{formatINR(settlementStats.totalPaidThisMonth)}</div>
+              </div>
+              <div className="p-5 bg-amber-50/80 rounded-3xl border border-amber-100 shadow-sm relative overflow-hidden transition-all">
+                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 opacity-20"><AlertCircle className="h-16 w-16 text-amber-400 stroke-[1.5]" /></div>
+                <div className="flex items-center gap-2 mb-3 relative z-10"><div className="p-1.5 bg-amber-100/80 rounded-lg"><AlertCircle className="h-3.5 w-3.5 text-amber-700" /></div><p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Overdue</p></div>
+                <div className="text-2xl font-black text-amber-800 tracking-tight relative z-10">{formatINR(settlementStats.pendingSettlement)}</div>
+              </div>
             </div>
-            <div className="flex items-center justify-between p-5 bg-slate-900 rounded-3xl border border-slate-800 shadow-xl group-hover:scale-[1.02] transition-transform">
-              <div className="flex items-center gap-4"><Clock className="h-6 w-6 text-emerald-400" /><span className="text-xs font-black text-white uppercase tracking-tight">Avg. Settlement Time</span></div>
-              <span className="text-sm font-black text-emerald-400">{settlementStats.avgSettlementTime}</span>
+            <div className="flex items-center justify-between p-4 bg-white rounded-3xl border border-slate-700 shadow-sm transition-all mt-auto">
+              <div className="flex items-center gap-4"><div className="p-2.5 bg-emerald-100 rounded-full"><Clock className="h-5 w-5 text-emerald-500" /></div><span className="text-xs font-black text-slate-900 uppercase tracking-widest">Avg. Settlement Time</span></div>
+              <div className="px-5 py-2 bg-emerald-50 rounded-full border border-emerald-200"><span className="text-sm font-black text-emerald-500 tracking-tighter">{settlementStats.avgSettlementTime}</span></div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden flex flex-col justify-between p-2">
           <CardHeader className="pb-4"><CardTitle className="text-xl font-black uppercase tracking-tight">Platform Profitability</CardTitle><CardDescription className="text-[10px] font-bold uppercase text-slate-400">Earnings Index</CardDescription></CardHeader>
-          <CardContent className="space-y-6 pt-0">
-            <div className="space-y-5">
+          <CardContent className="space-y-6 pt-0 flex-1 flex flex-col">
+            <div className="space-y-5 flex-1">
               {[
                 { label: "Gross Fees", value: platformCommission, color: "bg-emerald-500", pct: 100 },
-                { label: "Refund Impact", value: refundAmount, color: "bg-rose-500", pct: (refundAmount / platformCommission) * 100 || 0 }
+                { label: "Refund Impact", value: refundAmount, color: "bg-rose-500", pct: platformCommission > 0 ? (refundAmount / platformCommission) * 100 : 0 }
               ].map(row => (
                 <div key={row.label} className="space-y-2">
-                  <div className="flex justify-between items-center text-[10px] font-black"><span className="text-slate-400 uppercase">{row.label}</span><span className="text-slate-900">{formatINR(row.value)}</span></div>
-                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner"><div className={cn(row.color, "h-full transition-all duration-1000")} style={{width: `${Math.min(row.pct, 100)}%`}} /></div>
+                  <div className="flex justify-between items-center text-[10px] font-black"><span className="text-slate-500 uppercase">{row.label}</span><span className="text-slate-900">{formatINR(row.value)}</span></div>
+                  <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden shadow-inner"><div className={cn(row.color, "h-full transition-all duration-1000")} style={{width: `${Math.min(row.pct, 100)}%`}} /></div>
                 </div>
               ))}
             </div>
-            <div className="pt-8 border-t border-slate-100 flex justify-between items-end">
-              <div className="space-y-1"><span className="text-[9px] font-black text-slate-400 uppercase block tracking-widest">Net Revenue</span><span className="text-4xl font-black text-slate-900 tracking-tighter">{formatINR(platformCommission - refundAmount)}</span></div>
-              <div className="px-4 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm"><span className="text-[10px] font-black text-emerald-600 uppercase">Profitable</span></div>
+            <div className="pt-6 mt-auto border-t border-slate-100 flex justify-between items-end">
+              <div className="space-y-1"><span className="text-[9px] font-black text-slate-400 uppercase block tracking-widest">Net Revenue</span><span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-emerald-400 tracking-tighter">{formatINR(platformCommission - refundAmount)}</span></div>
+              <div className="px-4 py-1.5 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-full border border-emerald-200 shadow-sm"><span className="text-[10px] font-black text-emerald-700 uppercase">Profitable</span></div>
             </div>
           </CardContent>
         </Card>
