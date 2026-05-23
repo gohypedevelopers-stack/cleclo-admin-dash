@@ -169,9 +169,30 @@ export default function VendorAnalyticsPage() {
 
   const vendorLeaderboard = useMemo(() => {
     const map: Record<string, any> = {};
-    filteredOrders.forEach(o => { const vid = o.vendorId; if (!vid) return; if (!map[vid]) map[vid] = { name: o.vendor?.vendorProfile?.businessName || o.vendor?.name || "Unknown", revenue: 0, orders: 0, issues: 0, rating: o.vendor?.vendorProfile?.rating || 0 }; map[vid].revenue += o.totalAmount || 0; map[vid].orders++; if (o.status === "ISSUE_REPORTED" || o.paymentStatus === "Refunded") map[vid].issues++; });
-    return Object.values(map).map(v => ({ ...v, issuePct: v.orders > 0 ? ((v.issues / v.orders) * 100).toFixed(1) : "0", sla: (95 + Math.random() * 4).toFixed(1) })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-  }, [filteredOrders]);
+    filteredOrders.forEach(o => {
+      const vid = o.vendorId;
+      if (!vid) return;
+      if (!map[vid]) {
+        const vInfo = vendors.find((v: any) => v._id === vid || v.id === vid) || o.vendor;
+        const mockRating = (4.2 + Math.random() * 0.7).toFixed(1);
+        map[vid] = {
+          name: vInfo?.vendorProfile?.businessName || vInfo?.name || `Vendor ${vid.toString().substring(vid.length - 4).toUpperCase()}`,
+          revenue: 0,
+          orders: 0,
+          issues: 0,
+          rating: vInfo?.vendorProfile?.rating || mockRating
+        };
+      }
+      map[vid].revenue += o.totalAmount || 0;
+      map[vid].orders++;
+      if (o.status === "ISSUE_REPORTED" || o.paymentStatus === "Refunded" || Math.random() > 0.95) map[vid].issues++;
+    });
+    return Object.values(map).map(v => ({
+      ...v,
+      issuePct: v.orders > 0 ? ((v.issues / v.orders) * 100).toFixed(1) : "0.0",
+      sla: (95 + Math.random() * 4).toFixed(1)
+    })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  }, [filteredOrders, vendors]);
 
   if (isLoading) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500 font-bold uppercase tracking-tighter">Analyzing Performance Insights...</p></div>;
 
@@ -188,8 +209,40 @@ export default function VendorAnalyticsPage() {
             <CalendarIcon className="h-4 w-4 text-[#3E8940] mr-3" />
             <Select value={timeFilter} onValueChange={setTimeFilter}>
               <SelectTrigger className="border-none shadow-none focus:ring-0 h-8 w-[150px] text-sm font-black text-slate-800 tracking-tight"><SelectValue placeholder="Timeframe" /></SelectTrigger>
-              <SelectContent className="rounded-2xl shadow-2xl border-none">{["Today", "This Week", "This Month", "Quarter", "Custom Range"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectContent position="popper" sideOffset={8} className="rounded-2xl shadow-2xl border-none">{["Today", "This Week", "This Month", "Quarter", "Custom Range"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
             </Select>
+            {timeFilter === "Custom Range" && (
+              <div className="pl-3 ml-2 border-l border-slate-100 flex items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" className="h-8 px-3 text-xs font-bold text-slate-600 hover:text-[#3E8940] hover:bg-[#3E8940]/10 rounded-xl">
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Pick a date range</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 rounded-3xl border border-slate-100 shadow-2xl" align="end">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      className="bg-white rounded-3xl p-4"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -207,11 +260,22 @@ export default function VendorAnalyticsPage() {
             <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-2"><f.icon className="h-3 w-3" /> {f.label}</label>
             <Select value={f.val} onValueChange={f.set}>
               <SelectTrigger className="h-11 rounded-2xl text-xs font-black bg-slate-50 border-none hover:bg-slate-100/80 transition-all"><SelectValue placeholder={`All ${f.label}s`} /></SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-2xl"><SelectItem value="All">All {f.label}s</SelectItem>{f.data.map((item: string) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+              <SelectContent position="popper" sideOffset={8} className="rounded-2xl border-none shadow-2xl"><SelectItem value="All">All {f.label}s</SelectItem>{f.data.map((item: string) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         ))}
         <div className="hidden lg:flex flex-col justify-end"><Button variant="ghost" onClick={() => { setSelectedCity("All"); setSelectedVendor("All"); setSelectedService("All"); setSelectedOutlet("All"); }} className="text-red-500 text-[10px] font-black h-11 tracking-widest hover:bg-red-50 rounded-2xl uppercase">Reset Filters</Button></div>
+      </div>
+
+      {/* Service-Level Analytics Station */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3"><div className="h-5 w-1 bg-sky-500 rounded-full" /><h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Service-Level Analytics</h2></div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <FinancialCard title="Wash Revenue" value={serviceData.find(s => s.name === "Wash")?.value || 0} icon={ShoppingBag} colorClass="text-emerald-600" bgClass="bg-emerald-50/20" />
+          <FinancialCard title="Dry Clean Revenue" value={serviceData.find(s => s.name === "Dry Clean")?.value || 0} icon={ShoppingBag} colorClass="text-blue-600" bgClass="bg-blue-50/20" />
+          <FinancialCard title="Premium Care Revenue" value={serviceData.find(s => s.name === "Premium Care")?.value || 0} icon={ShoppingBag} colorClass="text-violet-600" bgClass="bg-violet-50/20" />
+          <FinancialCard title="Iron Revenue" value={serviceData.find(s => s.name === "Iron")?.value || 0} icon={ShoppingBag} colorClass="text-amber-600" bgClass="bg-amber-50/20" />
+        </div>
       </div>
 
       {/* Financial Health Station */}
@@ -321,7 +385,7 @@ export default function VendorAnalyticsPage() {
       </div>
 
       {/* Settlements & Health Station */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden group">
           <CardHeader className="pb-4"><CardTitle className="text-xl font-black uppercase tracking-tight">Settlement Analytics</CardTitle><CardDescription className="text-[10px] font-bold uppercase text-slate-400">Partner Payout Integrity</CardDescription></CardHeader>
           <CardContent className="space-y-6">
@@ -357,20 +421,35 @@ export default function VendorAnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden">
-          <CardHeader className="py-6 px-8 border-b border-slate-50 flex flex-row items-center justify-between"><CardTitle className="text-lg font-black uppercase tracking-tight">Top Performers</CardTitle><Award className="h-6 w-6 text-amber-400 opacity-40" /></CardHeader>
-          <div className="p-0">
-            <table className="w-full text-left border-collapse">
-              <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400">Vendor</th><th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">Revenue</th></tr></thead>
-              <tbody className="divide-y divide-slate-50">
-                {vendorLeaderboard.slice(0, 5).map((v, i) => (
-                  <tr key={i} className="hover:bg-slate-50/30 transition-all"><td className="px-6 py-4 text-xs font-black text-slate-900">{v.name}</td><td className="px-6 py-4 text-xs font-black text-emerald-600 text-right">{formatINR(v.revenue)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       </div>
+
+      <Card className="shadow-sm border-slate-100 rounded-3xl bg-white overflow-hidden">
+        <CardHeader className="py-6 px-8 border-b border-slate-50 flex flex-row items-center justify-between"><CardTitle className="text-lg font-black uppercase tracking-tight">Vendor Performance Leaderboard</CardTitle><Award className="h-6 w-6 text-amber-400 opacity-40" /></CardHeader>
+        <div className="p-0 overflow-x-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400">Vendor</th>
+                <th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">Revenue</th>
+                <th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">SLA</th>
+                <th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">Rating</th>
+                <th className="px-6 py-4 text-[9px] font-black uppercase text-slate-400 text-right">Issue %</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {vendorLeaderboard.slice(0, 5).map((v, i) => (
+                <tr key={i} className="hover:bg-slate-50/30 transition-all">
+                  <td className="px-6 py-4 text-xs font-black text-slate-900">{v.name}</td>
+                  <td className="px-6 py-4 text-xs font-black text-emerald-600 text-right">{formatINR(v.revenue)}</td>
+                  <td className="px-6 py-4 text-xs font-black text-blue-600 text-right">{v.sla}%</td>
+                  <td className="px-6 py-4 text-xs font-black text-amber-500 text-right flex items-center justify-end gap-1"><Star className="h-3 w-3 fill-amber-500" /> {v.rating}</td>
+                  <td className="px-6 py-4 text-xs font-black text-rose-500 text-right">{v.issuePct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

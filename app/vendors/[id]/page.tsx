@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText, Camera, CalendarClock, TrendingUp } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Briefcase, Star, Clock, AlertCircle, Loader2, AlertTriangle, RefreshCw, CheckCircle, Ban, IndianRupee, Mail, ShieldCheck, FileText, Camera, CalendarClock, TrendingUp, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:3000/api/admin/auth";
 const ORDER_API_URL = process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:3000/api/admin/orders";
@@ -64,6 +65,12 @@ export default function VendorDetailPage() {
   const [inspectionStatus, setInspectionStatus] = useState("");
   const [areaCoverage, setAreaCoverage] = useState("");
   const [onboardingStep, setOnboardingStep] = useState(1);
+
+  // Rejection modal state
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
 
   const fetchVendor = useCallback(async () => {
     setIsLoading(true);
@@ -158,6 +165,35 @@ export default function VendorDetailPage() {
       if (!res.ok) throw new Error("Failed"); toast.success(vendor.isBlocked ? "Reactivated" : "Suspended"); fetchVendor();
     } catch (err: any) { toast.error(err.message); }
   };
+
+  const handleReject = async () => {
+    if (!rejectReason) return toast.error("Please select a rejection reason");
+    setIsRejecting(true);
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/vendors/${vendorId}/reject`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason: rejectReason, notes: rejectNotes }),
+      });
+      if (!res.ok) throw new Error("Failed to reject vendor");
+      toast.success("Vendor rejected successfully");
+      setShowRejectModal(false);
+      setRejectReason("");
+      setRejectNotes("");
+      fetchVendor();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const REJECTION_REASONS = [
+    { value: "Incomplete Documents", icon: "📄", desc: "Missing KYC, GST, or business proof" },
+    { value: "Invalid GST", icon: "🧾", desc: "GST number is invalid or unverifiable" },
+    { value: "Location Not Supported", icon: "📍", desc: "Service area is outside coverage zone" },
+    { value: "Capacity Insufficient", icon: "⚙️", desc: "Daily capacity below minimum threshold" },
+  ];
 
   const vp = vendor?.vendorProfile || {};
   const displayName = vp.businessName || vendor?.name || "Vendor";
@@ -256,9 +292,14 @@ export default function VendorDetailPage() {
             {status}
           </Badge>
           {status === "Pending" && (
-            <Button variant="outline" className="gap-1.5 rounded-full shadow-none bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200 h-8 text-xs sm:text-sm sm:h-10 px-3 sm:px-4" onClick={handleApprove}>
-              <CheckCircle className="h-3.5 w-3.5" /> Approve
-            </Button>
+            <>
+              <Button variant="outline" className="gap-1.5 rounded-full shadow-none bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200 h-8 text-xs sm:text-sm sm:h-10 px-3 sm:px-4" onClick={handleApprove}>
+                <CheckCircle className="h-3.5 w-3.5" /> Approve
+              </Button>
+              <Button variant="outline" className="gap-1.5 rounded-full shadow-none bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200 h-8 text-xs sm:text-sm sm:h-10 px-3 sm:px-4" onClick={() => setShowRejectModal(true)}>
+                <XCircle className="h-3.5 w-3.5" /> Reject
+              </Button>
+            </>
           )}
           <Button variant="outline" className={`gap-1.5 rounded-full shadow-none bg-white h-8 text-xs sm:text-sm sm:h-10 px-3 sm:px-4 ${vendor.isBlocked ? "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 border-emerald-200" : "text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"}`} onClick={handleSuspend}>
             {vendor.isBlocked ? <><CheckCircle className="h-3.5 w-3.5" /> Reactivate</> : <><Ban className="h-3.5 w-3.5" /> Suspend</>}
@@ -317,7 +358,7 @@ export default function VendorDetailPage() {
                 { step: 1, label: "Applied", icon: "📝" },
                 { step: 2, label: "Docs Uploaded", icon: "📂" },
                 { step: 3, label: "Docs Verified", icon: "⚖️" },
-                { step: 4, label: "SLA Signed", icon: "✍️" },
+                { step: 4, label: "Agreement Signed", icon: "✍️" },
                 { step: 5, label: "Activated", icon: "🚀" }
               ].map((item) => {
                 const isActive = onboardingStep >= item.step;
@@ -338,10 +379,26 @@ export default function VendorDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border group hover:border-[#3E8940] transition-colors">
               <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border shadow-sm text-xl group-hover:scale-110 transition-transform">📍</div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Geographic Coverage</p>
-                <p className="text-xs font-bold text-slate-700 truncate">{areaCoverage || "Not specified by vendor"}</p>
-                <div className="flex gap-1 mt-1 flex-wrap">
+              <div className="flex-1 overflow-hidden pr-2">
+                <div className="flex justify-between items-center mb-1.5">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Geographic Coverage</p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-5 px-1.5 text-[9px] text-[#3E8940] hover:bg-green-50"
+                    onClick={() => handleUpdateVendor({ areaCoverage })}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="h-2 w-2 animate-spin" /> : "SAVE"}
+                  </Button>
+                </div>
+                <Input
+                  value={areaCoverage}
+                  onChange={(e) => setAreaCoverage(e.target.value)}
+                  placeholder="e.g., Thane East, Thane West"
+                  className="h-7 text-xs font-bold text-slate-700 border-none bg-white shadow-sm px-2 focus-visible:ring-1 focus-visible:ring-[#3E8940] truncate"
+                />
+                <div className="flex gap-1 mt-2 flex-wrap">
                   {(areaCoverage || "").split(',').slice(0, 4).map((area: string) => area.trim() && (
                     <span key={area} className="text-[8px] bg-white px-1.5 py-0.5 rounded-md border text-slate-500 font-bold">
                       {area.trim()}
@@ -672,6 +729,94 @@ export default function VendorDetailPage() {
           </Table>
         </div>
       </div>
+      {/* Rejection Reason Banner */}
+      {vp.rejectionReason && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-4">
+          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <XCircle className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-red-800">Vendor Rejected</p>
+            <p className="text-xs text-red-600 mt-0.5">Reason: <span className="font-bold">{vp.rejectionReason}</span></p>
+            {vp.rejectedAt && (
+              <p className="text-[10px] text-red-400 mt-1">Rejected on {formatDate(vp.rejectedAt)}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Dialog */}
+      <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="h-4 w-4 text-red-600" />
+              </div>
+              Reject Vendor
+            </DialogTitle>
+            <DialogDescription className="text-slate-500">
+              Select a reason for rejecting <span className="font-bold text-slate-700">{displayName}</span>. This will be logged for analytics.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 my-2">
+            {REJECTION_REASONS.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                className={cn(
+                  "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all duration-200 hover:shadow-sm",
+                  rejectReason === r.value
+                    ? "border-red-400 bg-red-50 shadow-sm"
+                    : "border-slate-100 bg-white hover:border-slate-200"
+                )}
+                onClick={() => setRejectReason(r.value)}
+              >
+                <span className="text-xl">{r.icon}</span>
+                <div className="flex-1">
+                  <p className={cn("text-sm font-bold", rejectReason === r.value ? "text-red-700" : "text-slate-800")}>{r.value}</p>
+                  <p className="text-[10px] text-slate-400">{r.desc}</p>
+                </div>
+                <div className={cn(
+                  "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
+                  rejectReason === r.value ? "border-red-500 bg-red-500" : "border-slate-200"
+                )}>
+                  {rejectReason === r.value && <CheckCircle className="h-3 w-3 text-white" />}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1.5">Additional Notes (Optional)</p>
+            <Textarea
+              placeholder="Add any additional context for this rejection..."
+              className="min-h-[70px] rounded-xl bg-slate-50 border-slate-100 text-sm"
+              value={rejectNotes}
+              onChange={(e) => setRejectNotes(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={() => { setShowRejectModal(false); setRejectReason(""); setRejectNotes(""); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="rounded-full bg-red-600 hover:bg-red-700 text-white gap-1.5"
+              onClick={handleReject}
+              disabled={!rejectReason || isRejecting}
+            >
+              {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+              Confirm Rejection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
