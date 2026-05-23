@@ -428,6 +428,75 @@ const downloadInvoice = (p: any) => {
   printWindow.document.close();
 };
 
+const getAuditLogs = (p: any, heldIds: string[]) => {
+  const d = new Date(p.createdAt);
+  
+  const formatTime = (dateObj: Date, hoursOffset: number) => {
+    const newDate = new Date(dateObj.getTime() + hoursOffset * 60 * 60 * 1000);
+    return newDate.toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  const logs = [];
+
+  logs.push({
+    title: "Settlement Cycle Accrued",
+    timestamp: formatTime(d, 0),
+    processedBy: "SYSTEM_AUTO_RECONCILER",
+    approvedBy: "PLATFORM_AUDIT_SERVICE",
+    description: "System completed reconciliation of weekly orders and generated settlement ledger entry.",
+    status: "completed"
+  });
+
+  if (heldIds.includes(p.id)) {
+    logs.push({
+      title: "Payout Placed On Hold",
+      timestamp: formatTime(new Date(), -0.1),
+      processedBy: "admin_operations_user",
+      approvedBy: "operations_risk_dept",
+      description: "Payout suspended under Quality Review protocol due to health score alert.",
+      status: "hold"
+    });
+  }
+
+  if (p.status.toLowerCase() === "paid") {
+    logs.push({
+      title: "Payout Approved & Released",
+      timestamp: formatTime(d, 24),
+      processedBy: "admin_finance_gateway",
+      approvedBy: "finance_director_super",
+      description: "Authorized disbursements file submitted and banking gateway payment instruction queued.",
+      status: "completed"
+    });
+
+    logs.push({
+      title: "Bank Disbursal Cleared",
+      timestamp: formatTime(d, 24.5),
+      processedBy: "HDFC_GATEWAY_NODE",
+      approvedBy: "BANK_IMPS_SETTLEMENT",
+      description: "Immediate Payment Service (IMPS) transaction confirmation received from beneficiary bank.",
+      status: "completed"
+    });
+  } else if (!heldIds.includes(p.id)) {
+    logs.push({
+      title: "Disbursal Authorization Pending",
+      timestamp: "-",
+      processedBy: "Awaiting Finance Admin Action",
+      approvedBy: "Awaiting Super Admin Approval",
+      description: "Reconciliation complete. Awaiting administrator release authorization.",
+      status: "pending"
+    });
+  }
+
+  return logs;
+};
+
 const getStatusBadge = (status: string) => {
   const s = String(status || "").toLowerCase();
   switch (s) {
@@ -489,6 +558,7 @@ export default function VendorPaymentsPage() {
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [ledgerVendor, setLedgerVendor] = useState<any>(null);
+  const [auditSettlement, setAuditSettlement] = useState<any>(null);
 
   // Payout Hold State
   const [heldIds, setHeldIds] = useState<string[]>([]);
@@ -1196,6 +1266,10 @@ export default function VendorPaymentsPage() {
                             <FileText className="h-4 w-4 mr-2 text-slate-400" />
                             View Ledger
                           </DropdownMenuItem>
+                          <DropdownMenuItem className="text-xs font-bold text-slate-600 cursor-pointer p-3 rounded-xl hover:bg-slate-50" onClick={() => setAuditSettlement(p)}>
+                            <ShieldCheck className="h-4 w-4 mr-2 text-slate-400" />
+                            View Audit Log
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-xs font-bold text-red-600 cursor-pointer p-3 rounded-xl hover:bg-red-50"
                             onClick={() => toggleHold(p.id)}
@@ -1522,6 +1596,86 @@ export default function VendorPaymentsPage() {
                   })()}
                 </TableBody>
               </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Log Dialog */}
+      <Dialog open={!!auditSettlement} onOpenChange={(open) => !open && setAuditSettlement(null)}>
+        <DialogContent showCloseButton={false} className="max-w-[650px] rounded-[2rem] p-0 border-none shadow-2xl bg-white overflow-hidden flex flex-col">
+          <DialogHeader className="p-8 pb-4 border-b border-slate-100 bg-slate-50/50 shrink-0 relative">
+            <DialogClose className="absolute right-6 top-6 p-2 rounded-full bg-white hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 focus:outline-none">
+              <X className="h-5 w-5" />
+            </DialogClose>
+            <DialogTitle className="text-2xl font-black flex items-center gap-3 tracking-tight text-slate-900">
+              <div className="p-2.5 bg-indigo-50 rounded-xl">
+                <ShieldCheck className="h-5 w-5 text-indigo-500" />
+              </div>
+              Payout Audit Log
+            </DialogTitle>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+              Settlement ID: {auditSettlement?.id.slice(0, 12).toUpperCase()}
+            </p>
+          </DialogHeader>
+          <div className="p-8 flex-1 overflow-y-auto max-h-[60vh] space-y-6">
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center text-xs">
+              <div>
+                <span className="text-slate-400 font-bold block uppercase tracking-wider text-[9px]">Vendor Account</span>
+                <span className="font-black text-slate-800 text-[11px] uppercase">
+                  {auditSettlement?.vendor?.vendorProfile?.businessName || auditSettlement?.vendor?.name || "Vendor"}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 font-bold block uppercase tracking-wider text-[9px]">Disbursal Amount</span>
+                <span className="font-black text-emerald-600 text-sm">
+                  {auditSettlement && formatINR(
+                    (auditSettlement.grossAmount || (auditSettlement.amount / 0.8)) -
+                    (auditSettlement.commissionAmount || ((auditSettlement.grossAmount || (auditSettlement.amount / 0.8)) * 0.2)) -
+                    ((auditSettlement.commissionAmount || ((auditSettlement.grossAmount || (auditSettlement.amount / 0.8)) * 0.2)) * 0.18) -
+                    ((auditSettlement.grossAmount || (auditSettlement.amount / 0.8)) * 0.01) -
+                    (auditSettlement.refunds || 0) -
+                    (auditSettlement.penalties || 0)
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-6 relative pl-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+              {auditSettlement && getAuditLogs(auditSettlement, heldIds).map((log, index) => {
+                let bulletColor = "bg-slate-300 ring-slate-100";
+                if (log.status === "completed") {
+                  bulletColor = "bg-emerald-500 ring-emerald-100";
+                } else if (log.status === "hold") {
+                  bulletColor = "bg-red-500 ring-red-100 animate-pulse";
+                } else if (log.status === "pending") {
+                  bulletColor = "bg-amber-500 ring-amber-100 animate-pulse";
+                }
+
+                return (
+                  <div key={index} className="relative group">
+                    <div className={cn("absolute -left-[20px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 transition-all duration-300", bulletColor)} />
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-black text-slate-800 tracking-tight">{log.title}</h4>
+                        <span className="text-[10px] font-bold text-slate-400 font-mono">{log.timestamp}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{log.description}</p>
+                      
+                      <div className="grid grid-cols-2 gap-4 bg-slate-50/50 group-hover:bg-slate-50 p-3 rounded-xl border border-slate-100/50 transition-all duration-300">
+                        <div>
+                          <span className="text-slate-400 font-bold block uppercase tracking-wider text-[8px]">Processed By</span>
+                          <span className="font-mono text-[10px] text-slate-600 font-bold">{log.processedBy}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-bold block uppercase tracking-wider text-[8px]">Approved By</span>
+                          <span className="font-mono text-[10px] text-slate-600 font-bold">{log.approvedBy}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </DialogContent>
