@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Mail, Phone, Wallet, Calendar, ShieldCheck, Bike, FileText, MapPin, Star, Clock, CheckCircle, AlertTriangle, Loader2, Ban, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Wallet, Calendar, ShieldCheck, Bike, FileText, MapPin, Star, Clock, CheckCircle, AlertTriangle, Loader2, Ban, TrendingUp, TrendingDown, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
@@ -33,6 +33,33 @@ const formatDate = (dateStr: string) => {
 
 const formatINR = (amount: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+
+const getRiderTypeColor = (type: string) => {
+  switch (type) {
+    case "Full-Time": return "bg-indigo-100 text-indigo-700 border-indigo-200";
+    case "Senior": return "bg-purple-100 text-purple-700 border-purple-200";
+    case "High Performer": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "New Joiner": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "Part-Time": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "Contract": return "bg-orange-100 text-orange-700 border-orange-200";
+    default: return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+};
+
+const formatLastActive = (lastActive: string | undefined, availability: string | undefined) => {
+  if (availability === 'online') return { text: 'Online Now', color: 'text-emerald-600', dot: '🟢' };
+  if (!lastActive || lastActive === 'Never') return { text: 'Never seen', color: 'text-slate-400', dot: '⚫' };
+  try {
+    const diff = Date.now() - new Date(lastActive).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return { text: 'Just now', color: 'text-emerald-500', dot: '🟢' };
+    if (mins < 60) return { text: `${mins}m ago`, color: 'text-blue-500', dot: '🔵' };
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return { text: `${hours}h ago`, color: 'text-amber-500', dot: '🟡' };
+    const days = Math.floor(hours / 24);
+    return { text: `${days}d ago`, color: 'text-red-500', dot: '🔴' };
+  } catch { return { text: 'Unknown', color: 'text-slate-400', dot: '⚫' }; }
+};
 
 export default function RiderDetailPage() {
   const params = useParams();
@@ -132,6 +159,11 @@ export default function RiderDetailPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-slate-900">{rider.name}</h1>
               <Badge className={cn("text-xs border", status === "Active" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-rose-100 text-rose-700 border-rose-200")}>{status}</Badge>
+              {rp.type && (
+                <Badge className={cn("text-xs border font-bold uppercase tracking-tight", getRiderTypeColor(rp.type))}>
+                  {rp.type}
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-slate-500">Rider ID: {rider.id.slice(0, 8)}</p>
           </div>
@@ -159,6 +191,11 @@ export default function RiderDetailPage() {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{rider.name}</h2>
                   <div className="flex items-center gap-1 text-slate-500 text-sm"><MapPin className="h-3 w-3" /> {rp.zone || rider.addresses?.[0]?.city || "—"}</div>
+                  {(() => { const la = formatLastActive(rp.lastActive, rp.availability); return (
+                    <p className={cn("text-xs font-semibold flex items-center gap-1 mt-1", la.color)}>
+                      <span className="text-sm">{la.dot}</span> {la.text}
+                    </p>
+                  ); })()}
                 </div>
               </div>
               <div className="space-y-3 mt-6">
@@ -232,12 +269,43 @@ export default function RiderDetailPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Zone</label>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">{rp.zone || "Not Assigned"}</p>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Assigned Zone</label>
+                  <p className="text-xs font-bold text-slate-700 flex items-center gap-1 mt-0.5">
+                    <MapPin className="h-3.5 w-3.5 text-blue-500" /> {rp.zone || "Not Assigned"}
+                  </p>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Cluster</label>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">{rp.cluster || "NCR"}</p>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Assigned Outlet</label>
+                  <p className="text-xs font-bold text-slate-700 flex items-center gap-1 mt-0.5">
+                    <Store className="h-3.5 w-3.5 text-[#3E8940]" /> {rp.assignedVendor || "Unassigned"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Operational Quality & Incidents */}
+          <Card className="shadow-sm border-slate-200 rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-orange-500" /> Operational Quality & Incidents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Rating</p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5 flex items-center gap-1">⭐ {rp.rating != null ? parseFloat(String(rp.rating)).toFixed(1) : '—'}</p>
+                </div>
+                <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100">
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">On-Time Rate</p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">{rp.onTimePct != null ? `${Math.round(rp.onTimePct)}%` : '—'}</p>
+                </div>
+                <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100">
+                  <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Incidents</p>
+                  <p className="text-lg font-black text-orange-700 mt-0.5">{rp.incidentsCount ?? 0}</p>
+                </div>
+                <div className="bg-rose-50/50 rounded-xl p-3 border border-rose-100">
+                  <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Damage Reports</p>
+                  <p className="text-lg font-black text-rose-700 mt-0.5">{rp.damageReportsCount ?? 0}</p>
                 </div>
               </div>
             </CardContent>

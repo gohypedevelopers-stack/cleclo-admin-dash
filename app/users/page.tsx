@@ -140,6 +140,17 @@ interface UserRecord {
     avgPickupDelay?: number;
     onTimePercent?: number;
     assignedVendorName?: string;
+    rating?: number;
+    cancellationPct?: number;
+    deliveriesToday?: number;
+    complaintsCount?: number;
+    zone?: string | null;
+    assignedVendor?: string | null;
+    activeOrders?: number;
+    availability?: string;
+    lastActive?: string;
+    incidentsCount?: number;
+    damageReportsCount?: number;
   };
 }
 
@@ -174,6 +185,21 @@ const getStatusColor = (status: string) => {
     return "bg-red-100 text-red-700 border-red-200";
   if (s === "pending") return "bg-amber-100 text-amber-700 border-amber-200";
   return "bg-slate-100 text-slate-700 border-slate-200";
+};
+
+const formatLastActive = (lastActive: string | undefined, availability: string | undefined) => {
+  if (availability === 'online') return { text: 'Online Now', color: 'text-emerald-600', dot: '🟢' };
+  if (!lastActive || lastActive === 'Never') return { text: 'Never seen', color: 'text-slate-400', dot: '⚫' };
+  try {
+    const diff = Date.now() - new Date(lastActive).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return { text: 'Just now', color: 'text-emerald-500', dot: '🟢' };
+    if (mins < 60) return { text: `${mins}m ago`, color: 'text-blue-500', dot: '🔵' };
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return { text: `${hours}h ago`, color: 'text-amber-500', dot: '🟡' };
+    const days = Math.floor(hours / 24);
+    return { text: `${days}d ago`, color: 'text-red-500', dot: '🔴' };
+  } catch { return { text: 'Unknown', color: 'text-slate-400', dot: '⚫' }; }
 };
 
 const getUserStatus = (user: UserRecord): string => {
@@ -778,17 +804,11 @@ function UsersPageContent() {
                   </>
                 ) : roleFilter === "rider" ? (
                   <>
-                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%] text-center">
-                      Deliveries
+                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">
+                      Performance
                     </TableHead>
-                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%] text-center">
-                      On-time %
-                    </TableHead>
-                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%] text-center">
-                      Avg Delay
-                    </TableHead>
-                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[12%]">
-                      Assigned Vendor
+                    <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[15%]">
+                      Zone / Outlet
                     </TableHead>
                     <TableHead className="py-4 font-bold text-[10px] uppercase tracking-wider text-slate-400 w-[10%]">
                       Earnings
@@ -1084,33 +1104,42 @@ function UsersPageContent() {
                         </>
                       ) : roleFilter === "rider" ? (
                         <>
-                          <TableCell className="text-center font-bold text-xs text-slate-700">
-                            {riderDeliveries}
+                          <TableCell className="text-xs font-medium">
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-slate-800 text-xs">
+                                Orders: <span className="font-bold text-[#3E8940]">{riderDeliveries}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                On-Time: <span className="text-indigo-600 font-bold">{riderOnTime != null ? `${Math.round(riderOnTime)}%` : "—"}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Rating: <span className="text-amber-600 font-bold">⭐ {rp?.rating != null ? parseFloat(String(rp.rating)).toFixed(1) : "—"}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Cancellation: <span className="text-rose-600 font-bold">{rp?.cancellationPct != null ? `${rp.cancellationPct}%` : "—"}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Today: <span className="text-emerald-600 font-bold">{rp?.deliveriesToday || 0}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Complaints: <span className="text-red-500 font-bold">{rp?.complaintsCount || 0}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Incidents: <span className="text-orange-600 font-bold">{rp?.incidentsCount || 0}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                Damage Reports: <span className="text-rose-700 font-bold">{rp?.damageReportsCount || 0}</span>
+                              </p>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "font-bold text-[10px]",
-                                riderOnTime >= 90
-                                  ? "text-emerald-600 border-emerald-200 bg-emerald-50"
-                                  : riderOnTime >= 75
-                                    ? "text-amber-600 border-amber-200 bg-amber-50"
-                                    : "text-red-600 border-red-200 bg-red-50",
-                              )}
-                            >
-                              {riderOnTime}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center text-xs text-slate-600">
-                            {riderDelay > 0 ? `${riderDelay} min` : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <Store className="h-3 w-3 text-slate-400" />
-                              <span className="text-[11px] font-medium text-slate-600">
-                                {rp?.assignedVendorName || "Unassigned"}
-                              </span>
+                          <TableCell className="text-xs font-medium">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-slate-700 flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-blue-500" /> {rp?.zone || "Not Assigned"}
+                              </p>
+                              <p className="text-slate-500 flex items-center gap-1">
+                                <Store className="h-3 w-3 text-[#3E8940]" /> {rp?.assignedVendorName || rp?.assignedVendor || "Unassigned"}
+                              </p>
                             </div>
                           </TableCell>
                           <TableCell className="font-bold text-xs text-slate-900">
@@ -1175,11 +1204,21 @@ function UsersPageContent() {
 
                       {/* Common Status & Actions */}
                       <TableCell>
-                        <Badge
-                          className={`${getStatusColor(status)} border font-bold text-[9px] shadow-none rounded-full px-2`}
-                        >
-                          {status}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <Badge
+                            className={`${getStatusColor(status)} border font-bold text-[9px] shadow-none rounded-full px-2`}
+                          >
+                            {status}
+                          </Badge>
+                          {user.role === 'rider' && (() => {
+                            const la = formatLastActive(rp?.lastActive, rp?.availability);
+                            return (
+                              <p className={cn("text-[9px] font-semibold flex items-center gap-0.5 mt-0.5", la.color)}>
+                                <span className="text-[8px]">{la.dot}</span> {la.text}
+                              </p>
+                            );
+                          })()}
+                        </div>
                       </TableCell>
 
                       <TableCell className="pr-6 text-right">

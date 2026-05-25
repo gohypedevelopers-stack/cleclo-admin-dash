@@ -99,6 +99,18 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const getRiderTypeColor = (type: string) => {
+  switch (type) {
+    case "Full-Time": return "bg-indigo-100 text-indigo-700 border-indigo-200";
+    case "Senior": return "bg-purple-100 text-purple-700 border-purple-200";
+    case "High Performer": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "New Joiner": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "Part-Time": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "Contract": return "bg-orange-100 text-orange-700 border-orange-200";
+    default: return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+};
+
 const formatDate = (dateStr: string) => {
   try {
     return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -962,14 +974,20 @@ export default function RiderDashboardPage() {
                             {r.addresses?.[0]?.city || "New Delhi"}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge className={`text-[9px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md border-none ${
-                              isElite ? "bg-purple-100 text-purple-700" :
-                              isNew ? "bg-blue-100 text-blue-700" :
-                              health > 85 ? "bg-emerald-100 text-emerald-700" :
-                              "bg-slate-100 text-slate-600"
-                            }`}>
-                              {isElite ? "Elite" : isNew ? "New Joiner" : health > 85 ? "Top Performer" : "Regular"}
-                            </Badge>
+                            {(() => {
+                              const type = isElite
+                                ? "High Performer"
+                                : isNew
+                                  ? "New Joiner"
+                                  : health > 85
+                                    ? "Senior"
+                                    : ["Full-Time", "Part-Time", "Contract"][i % 3];
+                              return (
+                                <Badge className={cn("text-[9px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md border-none", getRiderTypeColor(type))}>
+                                  {type}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-center text-xs font-bold text-slate-700">
                             {100 + Math.floor(Math.random() * 400)}

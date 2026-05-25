@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
-import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, ShieldCheck, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown, FileText } from "lucide-react";
+import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, ShieldCheck, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown, FileText, Flame, Send } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +44,24 @@ const getRiderTypeColor = (type: string) => {
     case "High Performer": return "bg-emerald-100 text-emerald-700 border-emerald-200";
     case "New Joiner": return "bg-blue-100 text-blue-700 border-blue-200";
     case "Part-Time": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "Contract": return "bg-orange-100 text-orange-700 border-orange-200";
     default: return "bg-slate-100 text-slate-700 border-slate-200";
   }
+};
+
+const formatLastActive = (lastActive: string | undefined, availability: string | undefined) => {
+  if (availability === 'online') return { text: 'Online Now', color: 'text-emerald-600', dot: '🟢' };
+  if (!lastActive || lastActive === 'Never') return { text: 'Never seen', color: 'text-slate-400', dot: '⚫' };
+  try {
+    const diff = Date.now() - new Date(lastActive).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return { text: 'Just now', color: 'text-emerald-500', dot: '🟢' };
+    if (mins < 60) return { text: `${mins}m ago`, color: 'text-blue-500', dot: '🔵' };
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return { text: `${hours}h ago`, color: 'text-amber-500', dot: '🟡' };
+    const days = Math.floor(hours / 24);
+    return { text: `${days}d ago`, color: 'text-red-500', dot: '🔴' };
+  } catch { return { text: 'Unknown', color: 'text-slate-400', dot: '⚫' }; }
 };
 
 function RidersContent() {
@@ -113,6 +129,8 @@ function RidersContent() {
   const avgHealth = riders.length > 0 ? Math.round(riders.reduce((s, r) => s + getRiderHealth(r).score, 0) / riders.length) : 0;
   const highRisk = riders.filter(r => getRiderHealth(r).score < 75).length;
   const totalDeliveries = riders.reduce((s, r) => s + (r.riderProfile?.deliveries || 0), 0);
+  const totalIncidents = riders.reduce((s, r) => s + (r.riderProfile?.incidentsCount || 0), 0);
+  const totalDamageReports = riders.reduce((s, r) => s + (r.riderProfile?.damageReportsCount || 0), 0);
 
   if (isLoading && riders.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-8 w-8 animate-spin text-[#3E8940]" /><p className="text-sm text-slate-500">Loading riders...</p></div>;
   if (error && riders.length === 0) return <div className="flex flex-col items-center justify-center h-[60vh] gap-4"><AlertTriangle className="h-10 w-10 text-red-500" /><p className="text-slate-500">{error}</p><Button onClick={fetchRiders} className="bg-[#3E8940] hover:bg-[#3E8940]/90 text-white gap-2 rounded-xl"><RefreshCw className="h-4 w-4" /> Retry</Button></div>;
@@ -128,7 +146,7 @@ function RidersContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <Card className="p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Bike className="h-5 w-5" /></div>
@@ -151,6 +169,20 @@ function RidersContent() {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-50 text-red-600 rounded-lg"><AlertTriangle className="h-5 w-5" /></div>
             <div><p className="text-[10px] font-bold text-slate-400 uppercase">At Risk</p><p className="text-xl font-bold text-red-600">{highRisk}</p></div>
+          </div>
+        </Card>
+        <Card className="p-4 shadow-sm border-orange-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><Flame className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Incident Count</p>
+              <p className="text-xl font-bold text-orange-600">{totalIncidents + totalDamageReports}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[9px] font-semibold text-orange-500">Incidents: {totalIncidents}</span>
+                <span className="text-[9px] text-slate-300">|</span>
+                <span className="text-[9px] font-semibold text-rose-500">Damage: {totalDamageReports}</span>
+              </div>
+            </div>
           </div>
         </Card>
       </div>
@@ -213,34 +245,98 @@ function RidersContent() {
           <Select value={filterType} onValueChange={setFilterType}><SelectTrigger className="w-40 rounded-xl bg-slate-50 border-none"><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All Status</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="blocked">Blocked</SelectItem></SelectContent></Select>
         </div>
         
-        {selectedRiders.length > 0 && (
-          <div className="flex items-center gap-2 bg-emerald-50 p-2 px-3 rounded-xl border border-emerald-100 animate-in fade-in slide-in-from-right-4">
-            <span className="text-xs font-bold text-emerald-700">{selectedRiders.length} Selected</span>
-            <div className="h-4 w-px bg-emerald-200 mx-1" />
-            <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 gap-1"><Bell className="h-3 w-3" /> Notify</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 gap-1"><MapPin className="h-3 w-3" /> Assign Zone</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold text-red-600 hover:bg-red-100 gap-1" onClick={() => setSelectedRiders([])}><Ban className="h-3 w-3" /> Block</Button>
+        {/* Bulk Actions */}
+        <div className={cn(
+          "flex items-center gap-2 p-2 px-3 rounded-xl border transition-all",
+          selectedRiders.length > 0 
+            ? "bg-emerald-50 border-emerald-200 shadow-sm" 
+            : "bg-slate-50 border-slate-200"
+        )}>
+          <div className="flex items-center gap-2 mr-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bulk Actions</span>
+            {selectedRiders.length > 0 && (
+              <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px] font-bold px-1.5 h-5">
+                {selectedRiders.length} selected
+              </Badge>
+            )}
           </div>
-        )}
+          <div className="h-4 w-px bg-slate-200 mx-1" />
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className={cn(
+              "h-7 text-[10px] font-bold gap-1 rounded-lg",
+              selectedRiders.length > 0 
+                ? "text-red-600 hover:bg-red-100" 
+                : "text-slate-400 cursor-not-allowed"
+            )}
+            disabled={selectedRiders.length === 0}
+            onClick={() => { toast.info(`Blocking ${selectedRiders.length} riders...`); }}
+          >
+            <Ban className="h-3 w-3" /> Block Selected
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className={cn(
+              "h-7 text-[10px] font-bold gap-1 rounded-lg",
+              selectedRiders.length > 0 
+                ? "text-blue-600 hover:bg-blue-100" 
+                : "text-slate-400 cursor-not-allowed"
+            )}
+            disabled={selectedRiders.length === 0}
+            onClick={() => { toast.info(`Assigning zone for ${selectedRiders.length} riders...`); }}
+          >
+            <MapPin className="h-3 w-3" /> Assign Zone
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className={cn(
+              "h-7 text-[10px] font-bold gap-1 rounded-lg",
+              selectedRiders.length > 0 
+                ? "text-emerald-700 hover:bg-emerald-100" 
+                : "text-slate-400 cursor-not-allowed"
+            )}
+            disabled={selectedRiders.length === 0}
+            onClick={() => { toast.info(`Sending notification to ${selectedRiders.length} riders...`); }}
+          >
+            <Send className="h-3 w-3" /> Send Notification
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className={cn(
+              "h-7 text-[10px] font-bold gap-1 rounded-lg",
+              selectedRiders.length > 0 
+                ? "text-purple-600 hover:bg-purple-100" 
+                : "text-slate-400 cursor-not-allowed"
+            )}
+            disabled={selectedRiders.length === 0}
+            onClick={() => { toast.info(`Processing payout for ${selectedRiders.length} riders...`); }}
+          >
+            <CreditCard className="h-3 w-3" /> Process Payout
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-          <Table className="min-w-[1500px] w-full">
+          <Table className="min-w-[1900px] w-full">
             <TableHeader><TableRow className="hover:bg-slate-50/50 border-none bg-slate-50/50">
             <TableHead className="w-[40px] pl-4"><Checkbox checked={selectedRiders.length === filtered.length && filtered.length > 0} onCheckedChange={(val) => val ? setSelectedRiders(filtered.map(r => r.id)) : setSelectedRiders([])} /></TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Rider Name</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Contact</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Area</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Vendor</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Deliveries (Month)</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Zone</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Assigned Outlet</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider">Performance</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Rider Utilization</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Active Orders</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Customer Rating</TableHead>
-            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">On-Time (%)</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Late Delivery %</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Failed Pickups</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Avg Pickup Delay</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Earnings/Settlement</TableHead>
+            <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Cost-to-Platform</TableHead>
             <TableHead className="text-[10px] font-bold uppercase text-slate-400 py-4 tracking-wider text-center">Status</TableHead>
             <TableHead className="w-[50px] pr-4"></TableHead>
           </TableRow></TableHeader>
@@ -282,29 +378,66 @@ function RidersContent() {
                   </div>
                 </TableCell>
 
-                {/* Assigned Area */}
+                {/* Assigned Zone */}
                 <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight leading-none mb-1">Logistics Assignment</p>
                     <p className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                       <span className="text-blue-500 font-black text-[9px] uppercase">Zone:</span> {p.zone}
+                       <MapPin className="h-3 w-3 text-blue-500" /> {p.zone || "Not Assigned"}
                     </p>
-                    <p className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
-                       <span className="text-slate-400 font-black text-[9px] uppercase">Cluster:</span> {p.cluster}
+                    <p className="text-[10px] font-semibold text-slate-500 pl-4">
+                       Cluster: {p.cluster || "NCR"}
                     </p>
                   </div>
                 </TableCell>
 
-                {/* Assigned Vendor */}
+                {/* Assigned Outlet */}
                 <TableCell onClick={() => router.push(`/rider/${r.id}`)}>
-                  <p className="text-xs font-medium text-slate-600 flex items-center gap-1"><Store className="h-3 w-3 text-slate-400" /> {p.assignedVendor}</p>
+                  <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Store className="h-3.5 w-3.5 text-[#3E8940]" /> {p.assignedVendor || "Unassigned Outlet"}
+                  </p>
                 </TableCell>
 
-                {/* Deliveries (Month) */}
-                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                {/* Performance */}
+                <TableCell className="text-xs font-medium" onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-slate-900">{p.deliveriesMonth}</p>
-                    <p className="text-[9px] text-slate-400">{p.deliveriesToday} today</p>
+                    <p className="font-semibold text-slate-800 text-xs">Orders: <span className="font-bold text-[#3E8940]">{p.deliveries || 0}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">On-Time: <span className="text-indigo-600 font-bold">{p.onTimePct != null ? `${Math.round(p.onTimePct)}%` : "—"}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">Rating: {p.rating != null ? (() => { const curr = parseFloat(String(p.rating)); const prev = p.previousRating != null ? parseFloat(String(p.previousRating)) : curr; const trend = curr > prev ? "up" : curr < prev ? "down" : "neutral"; return (<span className={cn("font-bold", trend === "up" ? "text-emerald-600" : trend === "down" ? "text-red-500" : "text-amber-600")}>⭐ {curr.toFixed(1)} {trend === "up" ? <TrendingUp className="inline h-3 w-3 ml-0.5" /> : trend === "down" ? <TrendingDown className="inline h-3 w-3 ml-0.5" /> : null}</span>); })() : <span className="text-amber-600 font-bold">—</span>}</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Cancellation: <span className="text-rose-600 font-bold">{p.cancellationPct != null ? `${p.cancellationPct}%` : "—"}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">Today: <span className="text-emerald-600 font-bold">{p.deliveriesToday || 0}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">Complaints: <span className="text-red-500 font-bold">{p.complaintsCount || 0}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">Incidents: <span className="text-orange-600 font-bold">{p.incidentsCount || 0}</span></p>
+                    <p className="text-[11px] text-slate-500 font-medium">Damage Reports: <span className="text-rose-700 font-bold">{p.damageReportsCount || 0}</span></p>
+                  </div>
+                </TableCell>
+
+                {/* Rider Utilization */}
+                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                  <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
+                    <div className="w-full">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] font-semibold text-slate-500">Active Days (30d)</span>
+                        <span className={cn("text-[10px] font-bold", (p.activeDays30 || 0) >= 25 ? "text-emerald-600" : (p.activeDays30 || 0) >= 15 ? "text-amber-600" : "text-red-500")}>{p.activeDays30 || 0}/30</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={cn("h-full rounded-full transition-all", (p.activeDays30 || 0) >= 25 ? "bg-emerald-500" : (p.activeDays30 || 0) >= 15 ? "bg-amber-500" : "bg-red-500")}
+                          style={{ width: `${Math.min(100, ((p.activeDays30 || 0) / 30) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="w-full">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] font-semibold text-slate-500">Total Hours</span>
+                        <span className={cn("text-[10px] font-bold", (p.totalActiveHours || 0) >= 180 ? "text-emerald-600" : (p.totalActiveHours || 0) >= 100 ? "text-amber-600" : "text-red-500")}>{p.totalActiveHours || 0}h</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={cn("h-full rounded-full transition-all", (p.totalActiveHours || 0) >= 180 ? "bg-emerald-500" : (p.totalActiveHours || 0) >= 100 ? "bg-amber-500" : "bg-red-500")}
+                          style={{ width: `${Math.min(100, ((p.totalActiveHours || 0) / 240) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
 
@@ -316,22 +449,6 @@ function RidersContent() {
                     <p className="text-[9px] text-slate-400">Load Factor: {Math.round((p.activeOrders / (p.maxCapacity || 1)) * 100)}%</p>
                     {p.activeOrders >= p.maxCapacity && <Badge className="text-[7px] bg-red-100 text-red-700 border-none px-1 h-3 uppercase">Overloaded</Badge>}
                   </div>
-                </TableCell>
-
-                {/* Customer Rating */}
-                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
-                      <span className="text-sm font-bold text-slate-700">{p.rating}</span>
-                    </div>
-                    <Badge variant="outline" className={cn("text-[8px] font-black border-none", health.color)}>{health.label}</Badge>
-                  </div>
-                </TableCell>
-
-                {/* On-Time (%) */}
-                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
-                  <Badge variant="outline" className={cn("font-bold text-[10px]", p.onTimePct >= 90 ? "text-emerald-600 border-emerald-200 bg-emerald-50" : p.onTimePct >= 80 ? "text-amber-600 border-amber-200 bg-amber-50" : "text-red-600 border-red-200 bg-red-50")}>{p.onTimePct}%</Badge>
                 </TableCell>
 
                 {/* Late Delivery % */}
@@ -370,13 +487,55 @@ function RidersContent() {
                   </div>
                 </TableCell>
 
+                {/* Cost-to-Platform */}
+                <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
+                  {(() => {
+                    const totalDel = p.deliveries || 0;
+                    const totalEarn = (p.earningsPending || 0) + (p.incentivesPending || 0) + (p.earningsSettled || 0);
+                    const costPerDel = totalDel > 0 ? totalEarn / totalDel : 0;
+                    const isEfficient = costPerDel > 0 && costPerDel < 50;
+                    const isModerate = costPerDel >= 50 && costPerDel <= 80;
+                    return (
+                      <div className="bg-slate-50/50 rounded-xl p-2 inline-block min-w-[110px]">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] uppercase font-bold text-slate-400">Deliveries</span>
+                            <span className="text-[11px] font-bold text-slate-800">{totalDel}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] uppercase font-bold text-slate-400">Earnings</span>
+                            <span className="text-[11px] font-bold text-slate-700">{formatINR(totalEarn)}</span>
+                          </div>
+                          <div className="border-t border-slate-200/60 pt-1 mt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] uppercase font-bold text-slate-400">Cost/Delivery</span>
+                              <span className={cn("text-[11px] font-black", isEfficient ? "text-emerald-600" : isModerate ? "text-amber-600" : "text-red-600")}>
+                                {totalDel > 0 ? formatINR(Math.round(costPerDel)) : "—"}
+                              </span>
+                            </div>
+                            {totalDel > 0 && (
+                              <Badge className={cn("text-[7px] font-black uppercase border-none px-1 h-3 mt-0.5", isEfficient ? "bg-emerald-100 text-emerald-700" : isModerate ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")}>
+                                {isEfficient ? "Efficient" : isModerate ? "Moderate" : "High Cost"}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </TableCell>
+
                 {/* Status */}
                 <TableCell className="text-center" onClick={() => router.push(`/rider/${r.id}`)}>
                   <div className="flex flex-col items-center">
                     <p className={cn("text-xs font-bold flex items-center gap-1", avail.color)}>
                       <span>{avail.dot}</span> {avail.label}
                     </p>
-                    <p className="text-[9px] text-slate-400">{p.lastActive}</p>
+                    {(() => { const la = formatLastActive(p.lastActive, p.availability); return (
+                      <p className={cn("text-[9px] font-semibold flex items-center gap-0.5", la.color)}>
+                        <span className="text-[8px]">{la.dot}</span> {la.text}
+                      </p>
+                    ); })()}
                   </div>
                 </TableCell>
 
