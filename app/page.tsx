@@ -1095,7 +1095,7 @@ export default function AdminDashboardPage() {
 
         {/* Actionable Panels Section (Moved from Sidebar to Bottom) */}
         {(data.approvals?.length > 0 || data.issueDigest?.length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Pending Vendor Approvals */}
             {data.approvals?.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">

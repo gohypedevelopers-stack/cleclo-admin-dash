@@ -73,9 +73,9 @@ const PRODUCTIVITY_DATA = [
 ];
 
 const CANCELLATION_ANALYTICS = [
-  { name: "Rider Cancelled", value: 15, color: "#ef4444" },
-  { name: "Customer Cancelled", value: 65, color: "#3b82f6" },
-  { name: "Vendor Delay Impact", value: 20, color: "#f59e0b" },
+  { name: "Customer Cancellation %", value: 65, color: "#3b82f6" },
+  { name: "Rider Cancellation %", value: 15, color: "#ef4444" },
+  { name: "Vendor Cancellation %", value: 20, color: "#f59e0b" },
 ];
 
 const RISK_CATEGORIES = [

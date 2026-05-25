@@ -33,6 +33,7 @@ import {
   TrendingDown,
   Briefcase,
   DollarSign,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -321,44 +322,79 @@ export default function RiderPaymentsPage() {
         </Card>
       </div>
 
-      {/* Rider Earnings Panel */}
-      <Card className="shadow-sm border-slate-200 bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-[#3E8940]" />
-              <CardTitle className="text-lg font-bold text-slate-800">Rider Earnings Panel</CardTitle>
-            </div>
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
-              <FileText className="h-3 w-3" /> Reconciliation Report
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="grid md:grid-cols-4 divide-x divide-slate-100">
-            <div className="p-6">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Earnings (Month)</p>
-              <p className="text-2xl font-black text-slate-900">₹{earningsStats.totalEarningsMonth.toLocaleString('en-IN')}</p>
-              <p className="text-[10px] text-green-600 font-bold mt-2">↑ 12.5% vs last month</p>
-            </div>
-            <div className="p-6">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Earnings / Rider</p>
-              <p className="text-2xl font-black text-slate-900">₹{earningsStats.avgEarningsPerRider.toLocaleString('en-IN')}</p>
-              <p className="text-[10px] text-slate-500 font-bold mt-2">Target: ₹6,000</p>
-            </div>
-            <div className="p-6">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Incentives Paid</p>
-              <p className="text-2xl font-black text-indigo-600">₹{earningsStats.incentivesPaid.toLocaleString('en-IN')}</p>
-              <p className="text-[10px] text-indigo-500 font-bold mt-2">High performance bonuses</p>
-            </div>
-            <div className="p-6 bg-amber-50/30">
-              <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Pending Payout</p>
-              <p className="text-2xl font-black text-amber-700">₹{earningsStats.pendingPayout.toLocaleString('en-IN')}</p>
-              <p className="text-[10px] text-amber-500 font-bold mt-2">Scheduled for next cycle</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Earnings & Reconciliation Grid */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2">
+          {/* Rider Earnings Panel */}
+          <Card className="shadow-sm border-slate-200 bg-white overflow-hidden h-full">
+            <CardHeader className="border-b bg-slate-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-[#3E8940]" />
+                  <CardTitle className="text-lg font-bold text-slate-800">Rider Earnings Panel</CardTitle>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+                  <FileText className="h-3 w-3" /> Reconciliation Report
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="grid md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full">
+                <div className="p-6">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Earnings (Month)</p>
+                  <p className="text-2xl font-black text-slate-900">₹{earningsStats.totalEarningsMonth.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-green-600 font-bold mt-2">↑ 12.5% vs last month</p>
+                </div>
+                <div className="p-6">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Earnings / Rider</p>
+                  <p className="text-2xl font-black text-slate-900">₹{earningsStats.avgEarningsPerRider.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-slate-500 font-bold mt-2">Target: ₹6,000</p>
+                </div>
+                <div className="p-6">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Incentives Paid</p>
+                  <p className="text-2xl font-black text-indigo-600">₹{earningsStats.incentivesPaid.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-indigo-500 font-bold mt-2">High performance bonuses</p>
+                </div>
+                <div className="p-6 bg-amber-50/30">
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Pending Payout</p>
+                  <p className="text-2xl font-black text-amber-700">₹{earningsStats.pendingPayout.toLocaleString('en-IN')}</p>
+                  <p className="text-[10px] text-amber-500 font-bold mt-2">Scheduled for next cycle</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-1">
+          {/* Rider Payment Reconciliation */}
+          <Card className="shadow-sm border-slate-200 bg-white overflow-hidden h-full flex flex-col justify-between">
+            <CardHeader className="border-b bg-indigo-50/30 p-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-indigo-600" />
+                <CardTitle className="text-sm font-bold text-indigo-900">Rider Payment Reconciliation</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 flex-1">
+              <div className="divide-y divide-slate-100">
+                {[
+                  { label: "Deliveries Done", value: `${filteredPayments.length * 12 + 4} orders`, icon: Truck, color: "text-blue-600" },
+                  { label: "Incentives", value: formatINR(filteredPayments.reduce((sum, p) => sum + p.breakdown.incentives, 0)), icon: Zap, color: "text-amber-600" },
+                  { label: "Penalties", value: `-${formatINR(filteredPayments.reduce((sum, p) => sum + p.breakdown.penalty, 0))}`, icon: AlertCircle, color: "text-rose-600" },
+                  { label: "Net Payout", value: formatINR(filteredPayments.reduce((sum, p) => sum + p.amount, 0)), icon: Wallet, color: "text-emerald-600", bold: true },
+                ].map((item, i) => (
+                  <div key={i} className="px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <item.icon className={`h-3.5 w-3.5 ${item.color}`} />
+                      <span className="text-xs font-semibold text-slate-600">{item.label}</span>
+                    </div>
+                    <span className={cn("text-xs font-bold text-slate-900", item.bold && "text-emerald-700 font-black text-sm")}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border">
