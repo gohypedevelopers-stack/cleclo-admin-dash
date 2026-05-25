@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
-import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, ShieldCheck, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, Filter, MoreVertical, Phone, Wallet, Ban, Eye, Loader2, AlertTriangle, RefreshCw, CheckCircle, Calendar, Bike, Star, MapPin, Activity, ShieldAlert, ShieldCheck, HeartPulse, TrendingUp, TrendingDown, Clock, UserPlus, Store, Bell, CreditCard, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,12 @@ function RidersContent() {
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [filterType, setFilterType] = useState("all");
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
+  const [earningsStats] = useState({
+    totalEarningsMonth: 145800,
+    avgEarningsPerRider: 4860,
+    incentivesPaid: 12400,
+    pendingPayout: 32150,
+  });
 
   const fetchRiders = useCallback(async () => {
     setIsLoading(true); setError(null);
@@ -148,6 +154,45 @@ function RidersContent() {
           </div>
         </Card>
       </div>
+
+      {/* Rider Earnings Panel */}
+      <Card className="shadow-sm border-slate-200 bg-white overflow-hidden my-6">
+        <CardHeader className="border-b bg-slate-50/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-[#3E8940]" />
+              <CardTitle className="text-lg font-bold text-slate-800">Rider Earnings Panel</CardTitle>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+              <FileText className="h-3 w-3" /> Reconciliation Report
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="grid md:grid-cols-4 divide-x divide-slate-100">
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Earnings (Month)</p>
+              <p className="text-2xl font-black text-slate-900">₹{earningsStats.totalEarningsMonth.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-green-600 font-bold mt-2">↑ 12.5% vs last month</p>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Earnings / Rider</p>
+              <p className="text-2xl font-black text-slate-900">₹{earningsStats.avgEarningsPerRider.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-slate-500 font-bold mt-2">Target: ₹6,000</p>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Incentives Paid</p>
+              <p className="text-2xl font-black text-indigo-600">₹{earningsStats.incentivesPaid.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-indigo-500 font-bold mt-2">High performance bonuses</p>
+            </div>
+            <div className="p-6 bg-amber-50/30">
+              <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Pending Payout</p>
+              <p className="text-2xl font-black text-amber-700">₹{earningsStats.pendingPayout.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-amber-500 font-bold mt-2">Scheduled for next cycle</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Dispatch system safeguard info */}
       <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-4 flex items-start gap-3">

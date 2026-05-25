@@ -193,6 +193,13 @@ export default function RiderPaymentsPage() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [payoutCycle, setPayoutCycle] = useState("Weekly");
 
+  const [earningsStats] = useState({
+    totalEarningsMonth: 145800,
+    avgEarningsPerRider: 4860,
+    incentivesPaid: 12400,
+    pendingPayout: 32150,
+  });
+
   const formatINR = (a: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(a);
 
   const filteredPayments = PAYMENTS.filter((payment) => {
@@ -310,9 +317,48 @@ export default function RiderPaymentsPage() {
                <Badge variant="outline" className="bg-red-900/30 text-red-400 border-red-900/50 text-[9px] px-1 py-0 font-bold">Duplicate Bank</Badge>
                <Badge variant="outline" className="bg-amber-900/30 text-amber-400 border-amber-900/50 text-[9px] px-1 py-0 font-bold">Spike</Badge>
             </div>
-          </CardContent>
+           </CardContent>
         </Card>
       </div>
+
+      {/* Rider Earnings Panel */}
+      <Card className="shadow-sm border-slate-200 bg-white overflow-hidden">
+        <CardHeader className="border-b bg-slate-50/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-[#3E8940]" />
+              <CardTitle className="text-lg font-bold text-slate-800">Rider Earnings Panel</CardTitle>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+              <FileText className="h-3 w-3" /> Reconciliation Report
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="grid md:grid-cols-4 divide-x divide-slate-100">
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Earnings (Month)</p>
+              <p className="text-2xl font-black text-slate-900">₹{earningsStats.totalEarningsMonth.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-green-600 font-bold mt-2">↑ 12.5% vs last month</p>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Earnings / Rider</p>
+              <p className="text-2xl font-black text-slate-900">₹{earningsStats.avgEarningsPerRider.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-slate-500 font-bold mt-2">Target: ₹6,000</p>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Incentives Paid</p>
+              <p className="text-2xl font-black text-indigo-600">₹{earningsStats.incentivesPaid.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-indigo-500 font-bold mt-2">High performance bonuses</p>
+            </div>
+            <div className="p-6 bg-amber-50/30">
+              <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Pending Payout</p>
+              <p className="text-2xl font-black text-amber-700">₹{earningsStats.pendingPayout.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-amber-500 font-bold mt-2">Scheduled for next cycle</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border">

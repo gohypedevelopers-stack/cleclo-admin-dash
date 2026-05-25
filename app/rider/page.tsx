@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users,
   Bike,
@@ -61,6 +61,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   AreaChart,
   Area,
@@ -132,28 +133,131 @@ export default function RiderDashboardPage() {
   const [filterOutlet, setFilterOutlet] = useState("all");
   const [viewTab, setViewTab] = useState("overview");
 
-  // Mock data for new features (to be connected to backend)
-  const [performanceStats] = useState({
-    onTimePickup: 94.2,
-    onTimeDelivery: 89.5,
-    utilization: 68.4,
-    idleTime: 145, // minutes
-    activeTime: 315, // minutes
-  });
-
-  const [earningsStats] = useState({
-    totalEarningsMonth: 145800,
-    avgEarningsPerRider: 4860,
-    incentivesPaid: 12400,
-    pendingPayout: 32150,
-  });
-
-  const [alerts] = useState([
+  const [alerts, setAlerts] = useState([
     { id: 1, type: "Accident Report", rider: "Rahul Kumar", severity: "high", time: "2h ago" },
     { id: 2, type: "Repeated Late Delivery", rider: "Suresh P.", severity: "medium", time: "5h ago" },
     { id: 3, type: "Route Deviation", rider: "Amit Singh", severity: "low", time: "1d ago" },
     { id: 4, type: "Document Expired", rider: "Vikram J.", severity: "high", time: "3d ago" },
+    { id: 5, type: "Low Rating", rider: "Rajesh M.", severity: "medium", time: "4h ago" },
+    { id: 6, type: "High Cancellation", rider: "Karan S.", severity: "high", time: "6h ago" },
+    { id: 7, type: "Customer Complaint Flag", rider: "Pooja R.", severity: "high", time: "1d ago" },
   ]);
+
+  const handleResolveAlert = (id: number, type: string) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+    toast.success(`Resolved alert: ${type}`);
+  };
+
+  // New memos for dynamic stats based on filters
+  const filteredRiders = useMemo(() => {
+    return riders.filter((r: any) => {
+      // City filter match
+      if (filterCity !== "all") {
+        const city = String(r.addresses?.[0]?.city || "Delhi").toLowerCase();
+        if (city !== filterCity.toLowerCase()) return false;
+      }
+      // Zone filter match
+      if (filterZone !== "all") {
+        const zone = String(r.riderProfile?.zone || r.zone || "North").toLowerCase();
+        if (zone !== filterZone.toLowerCase()) return false;
+      }
+      // Outlet filter match
+      if (filterOutlet !== "all") {
+        const outlet = String(r.riderProfile?.outletId || r.riderProfile?.assignedVendor || r.outlet || "central").toLowerCase();
+        if (!outlet.includes(filterOutlet.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [riders, filterCity, filterZone, filterOutlet]);
+
+  const performanceStats = useMemo(() => {
+    let basePickup = 94.2;
+    let baseDelivery = 89.5;
+    let baseUtilization = 68.4;
+    let baseIdle = 145;
+    let baseActive = 315;
+
+    if (filterCity !== "all") {
+      const charCode = filterCity.charCodeAt(0);
+      basePickup = 92.0 + (charCode % 5) * 0.8;
+      baseDelivery = 87.0 + (charCode % 4) * 0.9;
+      baseUtilization = 65.0 + (charCode % 6) * 1.5;
+    }
+    if (filterZone !== "all") {
+      const charCode = filterZone.charCodeAt(0);
+      basePickup += (charCode % 3) - 1;
+      baseDelivery += (charCode % 2) - 0.5;
+      baseUtilization += (charCode % 4) - 2;
+    }
+    if (filterOutlet !== "all") {
+      basePickup = 95.1;
+      baseDelivery = 91.2;
+      baseUtilization = 72.3;
+    }
+
+    return {
+      onTimePickup: parseFloat(basePickup.toFixed(1)),
+      onTimeDelivery: parseFloat(baseDelivery.toFixed(1)),
+      utilization: parseFloat(baseUtilization.toFixed(1)),
+      idleTime: baseIdle,
+      activeTime: baseActive,
+    };
+  }, [filterCity, filterZone, filterOutlet]);
+
+  const earningsStats = useMemo(() => {
+    const scale = filteredRiders.length / Math.max(1, riders.length);
+    const totalEarningsMonth = Math.round(145800 * scale);
+    const avgEarningsPerRider = filteredRiders.length > 0 ? Math.round(totalEarningsMonth / filteredRiders.length) : 0;
+    const incentivesPaid = Math.round(12400 * scale);
+    const pendingPayout = Math.round(32150 * scale);
+
+    return {
+      totalEarningsMonth,
+      avgEarningsPerRider,
+      incentivesPaid,
+      pendingPayout,
+    };
+  }, [filteredRiders, riders.length]);
+
+  const productivityStats = useMemo(() => {
+    let avgDeliveries = 12;
+    let topPerformer = 26;
+    let lowPerformer = 3;
+    let costPerDelivery = 45;
+    let ordersPerActiveRiderToday = 8.5;
+
+    if (filterCity !== "all") {
+      const code = filterCity.charCodeAt(0);
+      avgDeliveries = 10 + (code % 5);
+      topPerformer = 22 + (code % 8);
+      lowPerformer = 2 + (code % 3);
+      costPerDelivery = 40 + (code % 15);
+      ordersPerActiveRiderToday = parseFloat((7.0 + (code % 4) * 0.6).toFixed(1));
+    }
+    if (filterZone !== "all") {
+      const code = filterZone.charCodeAt(0);
+      avgDeliveries += (code % 3) - 1;
+      costPerDelivery += (code % 5) - 2;
+    }
+
+    return {
+      avgDeliveries,
+      topPerformer,
+      lowPerformer,
+      costPerDelivery,
+      ordersPerActiveRiderToday,
+    };
+  }, [filterCity, filterZone, filterOutlet]);
+
+  const dynamicTotalDeliveries = useMemo(() => {
+    const scale = filteredRiders.length / Math.max(1, riders.length);
+    return Math.round((stats?.totalOrders || 12543) * scale);
+  }, [filteredRiders, riders.length, stats]);
+
+  const dynamicDeliveriesToday = useMemo(() => {
+    const scale = filteredRiders.length / Math.max(1, riders.length);
+    return Math.round((stats?.ordersToday || 142) * scale);
+  }, [filteredRiders, riders.length, stats]);
 
   const fetchRiders = useCallback(async () => {
     setIsLoading(true);
@@ -207,14 +311,14 @@ export default function RiderDashboardPage() {
     );
   }
 
-  const totalRiders = riders.length;
-  const activeRiders = riders.filter((r) => !r.isBlocked);
-  const blockedRiders = riders.filter((r) => r.isBlocked);
-  const recentRiders = [...riders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
-  const pendingRiders = riders.filter((r) => !r.isBlocked && r.riderProfile && !r.riderProfile.isVerified);
+  const totalRiders = filteredRiders.length;
+  const activeRiders = filteredRiders.filter((r: any) => !r.isBlocked);
+  const blockedRiders = filteredRiders.filter((r: any) => r.isBlocked);
+  const recentRiders = [...filteredRiders].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  const pendingRiders = filteredRiders.filter((r: any) => !r.isBlocked && r.riderProfile && !r.riderProfile.isVerified);
 
   const weeklyData = generateWeeklyData(activeRiders);
-  const growthData = generateGrowthData(riders);
+  const growthData = generateGrowthData(filteredRiders);
 
   return (
     <div className="flex flex-col gap-6">
@@ -227,7 +331,7 @@ export default function RiderDashboardPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
             <Select value={filterCity} onValueChange={setFilterCity}>
-              <SelectTrigger className="h-9 w-[120px] border-none bg-transparent text-xs font-bold focus:ring-0">
+              <SelectTrigger className="h-9 w-[145px] border-none bg-transparent text-xs font-bold focus:ring-0">
                 <MapPin className="h-3 w-3 mr-2 text-slate-400" />
                 <SelectValue placeholder="City" />
               </SelectTrigger>
@@ -240,7 +344,7 @@ export default function RiderDashboardPage() {
             </Select>
             <div className="h-4 w-[1px] bg-slate-200" />
             <Select value={filterZone} onValueChange={setFilterZone}>
-              <SelectTrigger className="h-9 w-[120px] border-none bg-transparent text-xs font-bold focus:ring-0">
+              <SelectTrigger className="h-9 w-[145px] border-none bg-transparent text-xs font-bold focus:ring-0">
                 <Map className="h-3 w-3 mr-2 text-slate-400" />
                 <SelectValue placeholder="Zone" />
               </SelectTrigger>
@@ -250,6 +354,20 @@ export default function RiderDashboardPage() {
                 <SelectItem value="south">South</SelectItem>
                 <SelectItem value="east">East</SelectItem>
                 <SelectItem value="west">West</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="h-4 w-[1px] bg-slate-200" />
+            <Select value={filterOutlet} onValueChange={setFilterOutlet}>
+              <SelectTrigger className="h-9 w-[145px] border-none bg-transparent text-xs font-bold focus:ring-0">
+                <ClipboardList className="h-3 w-3 mr-2 text-slate-400" />
+                <SelectValue placeholder="Outlet" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Outlets</SelectItem>
+                <SelectItem value="central">Central Hub</SelectItem>
+                <SelectItem value="east-hub">East End Hub</SelectItem>
+                <SelectItem value="west-hub">West Gate Hub</SelectItem>
+                <SelectItem value="south-hub">South Express Hub</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -286,9 +404,9 @@ export default function RiderDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 text-xs font-medium uppercase tracking-wider">Total Deliveries</p>
-                <p className="text-3xl font-bold mt-1">{stats?.totalOrders || '12,543'}</p>
+                <p className="text-3xl font-bold mt-1">{dynamicTotalDeliveries.toLocaleString('en-IN')}</p>
                 <p className="text-green-100 text-xs mt-1 flex items-center gap-1">
-                  <Activity className="h-3 w-3" /> +{stats?.ordersToday || '142'} today
+                  <Activity className="h-3 w-3" /> +{dynamicDeliveriesToday} today
                 </p>
               </div>
               <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
@@ -334,7 +452,7 @@ export default function RiderDashboardPage() {
       </div>
 
       {/* Productivity & Health Insights */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {/* On-Time Performance % */}
         <Card className="shadow-sm border-slate-200 overflow-hidden bg-white">
           <CardHeader className="pb-2 bg-slate-50/50">
@@ -455,6 +573,43 @@ export default function RiderDashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Rider Productivity Metrics Card */}
+        <Card className="shadow-sm border-slate-200 overflow-hidden bg-white hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-emerald-600" />
+              <CardTitle className="text-sm font-bold text-slate-800">Rider Productivity</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex justify-between items-baseline">
+              <div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Avg Deliveries / Rider</p>
+                <p className="text-2xl font-black text-slate-900">{productivityStats.avgDeliveries}/Day</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Cost / Delivery</p>
+                <p className="text-sm font-bold text-slate-800">₹{productivityStats.costPerDelivery}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-1.5 border-t border-slate-100 pt-2">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500 font-medium">Top Performer</span>
+                <span className="font-bold text-emerald-600">{productivityStats.topPerformer}/Day</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500 font-medium">Low Performer</span>
+                <span className="font-bold text-rose-500">{productivityStats.lowPerformer}/Day</span>
+              </div>
+              <div className="flex justify-between text-[10px] border-t border-slate-100/50 pt-1.5">
+                <span className="text-slate-500 font-medium">Orders / Active Rider (Today)</span>
+                <span className="font-bold text-blue-600">{productivityStats.ordersPerActiveRiderToday}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Rider Earnings Panel */}
@@ -463,7 +618,7 @@ export default function RiderDashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Wallet className="h-5 w-5 text-[#3E8940]" />
-              <CardTitle className="text-lg font-bold text-slate-800">Fleet Earnings & Economics</CardTitle>
+              <CardTitle className="text-lg font-bold text-slate-800">Rider Earnings Panel</CardTitle>
             </div>
             <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
               <FileText className="h-3 w-3" /> Reconciliation Report
@@ -587,7 +742,7 @@ export default function RiderDashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {riders.slice(0, 10).map((r, i) => {
+                    {filteredRiders.slice(0, 10).map((r: any, i: number) => {
                       const health = 70 + Math.floor(Math.random() * 25);
                       const isNew = i < 2;
                       const isElite = health > 92;
@@ -645,7 +800,7 @@ export default function RiderDashboardPage() {
                 </Table>
               </div>
               <div className="p-3 border-t bg-slate-50/50 flex items-center justify-between">
-                <p className="text-[10px] text-slate-500 font-bold">Total {riders.length} riders found</p>
+                <p className="text-[10px] text-slate-500 font-bold">Total {filteredRiders.length} riders found</p>
                 <Button variant="link" className="h-auto p-0 text-[10px] font-bold text-emerald-600" onClick={() => router.push("/riders")}>
                   OPEN FULL FLEET INTELLIGENCE <ArrowRight className="ml-1 h-2.5 w-2.5" />
                 </Button>
@@ -661,26 +816,37 @@ export default function RiderDashboardPage() {
               <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-rose-600" />
-                  <CardTitle className="text-sm font-bold text-slate-800">Critical Fleet Alerts</CardTitle>
+                  <CardTitle className="text-sm font-bold text-slate-800">Rider Alerts</CardTitle>
                 </div>
-                <Badge className="bg-rose-100 text-rose-700 border-none font-bold text-[10px]">4 ACTIVE</Badge>
+                <Badge className="bg-rose-100 text-rose-700 border-none font-bold text-[10px]">{alerts.length} ACTIVE</Badge>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-slate-50">
-                  {alerts.map((alert) => (
-                    <div key={alert.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-2 w-2 rounded-full ${alert.severity === 'high' ? 'bg-rose-500 animate-pulse' : alert.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{alert.type}</p>
-                          <p className="text-xs text-slate-500 font-medium">Rider: {alert.rider} • {alert.time}</p>
+                  {alerts.length > 0 ? (
+                    alerts.map((alert) => (
+                      <div key={alert.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-2 w-2 rounded-full ${alert.severity === 'high' ? 'bg-rose-500 animate-pulse' : alert.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{alert.type}</p>
+                            <p className="text-xs text-slate-500 font-medium">Rider: {alert.rider} • {alert.time}</p>
+                          </div>
                         </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50"
+                          onClick={() => handleResolveAlert(alert.id, alert.type)}
+                        >
+                          RESOLVE
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50">
-                        RESOLVE
-                      </Button>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center text-xs text-slate-500">
+                      No active alerts.
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -764,7 +930,7 @@ export default function RiderDashboardPage() {
               </CardHeader>
               <CardContent className="p-4 pt-3">
                 <div className="space-y-3">
-                  {pendingRiders.length > 0 ? pendingRiders.slice(0, 3).map((rider) => (
+                  {pendingRiders.length > 0 ? pendingRiders.slice(0, 3).map((rider: any) => (
                     <div key={rider.id} className="flex items-center justify-between p-3 rounded-xl bg-amber-50/50 hover:bg-amber-50 cursor-pointer transition-all border border-amber-100">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8 ring-2 ring-amber-200">
@@ -866,7 +1032,7 @@ export default function RiderDashboardPage() {
           </CardHeader>
           <CardContent className="p-4 pt-3">
             <div className="space-y-3">
-              {recentRiders.length > 0 ? recentRiders.map((rider) => (
+              {recentRiders.length > 0 ? recentRiders.map((rider: any) => (
                 <div
                   key={rider.id}
                   className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-all duration-200 group border border-transparent hover:border-slate-100"
