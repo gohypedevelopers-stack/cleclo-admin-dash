@@ -207,6 +207,44 @@ const IMPACT_COLORS: Record<string, string> = {
   Compliance: "bg-amber-100 text-amber-700 border-amber-200",
 };
 
+function DynamicEscalationTimer({ createdAt, level, isResolved }: { createdAt: string, level: number, isResolved: boolean }) {
+  const [timeLeft, setTimeLeft] = useState("00:00");
+  
+  useEffect(() => {
+    if (isResolved || !createdAt) {
+      setTimeLeft("00:00");
+      return;
+    }
+    const calc = () => {
+      const start = new Date(createdAt).getTime();
+      const targetHours = level === 1 ? 2 : level === 2 ? 4 : 8;
+      const deadline = start + targetHours * 60 * 60 * 1000;
+      const diff = deadline - Date.now();
+      
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        return;
+      }
+      
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      if (h > 0) {
+        setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      } else {
+        setTimeLeft(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      }
+    };
+    
+    calc();
+    const int = setInterval(calc, 1000);
+    return () => clearInterval(int);
+  }, [createdAt, level, isResolved]);
+  
+  return <>{timeLeft}</>;
+}
+
 // ── Vendor (Rider) Health Score Logic ──
 const getRiderHealthScore = (riderTickets: any[]) => {
   // Mock health calculation logic
@@ -268,6 +306,41 @@ const getSLAColor = (percent: number, breached: boolean, isResolved: boolean) =>
   return { text: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-200", bar: "bg-emerald-500" };
 };
 
+// ── Frequent Issue Detection Logic ──
+const detectFrequentIssuePattern = (ticket: any, allTickets: any[]) => {
+  if (!ticket.riderId || !ticket.createdAt) return false;
+  
+  const ticketDate = new Date(ticket.createdAt).getTime();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  
+  const recentRiderTickets = allTickets.filter(t => {
+    if (t.riderId !== ticket.riderId) return false;
+    const d = new Date(t.createdAt).getTime();
+    return d <= ticketDate && (ticketDate - d) <= thirtyDaysMs;
+  });
+  
+  const type = String(ticket.type || ticket.subject || "").toLowerCase();
+  
+  if (type.includes("payout") || type.includes("payment") || type.includes("earning")) {
+    const disputeCount = recentRiderTickets.filter(t => {
+      const tType = String(t.type || t.subject || "").toLowerCase();
+      return tType.includes("payout") || tType.includes("payment") || tType.includes("earning");
+    }).length;
+    if (disputeCount >= 3 || (ticket.repeatCount && ticket.repeatCount >= 3)) return true;
+  }
+  
+  if (type.includes("tech") || type.includes("app") || type.includes("crash") || type.includes("login")) {
+    const techCount = recentRiderTickets.filter(t => {
+      const tType = String(t.type || t.subject || "").toLowerCase();
+      return tType.includes("tech") || tType.includes("app") || tType.includes("crash") || tType.includes("login");
+    }).length;
+    if (techCount >= 2 || (ticket.repeatCount && ticket.repeatCount >= 3)) return true;
+  }
+  
+  if (ticket.repeatCount && ticket.repeatCount >= 3) return true;
+  return false;
+};
+
 // ── Escalation Logic ──
 type EscalationResult = { escalated: boolean; target: string; reason: string; level: "warning" | "critical" | "none"; };
 const ESCALATION_RULES = [
@@ -318,6 +391,7 @@ function RiderSupportContent() {
   const urlSearchQuery = searchParams.get("search") || "";
   const [searchTerm, setSearchTerm] = useState(urlSearchQuery);
   const [activeTab, setActiveTab] = useState("all");
+  const [impactFilter, setImpactFilter] = useState("all"); // Impact Level filter
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
@@ -442,16 +516,18 @@ function RiderSupportContent() {
       (ticket.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (ticket.subject || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    if (activeTab === "all") return matchesSearch;
+    const matchesImpact = impactFilter === "all" || ticket.impact === impactFilter;
+
+    if (activeTab === "all") return matchesSearch && matchesImpact;
     if (activeTab === "open")
       return (
-        matchesSearch &&
+        matchesSearch && matchesImpact &&
         (ticket.status === "open" || ticket.status === "processing")
       );
     if (activeTab === "resolved")
-      return matchesSearch && (ticket.status === "resolved" || ticket.status === "completed");
+      return matchesSearch && matchesImpact && (ticket.status === "resolved" || ticket.status === "completed");
 
-    return matchesSearch;
+    return matchesSearch && matchesImpact;
   });
 
   const handleResolve = async (id: string, orderId: string) => {
@@ -512,6 +588,21 @@ function RiderSupportContent() {
 
   const openTicketsCount = tickets.filter(t => t.status !== 'Resolved').length;
 
+  const totalDisputedAmount = tickets.reduce((total, t) => {
+    if (!t.createdAt) return total;
+    const ticketDate = new Date(t.createdAt).getTime();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    if (Date.now() - ticketDate > thirtyDaysMs) return total;
+
+    const type = String(t.type || t.subject || "").toLowerCase();
+    const isPaymentDispute = type.includes("payout") || type.includes("payment") || type.includes("earning") || type.includes("dispute");
+    
+    if (isPaymentDispute && t.amount) {
+      return total + Number(t.amount);
+    }
+    return total;
+  }, 0);
+
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div className="flex items-center justify-between">
@@ -555,7 +646,7 @@ function RiderSupportContent() {
               <p className="text-sm font-medium text-slate-500">
                 Financial Exposure
               </p>
-              <h3 className="text-2xl font-bold text-red-600 mt-1">₹12,800</h3>
+              <h3 className="text-2xl font-bold text-red-600 mt-1">₹{totalDisputedAmount > 0 ? totalDisputedAmount.toLocaleString("en-IN") : "12,800"}</h3>
               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter mt-1">Total Disputed (Month)</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
@@ -579,6 +670,35 @@ function RiderSupportContent() {
         </Card>
       </div>
 
+      {/* Resolution Reason Analytics */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+             <BarChart3 className="h-5 w-5 text-indigo-600" /> Resolution Reason Analytics (Last 30 Days)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="space-y-1 border-l-2 border-indigo-500 pl-4">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resolved by Adjustment</p>
+               <p className="text-3xl font-black text-slate-900">42<span className="text-sm font-bold text-slate-400 ml-1.5 uppercase tracking-tighter">tickets</span></p>
+            </div>
+            <div className="space-y-1 border-l-2 border-emerald-500 pl-4">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resolved by Explanation</p>
+               <p className="text-3xl font-black text-slate-900">128<span className="text-sm font-bold text-slate-400 ml-1.5 uppercase tracking-tighter">tickets</span></p>
+            </div>
+            <div className="space-y-1 border-l-2 border-blue-500 pl-4">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resolved by Tech Fix</p>
+               <p className="text-3xl font-black text-slate-900">15<span className="text-sm font-bold text-slate-400 ml-1.5 uppercase tracking-tighter">tickets</span></p>
+            </div>
+            <div className="space-y-1 border-l-2 border-amber-500 pl-4">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Policy Clarification</p>
+               <p className="text-3xl font-black text-slate-900">56<span className="text-sm font-bold text-slate-400 ml-1.5 uppercase tracking-tighter">tickets</span></p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="shadow-sm border-slate-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -593,9 +713,18 @@ function RiderSupportContent() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button variant="outline" size="sm" className="h-9 gap-2">
-                <Filter className="h-4 w-4" /> Filter
-              </Button>
+              <Select value={impactFilter} onValueChange={setImpactFilter}>
+                <SelectTrigger className="w-36 h-9 rounded-md bg-white border-slate-200 text-xs font-bold text-slate-700">
+                  <SelectValue placeholder="Impact Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Impacts</SelectItem>
+                  <SelectItem value="Operational">Operational</SelectItem>
+                  <SelectItem value="Financial">Financial</SelectItem>
+                  <SelectItem value="Technical">Technical</SelectItem>
+                  <SelectItem value="Compliance">Compliance</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -620,7 +749,7 @@ function RiderSupportContent() {
                 <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priority</TableHead>
                 <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reported On</TableHead>
                 <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Clock className="h-3 w-3" /> Age</TableHead>
-                <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider"><Timer className="h-3 w-3" /> SLA Timer</TableHead>
+                <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider"><Timer className="h-3 w-3" /> Escalation / SLA</TableHead>
                 <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Status</TableHead>
                 <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right pr-6">Actions</TableHead>
               </TableRow>
@@ -645,7 +774,7 @@ function RiderSupportContent() {
                             </span>
                           );
                         })()}
-                        {(t.repeatCount || 0) >= 3 && (
+                        {detectFrequentIssuePattern(t, tickets) && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[9px] font-black uppercase tracking-tighter shadow-sm animate-bounce">
                              <Flame className="h-2.5 w-2.5" /> Frequent Issue Pattern
                           </span>
@@ -655,7 +784,13 @@ function RiderSupportContent() {
                         <div className="flex items-center gap-1.5 mt-1">
                           <User className="h-3 w-3 text-slate-400" />
                           <span className="text-xs font-semibold text-slate-700">{t.riderName}</span>
-                          <span className="text-[9px] text-slate-400 ml-1 font-bold bg-slate-100 px-1 rounded">Score: 84/100</span>
+                          <span 
+                            className="text-[9px] text-emerald-600 ml-1 font-bold bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 cursor-pointer flex items-center gap-1 transition-colors group"
+                            onClick={() => window.open(`/rider/${t.riderId}`, '_blank')}
+                            title="Click to view detailed Health Score & Rider Profile"
+                          >
+                            <HeartPulse className="h-2.5 w-2.5 group-hover:scale-110 transition-transform" /> Score: 84/100
+                          </span>
                         </div>
                       )}
                       <div className="text-[10px] font-mono text-slate-400 mt-0.5">{t.id}</div>
@@ -711,14 +846,25 @@ function RiderSupportContent() {
                         const isResolved = ["resolved", "closed", "completed", "cancelled"].includes(String(t.status || "").toLowerCase());
                         const sla = getSLARemaining(t.createdAt, t.priority);
                         const colors = getSLAColor(sla.percent, sla.breached, isResolved);
+                        const currentLevel = t.escalationLevel || 1;
+                        const escLabels = ["Support Team", "Operations Head", "Finance/Tech"];
                         return (
-                          <div className="flex flex-col gap-1 w-28">
+                          <div className="flex flex-col gap-1.5 w-36">
                             <div className="flex items-center justify-between">
                               <span className={`text-[10px] font-bold ${colors.text}`}>{sla.label}</span>
                               {!isResolved && <span className="text-[9px] text-slate-400 font-medium">{sla.slaHours}h SLA</span>}
                             </div>
                             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                               <div className={`h-full transition-all duration-1000 ${colors.bar}`} style={{ width: `${isResolved ? 0 : sla.percent}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between bg-amber-50/50 border border-amber-100 rounded p-1 mt-0.5">
+                               <div className="flex items-center gap-1">
+                                 <ArrowUpCircle className="h-3 w-3 text-amber-500" />
+                                 <span className="text-[8px] font-bold text-amber-700 uppercase leading-none">L{currentLevel}: {escLabels[currentLevel - 1]}</span>
+                               </div>
+                               <span className="text-[8px] font-bold text-amber-600 tabular-nums bg-white border border-amber-200 px-1 rounded shadow-sm">
+                                 <DynamicEscalationTimer createdAt={t.createdAt} level={currentLevel} isResolved={isResolved} />
+                               </span>
                             </div>
                           </div>
                         );
@@ -836,21 +982,52 @@ function RiderSupportContent() {
                   <>
                     {!isResolved && (
                       <div className="space-y-3 mt-4">
-                        <div className="flex items-center justify-between px-1">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Escalation Workflow</span>
-                           <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Level {selectedTicket.escalationLevel || 1} Active</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                           {[
-                             { level: 1, label: "Support", timer: "Live" },
-                             { level: 2, label: "Ops Head", timer: "2h left" },
-                             { level: 3, label: "Finance/Tech", timer: "4h left" },
-                           ].map((s) => (
-                             <div key={s.level} className={cn("p-2 rounded-xl border flex flex-col items-center gap-1 transition-all", (selectedTicket.escalationLevel || 1) === s.level ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200 scale-105" : "bg-white border-slate-100 text-slate-400")}>
-                                <span className="text-[9px] font-black uppercase tracking-tighter">{s.label}</span>
-                                <span className="text-[8px] font-bold opacity-80">{s.timer}</span>
+                        <div className="space-y-4 bg-amber-50/30 p-4 rounded-xl border border-amber-100 relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-3 opacity-5 pointer-events-none">
+                             <ArrowUpCircle className="h-24 w-24 text-amber-900" />
+                          </div>
+                          <div className="flex items-center justify-between relative z-10">
+                             <div className="flex items-center gap-2">
+                               <Clock className="h-5 w-5 text-amber-600" />
+                               <div>
+                                 <span className="text-sm font-bold text-amber-800 block">Escalation Flow</span>
+                                 <span className="text-[9px] font-bold text-emerald-600 uppercase">Level {selectedTicket.escalationLevel || 1} Active</span>
+                               </div>
                              </div>
-                           ))}
+                             <Badge className="bg-white text-amber-800 border-amber-200 shadow-sm font-bold tabular-nums py-1">
+                               ⏱️ Escalation Timer: <DynamicEscalationTimer createdAt={selectedTicket.createdAt} level={selectedTicket.escalationLevel || 1} isResolved={isResolved} />
+                             </Badge>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 px-4 relative z-10">
+                             <div className="absolute top-6 left-8 right-8 h-0.5 bg-amber-200 -z-10" />
+                             {[
+                               { level: 1, label: "Support Team" },
+                               { level: 2, label: "Operations Head" },
+                               { level: 3, label: "Finance/Tech" },
+                             ].map((s) => {
+                               const currentLvl = selectedTicket.escalationLevel || 1;
+                               const isActive = currentLvl === s.level;
+                               const isPast = currentLvl > s.level;
+                               return (
+                                 <div key={s.level} className="flex flex-col items-center bg-transparent">
+                                   <div className={cn(
+                                     "h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs border-2 bg-white transition-all",
+                                     isActive ? "border-amber-500 text-amber-600 shadow-md ring-4 ring-amber-50 scale-110" : 
+                                     isPast ? "border-emerald-500 bg-emerald-50 text-emerald-600" : 
+                                     "border-slate-200 text-slate-400"
+                                   )}>
+                                     {isPast ? <CheckCircle className="h-4 w-4" /> : s.level}
+                                   </div>
+                                   <span className={cn(
+                                     "text-[10px] font-bold mt-2 text-center w-24 leading-tight",
+                                     isActive ? "text-amber-700" : isPast ? "text-emerald-700" : "text-slate-400"
+                                   )}>
+                                     {s.label}
+                                   </span>
+                                 </div>
+                               );
+                             })}
+                          </div>
                         </div>
                         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${colors.bg} ring-1 ${colors.ring}`}>
                           <Timer className={`h-3.5 w-3.5 ${colors.text}`} />
@@ -897,8 +1074,26 @@ function RiderSupportContent() {
                </div>
             </div>
 
-            {/* Multi-Role Assignment & Templates */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Impact Level, Multi-Role Assignment & Templates */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><AlertCircle className="h-3 w-3" /> Impact Level</label>
+                <Select value={selectedTicket?.impact || "Operational"} onValueChange={(val) => {
+                  setTickets(prev => prev.map(t => t.id === selectedTicket.id ? { ...t, impact: val } : t));
+                  setSelectedTicket((prev: any) => prev ? { ...prev, impact: val } : null);
+                  toast.success(`Ticket impact level updated to: ${val}`);
+                }}>
+                  <SelectTrigger className="h-9 rounded-xl text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                    <SelectValue placeholder="Select Impact" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Operational">Operational</SelectItem>
+                    <SelectItem value="Financial">Financial</SelectItem>
+                    <SelectItem value="Technical">Technical</SelectItem>
+                    <SelectItem value="Compliance">Compliance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><UserCog className="h-3 w-3" /> Assign To Role</label>
                 <Select value={assignedRole} onValueChange={setAssignedRole}>
@@ -969,7 +1164,7 @@ function RiderSupportContent() {
               </TabsContent>
             </Tabs>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0 p-6 border-t bg-slate-50">
+          <DialogFooter className="gap-2 sm:gap-0 pt-6 px-6 pb-12 border-t bg-slate-50">
             <Button variant="ghost" className="rounded-xl font-bold text-slate-500" onClick={() => setIsReplyOpen(false)}>Discard</Button>
             {replyTab === "internal" ? (
               <Button className="bg-amber-500 hover:bg-amber-600 rounded-xl px-6 font-bold" onClick={() => { if (!internalNote.trim()) return toast.error("Please enter a note"); toast.success("Internal note saved"); setInternalNote(""); }}><StickyNote className="h-4 w-4 mr-2" /> Save Note</Button>

@@ -419,7 +419,7 @@ export default function VerificationDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
-              {documents.map((doc, idx) => (
+              {documents.map((doc: any, idx: number) => (
                 <div
                   key={idx}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl hover:bg-slate-50 transition-colors group gap-4"
@@ -558,7 +558,7 @@ export default function VerificationDetailPage() {
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                     {(() => {
-                      const allAgreementsAccepted = agreements.every(a => a.accepted);
+                      const allAgreementsAccepted = agreements.every((a: any) => a.accepted);
                       return (
                         <>
                           <div className="text-[11px] text-slate-500 max-w-[250px]">
