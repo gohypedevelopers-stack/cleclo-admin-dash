@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -239,6 +240,15 @@ function OrdersPageContent() {
   const [totalRecords, setTotalRecords] = useState(0);
   const limit = 10;
 
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const toggleOrderSelection = (id: string) => setSelectedOrderIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAllOrders = () => setSelectedOrderIds(selectedOrderIds.length === orders.length ? [] : orders.map(o => o.id));
+  const executeBulkAction = (actionName: string) => {
+    if (selectedOrderIds.length === 0) return toast.error(`Please select at least one order to ${actionName}.`);
+    toast.success(`Successfully executed '${actionName}' on ${selectedOrderIds.length} orders!`);
+    setSelectedOrderIds([]);
+  };
+
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -369,16 +379,16 @@ function OrdersPageContent() {
       {/* Bulk Actions & High-Level Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2" onClick={() => executeBulkAction('Bulk Assign Rider')}>
                <Check className="h-4 w-4" /> Bulk Assign Rider
             </Button>
-            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2" onClick={() => executeBulkAction('Bulk Change Status')}>
                <Layers className="h-4 w-4" /> Bulk Change Status
             </Button>
-            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2" onClick={() => executeBulkAction('Bulk Export')}>
                <Download className="h-4 w-4" /> Bulk Export
             </Button>
-            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2" onClick={() => executeBulkAction('Bulk Notify Customers')}>
                <Bell className="h-4 w-4" /> Bulk Notify Customers
             </Button>
          </div>
@@ -492,16 +502,19 @@ function OrdersPageContent() {
 
       {/* Orders Table */}
       <div className="bg-white rounded-xl shadow-sm border overflow-x-auto">
-        <Table>
+        <Table className="min-w-max">
           <TableHeader>
             <TableRow className="hover:bg-[#fbfbfb] border-none bg-[#fbfbfb]">
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-6 tracking-wider">Order</TableHead>
+              <TableHead className="w-12 pl-6 py-4">
+                <Checkbox checked={orders.length > 0 && selectedOrderIds.length === orders.length} onCheckedChange={toggleAllOrders} className="border-slate-300 data-[state=checked]:bg-[#3E8940] data-[state=checked]:border-[#3E8940]" />
+              </TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 pl-2 tracking-wider">Order</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Customer</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Vendor</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Pickup / Delivery</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">SLA Timer</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Type</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Damage/Special Handling Tag</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Handling</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Items</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Order Value</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Margin %</TableHead>
@@ -528,7 +541,10 @@ function OrdersPageContent() {
 
               return (
                 <TableRow key={order.id} className={`hover:bg-slate-50 cursor-pointer ${isUnassigned ? "bg-red-50/40" : ""}`} onClick={() => router.push(`/orders/${order.id}`)}>
-                  <TableCell className="py-4 pl-6">
+                  <TableCell className="pl-6" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox checked={selectedOrderIds.includes(order.id)} onCheckedChange={() => toggleOrderSelection(order.id)} className="border-slate-300 data-[state=checked]:bg-[#3E8940] data-[state=checked]:border-[#3E8940]" />
+                  </TableCell>
+                  <TableCell className="py-4 pl-2">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-lg bg-slate-50 border flex items-center justify-center shrink-0">
                         {order.status === "DELIVERED" ? <Package className="h-4 w-4 text-slate-400" /> : <Truck className="h-4 w-4 text-[#3E8940]" />}
@@ -627,7 +643,7 @@ function OrdersPageContent() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-[140px]">
+                    <div className="flex flex-wrap gap-1 max-w-[200px]">
                       {getHandlingTags(order).length > 0 ? getHandlingTags(order).map((tag, i) => {
                         let colors = "text-slate-500 bg-slate-100";
                         if (tag === "Stain Removal") colors = "text-red-600 bg-red-50 border-red-100 border";

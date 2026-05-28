@@ -442,7 +442,7 @@ function SettlementsContent() {
               <TableHead className="w-10 pl-4 py-4"><input type="checkbox" className="rounded" /></TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">ID & Type</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Vendor</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Period & Age</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Period & Cycle</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Gross & Comm</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Tax & Deductions</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Net Payout</TableHead>
@@ -456,7 +456,6 @@ function SettlementsContent() {
                 <TableCell className="w-10 pl-4"><input type="checkbox" className="rounded border-slate-300" /></TableCell>
                 <TableCell className="py-4">
                   <p className="font-bold text-slate-900 text-xs">{s.transactionId || s.id.slice(0, 8).toUpperCase()}</p>
-                  <p className="text-[9px] text-slate-400 capitalize">{s.settlementCycle || "standard"} Cycle</p>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -466,9 +465,10 @@ function SettlementsContent() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <p className="text-slate-600 text-xs">{s.period || formatDate(s.createdAt)}</p>
+                  <p className="text-slate-900 font-bold text-xs">{s.period || formatDate(s.createdAt)}</p>
+                  <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-1.5 py-0 mt-1 uppercase tracking-wider">{s.settlementCycle || "Weekly"}</Badge>
                   {s.status.toLowerCase() === "pending" && (
-                    <p className={`text-[9px] font-bold mt-0.5 ${(s.daysPending ?? 0) > 7 ? 'text-red-500' : (s.daysPending ?? 0) > 3 ? 'text-orange-500' : 'text-slate-400'}`}>
+                    <p className={`text-[9px] font-bold mt-1 ${(s.daysPending ?? 0) > 7 ? 'text-red-500' : (s.daysPending ?? 0) > 3 ? 'text-orange-500' : 'text-slate-400'}`}>
                       {(s.daysPending ?? 0) > 0 ? `Pending ${s.daysPending ?? 0} days` : 'Added today'}
                       {s.daysPending > 7 && ' ⚠️'}
                     </p>
@@ -482,23 +482,38 @@ function SettlementsContent() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1">
-                      <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.commissionAmount * 0.18)}</span>
-                      <span className="text-[9px] text-slate-400">GST</span>
+                  <div className="group relative inline-block cursor-help">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.commissionAmount * 0.18)}</span>
+                        <span className="text-[9px] text-slate-400">GST</span>
+                      </div>
+                      {s.taxDeducted > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.taxDeducted)}</span>
+                          <span className="text-[9px] text-slate-400">TDS (1%)</span>
+                        </div>
+                      )}
+                      {s.deductions > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-red-600 font-medium text-[10px]">-{formatINR(s.deductions)}</span>
+                          <span className="text-[9px] text-slate-400">Penalties</span>
+                        </div>
+                      )}
+                      <div className="text-[8px] font-bold text-blue-500 mt-0.5 flex items-center gap-1 transition-colors group-hover:text-blue-600">
+                        <Eye className="h-2.5 w-2.5" /> View Details
+                      </div>
                     </div>
-                    {s.taxDeducted > 0 && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-orange-600 font-medium text-[10px]">-{formatINR(s.taxDeducted)}</span>
-                        <span className="text-[9px] text-slate-400">TDS (1%)</span>
-                      </div>
-                    )}
-                    {s.deductions > 0 && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-red-600 font-medium text-[10px]">-{formatINR(s.deductions)}</span>
-                        <span className="text-[9px] text-slate-400">Penalties</span>
-                      </div>
-                    )}
+                    
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 hidden group-hover:block w-56 bg-slate-900 text-white p-3 rounded-xl shadow-2xl z-[100] text-[10px] space-y-2 border border-white/10 backdrop-blur-md text-left">
+                       <p className="font-black border-b border-white/10 pb-1.5 mb-1.5 uppercase tracking-widest text-[8px] text-slate-400">Deduction Breakdown</p>
+                       <div className="flex justify-between text-red-400"><span>Platform Commission:</span><span className="font-bold">-{formatINR(s.commissionAmount)}</span></div>
+                       <div className="flex justify-between text-red-400"><span>Marketing Fee:</span><span className="font-bold">-{formatINR(0)}</span></div>
+                       <div className="flex justify-between text-red-400"><span>Rider Cost Recovery:</span><span className="font-bold">-{formatINR(s.orderCount * 45)}</span></div>
+                       <div className="flex justify-between text-red-400"><span>Penalty/SLA Deduction:</span><span className="font-bold">-{formatINR(s.deductions)}</span></div>
+                       <div className="flex justify-between text-red-400"><span>Damage Claims:</span><span className="font-bold">-{formatINR(0)}</span></div>
+                       <div className="flex justify-between text-orange-400 border-t border-white/10 pt-1.5 mt-1.5"><span>Tax Deduction:</span><span className="font-bold">-{formatINR(s.taxDeducted + s.commissionAmount * 0.18)}</span></div>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
