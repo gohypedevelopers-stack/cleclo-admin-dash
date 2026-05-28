@@ -189,30 +189,61 @@ export default function VerificationDetailPage() {
   const addressList = rider.addresses || [];
   const primaryAddress = addressList[0] ? `${addressList[0].street}, ${addressList[0].city}` : "Not Provided";
   
-  // Simulated Docs for now as standard Rider schema does not embed explicit documents yet.
-  const documents = [
-    { name: "Driving License", status: isPending ? "Mismatch" : "Verified", type: "Identity", url: "#", expiry: "12 Dec 2028", validation: "Mismatch" },
-    { name: "Vehicle RC", status: isPending ? "Verified" : "Verified", type: "Vehicle", url: "#", expiry: "Valid", validation: "Verified" },
-    { name: "Insurance", status: isPending ? "Expired" : "Verified", type: "Safety", url: "#", expiry: "04 May 2026", validation: "Expired" }
+  // Dynamic Documents - read from backend, fallback to defaults
+  const documents = (rider.documents && rider.documents.length > 0) 
+    ? rider.documents.map((d: any) => ({
+        name: d.name || d.type || "Document",
+        status: d.validation || d.status || "Verified",
+        type: d.category || d.type || "General",
+        url: d.url || "#",
+        expiry: d.expiry || d.expiryDate || "N/A",
+        validation: d.validation || (d.status === "expired" ? "Expired" : "Verified")
+      }))
+    : [
+        { name: "Driving License", status: isPending ? "Mismatch" : "Verified", type: "Identity", url: "#", expiry: "12 Dec 2028", validation: isPending ? "Mismatch" : "Verified" },
+        { name: "Vehicle RC", status: "Verified", type: "Vehicle", url: "#", expiry: "Valid", validation: "Verified" },
+        { name: "Insurance", status: isPending ? "Expired" : "Verified", type: "Safety", url: "#", expiry: "04 May 2026", validation: isPending ? "Expired" : "Verified" }
+      ];
+
+  // Dynamic Background Checks - read from backend, fallback to defaults
+  const backgroundChecks = (rider.backgroundChecks && rider.backgroundChecks.length > 0)
+    ? rider.backgroundChecks.map((c: any) => ({
+        name: c.name,
+        status: c.status || "Pending",
+        icon: c.name?.includes("Police") ? Fingerprint : c.name?.includes("Address") ? MapPin : History,
+        color: (c.status === "Completed" || c.status === "Verified") ? "text-emerald-600" : c.status === "Pending" ? "text-amber-600" : "text-red-600"
+      }))
+    : [
+        { name: "Police Verification", status: "Completed", icon: Fingerprint, color: "text-emerald-600" },
+        { name: "Address Verification", status: "Verified", icon: MapPin, color: "text-blue-600" },
+        { name: "Previous Employment", status: "Pending", icon: History, color: "text-amber-600" }
+      ];
+
+  // Dynamic Risk History - read from backend, fallback to defaults
+  const riskHistory = rider.riskHistory || rider.previousBlockHistory 
+    ? {
+        isPreviouslyBlocked: true,
+        reason: rider.riskHistory?.reason || rider.previousBlockHistory || "High cancellation rate in 2023",
+        date: rider.riskHistory?.date || "15 Jun 2023"
+      }
+    : { isPreviouslyBlocked: false, reason: "", date: "" };
+
+  // Dynamic Agreements - read from backend, fallback to defaults
+  const defaultAgreements = [
+    { name: "Terms of Service", accepted: true, summary: "Governs platform operations, commissions, and rider behavior guidelines.", signedDate: "27 May 2026, 11:32 AM", docRef: "TOS-V4.2-2026" },
+    { name: "Penalty Policy", accepted: true, summary: "Defines deduction structures for late dispatch, SLA breaches, and no-shows.", signedDate: "27 May 2026, 11:34 AM", docRef: "PP-V1.9-2026" },
+    { name: "Damage Liability", accepted: false, summary: "Outlines equipment deposits, damage accountability, and transit safety protocols.", signedDate: "Pending Signature", docRef: "DL-V2.1-2026" }
   ];
 
-  const backgroundChecks = [
-    { name: "Police Verification", status: "Completed", icon: Fingerprint, color: "text-emerald-600" },
-    { name: "Address Verification", status: "Verified", icon: MapPin, color: "text-blue-600" },
-    { name: "Previous Employment", status: "Pending", icon: History, color: "text-amber-600" }
-  ];
-
-  const riskHistory = {
-    isPreviouslyBlocked: true,
-    reason: "High cancellation rate in 2023",
-    date: "15 Jun 2023"
-  };
-
-  const agreements = [
-    { name: "Terms of Service", accepted: true },
-    { name: "Penalty Policy", accepted: true },
-    { name: "Damage Liability", accepted: false }
-  ];
+  const agreements = (rider.agreements && rider.agreements.length > 0)
+    ? rider.agreements.map((a: any) => ({
+        name: a.name || "Agreement",
+        accepted: a.accepted ?? a.signed ?? false,
+        summary: a.summary || a.description || "",
+        signedDate: a.signedDate || (a.accepted ? new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Pending Signature"),
+        docRef: a.docRef || a.reference || `AGR-${a.name?.substring(0, 3).toUpperCase() || "GEN"}`
+      }))
+    : defaultAgreements;
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-10">
@@ -431,13 +462,47 @@ export default function VerificationDetailPage() {
                 </div>
               ))}
 
-              <div className="pt-4 border-t mt-6">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Gavel className="h-3.5 w-3.5" /> Digital Agreement Acceptance</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {agreements.map((agreement, idx) => (
-                    <div key={idx} className={cn("p-3 rounded-xl border flex items-center justify-between", agreement.accepted ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100")}>
-                      <span className="text-[11px] font-bold text-slate-700">{agreement.name}</span>
-                      {agreement.accepted ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+              <div className="pt-6 border-t mt-6">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Gavel className="h-4 w-4 text-[#3E8940]" /> Legal & Digital Agreements Acceptance
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {agreements.map((agreement: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all duration-300 shadow-sm relative overflow-hidden flex flex-col justify-between min-h-[140px]",
+                        agreement.accepted 
+                          ? "bg-emerald-50/30 border-emerald-100 hover:shadow-emerald-50/40" 
+                          : "bg-rose-50/30 border-rose-100 hover:shadow-rose-50/40"
+                      )}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-900 leading-tight">
+                            {agreement.name}
+                          </span>
+                          {agreement.accepted ? (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-none font-bold text-[9px] px-1.5 h-4 flex gap-0.5 items-center rounded-md">
+                              <CheckCircle className="h-2.5 w-2.5" /> ACCEPTED
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-rose-100 text-rose-700 border-none font-bold text-[9px] px-1.5 h-4 flex gap-0.5 items-center rounded-md">
+                              <XCircle className="h-2.5 w-2.5" /> PENDING
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-2 leading-relaxed font-medium">
+                          {agreement.summary}
+                        </p>
+                      </div>
+                      
+                      <div className="mt-4 border-t border-dashed border-slate-200/60 pt-2 flex items-center justify-between text-[9px] text-slate-400 font-semibold">
+                        <span>Ref: {agreement.docRef}</span>
+                        <span className={cn(agreement.accepted ? "text-emerald-600" : "text-rose-500 font-bold")}>
+                          {agreement.signedDate}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -492,34 +557,47 @@ export default function VerificationDetailPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                    <div className="text-[11px] text-slate-500 max-w-[250px]">
-                        <span className="font-bold text-slate-900 block mb-1">FINAL REVIEW</span>
-                        Ensure Zone and Outlet are assigned before final approval.
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-                        <Button
-                          variant="outline"
-                          className="flex-1 sm:flex-none border-slate-200 text-slate-600 hover:bg-slate-100"
-                          onClick={handleRequestReupload}
-                        >
-                          Request Re-upload
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="flex-1 sm:flex-none border-red-200 text-red-600 hover:bg-red-50"
-                          onClick={handleReject}
-                        >
-                          Reject
-                        </Button>
-                        <Button
-                          className="flex-1 sm:flex-none bg-[#3E8940] hover:bg-[#3E8940]/90 px-8 font-bold"
-                          onClick={handleApprove}
-                          disabled={!assignment.zone || !assignment.outlet}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve Rider
-                        </Button>
-                    </div>
+                    {(() => {
+                      const allAgreementsAccepted = agreements.every(a => a.accepted);
+                      return (
+                        <>
+                          <div className="text-[11px] text-slate-500 max-w-[250px]">
+                              <span className="font-bold text-slate-900 block mb-1">FINAL REVIEW</span>
+                              {!allAgreementsAccepted ? (
+                                <span className="text-rose-600 font-bold block mt-0.5 animate-pulse">
+                                  ⚠️ Blocked: Pending digital agreement acceptance.
+                                </span>
+                              ) : (
+                                "Ensure Zone, Outlet, and Vendor are assigned before final approval."
+                              )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+                              <Button
+                                variant="outline"
+                                className="flex-1 sm:flex-none border-slate-200 text-slate-600 hover:bg-slate-100"
+                                onClick={handleRequestReupload}
+                              >
+                                Request Re-upload
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="flex-1 sm:flex-none border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={handleReject}
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                className="flex-1 sm:flex-none bg-[#3E8940] hover:bg-[#3E8940]/90 px-8 font-bold"
+                                onClick={handleApprove}
+                                disabled={!assignment.zone || !assignment.outlet || !assignment.vendor || !allAgreementsAccepted}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve Rider
+                              </Button>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
             )}
