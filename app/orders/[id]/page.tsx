@@ -296,24 +296,38 @@ export default function AdminOrderDetailPage() {
             </div>
           </div>
 
-          {/* Payout & Commission */}
+          {/* Order Profitability View */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h3 className="font-bold text-black flex items-center gap-2 mb-4"><IndianRupee className="h-4 w-4 text-emerald-600" /> Payout & Commission</h3>
+            <h3 className="font-bold text-black flex items-center gap-2 mb-4"><IndianRupee className="h-4 w-4 text-emerald-600" /> Order Profitability View</h3>
             <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 font-medium">Order Gross</span>
-                <span className="font-bold text-slate-900">{formatINR(order.totalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 font-medium">Platform Commission ({order.vendor?.vendorProfile?.commissionRate || 20}%)</span>
-                <span className="font-bold text-red-600">-{formatINR(order.commissionAmount || (order.totalAmount * (order.vendor?.vendorProfile?.commissionRate / 100 || 0.2)))}</span>
-              </div>
-              <div className="h-px bg-slate-200 my-1" />
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-bold text-slate-900">Net Vendor Payout</span>
-                <span className="text-lg font-bold text-[#3E8940]">{formatINR(order.totalAmount - (order.commissionAmount || (order.totalAmount * (order.vendor?.vendorProfile?.commissionRate / 100 || 0.2))))}</span>
-              </div>
-              <p className="text-[10px] text-slate-400 italic mt-2 text-center">Calculated based on vendor's agreement</p>
+              {(() => {
+                const orderValue = order.totalAmount || 0;
+                const marginAmount = order.platformCommissionAmount || order.platformMargin || (orderValue * 0.2);
+                const vendorCost = order.vendorShareAmount || (orderValue - marginAmount - 140);
+                const riderCost = orderValue - marginAmount - vendorCost; 
+                
+                return (
+                  <>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Order Value</span>
+                      <span className="font-bold text-slate-900">{formatINR(orderValue)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Vendor Cost</span>
+                      <span className="font-bold text-red-600">-{formatINR(vendorCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Rider Cost</span>
+                      <span className="font-bold text-red-600">-{formatINR(riderCost)}</span>
+                    </div>
+                    <div className="h-px bg-slate-200 my-1" />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-slate-900">Platform Margin</span>
+                      <span className="text-lg font-bold text-[#3E8940]">{formatINR(marginAmount)}</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 

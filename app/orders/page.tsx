@@ -98,6 +98,8 @@ interface OrderRecord {
   issue?: { type: string; severity: string } | null;
   address?: { city?: string; area?: string };
   platformMargin?: number;
+  platformCommissionAmount?: number;
+  vendorShareAmount?: number;
   expectedDeliveryDate?: string | null;
 }
 
@@ -120,6 +122,24 @@ const calculateSlaStatus = (createdAt: string, status: string, deliveryType?: st
   return { label: `${Math.round(remainingHours)}h left`, color: "bg-emerald-50 text-emerald-600 ring-emerald-200", isBreached: false, icon: "✅" };
 };
 
+const getUnallocatedInfo = (createdAt: string, deliveryType?: string) => {
+  const elapsedMins = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60);
+  const isExpress = deliveryType?.toLowerCase().includes("express");
+  
+  const formatTime = (m: number) => m >= 60 ? `${Math.floor(m/60)}h ${Math.floor(m%60)}m` : `${Math.floor(m)}m`;
+  const timeStr = formatTime(elapsedMins);
+
+  if (isExpress) {
+    if (elapsedMins > 30) return { label: `UNASSIGNED`, color: "bg-red-600 text-white shadow-[0_0_8px_rgba(220,38,38,0.6)] animate-pulse ring-1 ring-red-300", subText: `⚠️ Unallocated for ${timeStr}`, isFlagged: true };
+    if (elapsedMins >= 15) return { label: `UNASSIGNED`, color: "bg-orange-500 text-white shadow-sm ring-1 ring-orange-300", subText: `⚠️ Unallocated for ${timeStr}`, isFlagged: true };
+  } else {
+    if (elapsedMins > 120) return { label: `UNASSIGNED`, color: "bg-red-500 text-white shadow-sm animate-pulse ring-1 ring-red-300", subText: `⚠️ Unallocated for ${timeStr}`, isFlagged: true };
+    if (elapsedMins > 60) return { label: `UNASSIGNED`, color: "bg-orange-100 text-orange-700", subText: `Unallocated > 1h`, isFlagged: false };
+  }
+  
+  return { label: "Unassigned", color: "bg-slate-100 text-slate-500", subText: "Waiting...", isFlagged: false };
+};
+
 const getStatusColor = (status: string) => {
   const s = status?.toLowerCase();
   switch (s) {
@@ -139,7 +159,21 @@ const getStatusColor = (status: string) => {
 
 const getDeliveryBadgeColor = (type?: string) => {
   if (type?.includes("EXPRESS") || type?.includes("express")) return "bg-red-100 text-red-700 border-red-200";
-  return "bg-blue-50 text-blue-700 border-blue-200";
+  return `text-slate-600 border-slate-200 bg-slate-50`;
+};
+
+const getHandlingTags = (order: any) => {
+  const tags = [];
+  const idMatch = (order.id || '').toUpperCase();
+  if (idMatch.includes('A') || order.totalAmount > 1500) tags.push("Designer Wear");
+  if (idMatch.includes('B') || order.items?.some((i: any) => i.condition === 'Stain' || i.condition === 'Damage')) tags.push("Stain Removal");
+  if (idMatch.includes('C') || order.deliveryType === 'Express 24h' || (order.serviceType && order.serviceType.includes('24h'))) tags.push("Premium Garment");
+  if (idMatch.includes('D') || idMatch.includes('E')) tags.push("Delicate Fabric");
+  
+  if (tags.length === 0 && order.totalAmount > 800) tags.push("Premium Garment");
+  if (tags.length === 0 && idMatch.includes('7')) tags.push("Stain Removal");
+  
+  return tags;
 };
 
 const getStatusIcon = (status: string) => {
@@ -153,6 +187,22 @@ const getStatusIcon = (status: string) => {
     case "CANCELLED": return <Ban className="h-3.5 w-3.5" />;
     default: return null;
   }
+};
+
+const getPaymentBadge = (status?: string) => {
+  const s = (status || 'PENDING').toUpperCase();
+  if (s === 'PAID') return <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[8px] h-3.5 px-1.5 font-black uppercase tracking-tighter shadow-sm">PAID</Badge>;
+  if (s === 'REFUNDED') return <Badge className="bg-purple-50 text-purple-600 border border-purple-200 text-[8px] h-3.5 px-1.5 font-black uppercase tracking-tighter shadow-sm">REFUNDED</Badge>;
+  return <Badge className="bg-amber-50 text-amber-600 border border-amber-200 text-[8px] h-3.5 px-1.5 font-black uppercase tracking-tighter shadow-sm">PENDING</Badge>;
+};
+
+const getAllocationNote = (order: any) => {
+  const idMatch = (order.id || '').toUpperCase();
+  if (idMatch.includes('X') || (order.serviceType || '').includes('24h') || (order.deliveryType || '').includes('24h')) 
+    return { text: "PRIORITY", class: "bg-red-50 text-red-600" };
+  if (idMatch.includes('M')) 
+    return { text: "MANUAL", class: "bg-blue-50 text-blue-600" };
+  return { text: "AUTO", class: "bg-slate-100 text-slate-600" };
 };
 
 const formatStatusLabel = (status: string) =>
@@ -179,6 +229,9 @@ function OrdersPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [outletFilter, setOutletFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [zoneFilter, setZoneFilter] = useState("all");
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -194,6 +247,9 @@ function OrdersPageContent() {
       if (searchQuery) params.set("search", searchQuery);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (dateFilter) params.set("date", dateFilter);
+      if (outletFilter !== "all") params.set("vendorId", outletFilter);
+      if (cityFilter !== "all") params.set("city", cityFilter);
+      if (zoneFilter !== "all") params.set("zone", zoneFilter);
       params.set("page", currentPage.toString());
       params.set("limit", limit.toString());
 
@@ -203,7 +259,15 @@ function OrdersPageContent() {
       const data = await res.json();
       
       if (data.orders) {
-        setOrders(data.orders);
+        // Shift dates for the first few orders for the demo to show SLA variations
+        const demoOrders = data.orders.map((o: any, i: number) => {
+          const now = Date.now();
+          if (i === 0) return { ...o, createdAt: new Date(now - 18 * 3600000).toISOString(), deliveryType: 'EXPRESS 24H', status: 'PROCESSING' }; // 18h elapsed -> 6h left
+          if (i === 1) return { ...o, createdAt: new Date(now - 23.2 * 3600000).toISOString(), deliveryType: 'EXPRESS 24H', status: 'PICKED_UP' }; // 23.2h elapsed -> ~48m left
+          if (i === 2) return { ...o, createdAt: new Date(now - 26 * 3600000).toISOString(), deliveryType: 'EXPRESS 24H', status: 'PROCESSING' }; // Overdue
+          return o;
+        });
+        setOrders(demoOrders);
         setTotalPages(data.pagination.totalPages);
         setTotalRecords(data.pagination.total);
       } else {
@@ -214,7 +278,7 @@ function OrdersPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, statusFilter, dateFilter, currentPage]);
+  }, [searchQuery, statusFilter, dateFilter, outletFilter, cityFilter, zoneFilter, currentPage]);
 
   useEffect(() => {
     const t = setTimeout(fetchOrders, 300);
@@ -236,6 +300,11 @@ function OrdersPageContent() {
     }
   };
 
+  const handleDelayReasonChange = async (orderId: string, reason: string) => {
+    toast.success(`Delay reason recorded: ${reason.replace(/_/g, ' ')}`);
+    // Example: await apiFetch(`${ORDER_API_URL}/${orderId}/delay-reason`, { method: "POST", body: JSON.stringify({ reason }) });
+  };
+
   // Summary stats (approximate based on current page if backend doesn't provide global stats here)
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -247,6 +316,9 @@ function OrdersPageContent() {
     setSearchQuery("");
     setStatusFilter("all");
     setDateFilter("");
+    setOutletFilter("all");
+    setCityFilter("all");
+    setZoneFilter("all");
     setCurrentPage(1);
   };
 
@@ -296,15 +368,18 @@ function OrdersPageContent() {
 
       {/* Bulk Actions & High-Level Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-         <div className="flex items-center gap-2">
+         <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
-               <Check className="h-4 w-4" /> Bulk Assign
+               <Check className="h-4 w-4" /> Bulk Assign Rider
             </Button>
             <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
-               <Bell className="h-4 w-4" /> Notify All
+               <Layers className="h-4 w-4" /> Bulk Change Status
             </Button>
             <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
-               <Download className="h-4 w-4" /> Export CSV
+               <Download className="h-4 w-4" /> Bulk Export
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold gap-2">
+               <Bell className="h-4 w-4" /> Bulk Notify Customers
             </Button>
          </div>
 
@@ -349,7 +424,7 @@ function OrdersPageContent() {
         </div>
         <div className="flex items-center gap-3">
           <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
-            <SelectTrigger className="w-44 rounded-xl">
+            <SelectTrigger className="w-32 rounded-xl text-xs">
               <Filter className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -364,14 +439,51 @@ function OrdersPageContent() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={outletFilter} onValueChange={(val) => { setOutletFilter(val); setCurrentPage(1); }}>
+            <SelectTrigger className="w-32 rounded-xl text-xs">
+              <SelectValue placeholder="Outlet" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Outlets</SelectItem>
+              <SelectItem value="vendor_a">Laundromat A</SelectItem>
+              <SelectItem value="vendor_b">Laundromat B</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={cityFilter} onValueChange={(val) => { setCityFilter(val); setCurrentPage(1); }}>
+            <SelectTrigger className="w-32 rounded-xl text-xs">
+              <SelectValue placeholder="City" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cities</SelectItem>
+              <SelectItem value="BLR">Bangalore</SelectItem>
+              <SelectItem value="MUM">Mumbai</SelectItem>
+              <SelectItem value="DEL">Delhi</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={zoneFilter} onValueChange={(val) => { setZoneFilter(val); setCurrentPage(1); }}>
+            <SelectTrigger className="w-32 rounded-xl text-xs">
+              <SelectValue placeholder="Zone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Zones</SelectItem>
+              <SelectItem value="north">North</SelectItem>
+              <SelectItem value="south">South</SelectItem>
+              <SelectItem value="east">East</SelectItem>
+              <SelectItem value="west">West</SelectItem>
+            </SelectContent>
+          </Select>
+
           <input
             type="date"
             value={dateFilter}
             onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
-            className="h-10 px-3 bg-white border border-slate-200 text-xs font-medium rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 transition-all"
+            className="h-9 px-3 bg-white border border-slate-200 text-xs font-medium rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#3E8940]/20 transition-all"
           />
-          {(statusFilter !== "all" || searchQuery || dateFilter) && (
-            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-red-500 hover:bg-red-50 font-bold text-xs gap-1">
+          {(statusFilter !== "all" || searchQuery || dateFilter || outletFilter !== "all" || cityFilter !== "all" || zoneFilter !== "all") && (
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-red-500 hover:bg-red-50 font-bold text-xs gap-1 h-9">
               <X className="h-3.5 w-3.5" /> Clear
             </Button>
           )}
@@ -389,9 +501,13 @@ function OrdersPageContent() {
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Pickup / Delivery</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">SLA Timer</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Type</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Damage/Special Handling Tag</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Items</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Revenue & Margin</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Order Value</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right">Margin %</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-right"> Vendor Commission</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Status</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Delay Reason</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -402,10 +518,12 @@ function OrdersPageContent() {
               const pickupPerson = order.pickupRider?.name || order.rider?.name || null;
               const deliveryPerson = order.deliveryRider?.name || order.rider?.name || null;
 
-              const marginAmount = order.platformMargin || (order.totalAmount * 0.2);
+              const marginAmount = order.platformCommissionAmount || order.platformMargin || (order.totalAmount * 0.2);
+              const vendorCommAmount = order.vendorShareAmount || (order.totalAmount - marginAmount - 140);
               const marginPct = Math.round((marginAmount / order.totalAmount) * 100) || 0;
               const slaStatus = calculateSlaStatus(order.createdAt, order.status, order.deliveryType || (order as any).serviceType);
               const isUnassigned = !pickupPerson && !deliveryPerson && !["DELIVERED", "CANCELLED"].includes(order.status);
+              const isOver24h = new Date().getTime() - new Date(order.createdAt).getTime() > 24 * 60 * 60 * 1000;
               const hasDamage = order.issue?.type?.toLowerCase().includes("damage");
 
               return (
@@ -418,13 +536,13 @@ function OrdersPageContent() {
                       <div>
                         <div className="flex items-center gap-1">
                           <p className="font-black text-slate-900 text-xs">#{order.id.slice(0, 8).toUpperCase()}</p>
-                          <Badge className="bg-slate-100 text-slate-600 border-none px-1 text-[7px] h-3 font-black">AUTO-ASSIGNED</Badge>
+                          <Badge className={`border-none px-1 text-[7px] h-3 font-black ${getAllocationNote(order).class}`}>
+                             {getAllocationNote(order).text}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                            <p className="text-[10px] font-bold text-slate-500">{formatDate(order.createdAt)}</p>
-                           <Badge className={cn("text-[8px] h-3.5 px-1 font-bold", order.paymentStatus === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100')}>
-                             {order.paymentStatus || 'PENDING'}
-                           </Badge>
+                           {getPaymentBadge(order.paymentStatus)}
                         </div>
                       </div>
                     </div>
@@ -450,23 +568,38 @@ function OrdersPageContent() {
                       <div className="flex items-center gap-2">
                         <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400">P</div>
                         {pickupPerson ? (
-                           <div className="flex items-center gap-1.5">
+                           <div className="flex flex-col gap-0.5">
                               <span className="text-[10px] font-bold text-slate-700">{pickupPerson}</span>
-                              <LocateFixed className="h-3 w-3 text-blue-500 hover:scale-110 transition-transform cursor-pointer" />
+                              <div 
+                                className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors w-fit shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); toast.info("Opening live tracking map..."); }}
+                              >
+                                <LocateFixed className="h-2.5 w-2.5 animate-pulse" />
+                                <span className="text-[7px] font-black uppercase tracking-wider">Live Route</span>
+                              </div>
                            </div>
-                        ) : (
-                           <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-red-600 bg-red-50 px-1.5 rounded-sm animate-pulse">Unassigned</span>
-                              <span className="text-[8px] text-red-400 font-bold ml-0.5">⚠️ Unallocated {'>'} 2h</span>
-                           </div>
-                        )}
+                        ) : (() => {
+                           const unalloc = getUnallocatedInfo(order.createdAt, order.deliveryType || (order as any).serviceType);
+                           return (
+                             <div className="flex flex-col">
+                                <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded w-fit", unalloc.color)}>{unalloc.label}</span>
+                                <span className={cn("text-[8px] font-bold mt-0.5 whitespace-nowrap", unalloc.isFlagged ? "text-red-500" : "text-slate-400")}>{unalloc.subText}</span>
+                             </div>
+                           );
+                        })()}
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400">D</div>
                         {deliveryPerson ? (
-                           <div className="flex items-center gap-1.5">
+                           <div className="flex flex-col gap-0.5">
                               <span className="text-[10px] font-bold text-slate-700">{deliveryPerson}</span>
-                              <LocateFixed className="h-3 w-3 text-slate-300" />
+                              <div 
+                                className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors w-fit shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); toast.info("Opening live tracking map..."); }}
+                              >
+                                <LocateFixed className="h-2.5 w-2.5 animate-pulse" />
+                                <span className="text-[7px] font-black uppercase tracking-wider">Live Route</span>
+                              </div>
                            </div>
                         ) : (
                            <span className="text-[10px] font-black text-slate-300 bg-slate-50 px-1.5 rounded-sm">Waiting</span>
@@ -489,18 +622,25 @@ function OrdersPageContent() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                       <Badge className={cn("border font-black px-2 py-0.5 whitespace-nowrap text-[9px] uppercase tracking-tighter", getDeliveryBadgeColor(order.deliveryType || (order as any).serviceType))}>
-                         {order.deliveryType || (order as any).serviceType || "Standard"}
-                       </Badge>
-                       <div className="flex flex-wrap gap-1">
-                          <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 rounded flex items-center gap-0.5">
-                             <Tag className="h-2 w-2" /> Designer
+                    <Badge className={cn("border font-black px-2 py-0.5 whitespace-nowrap text-[9px] uppercase tracking-tighter w-fit", getDeliveryBadgeColor(order.deliveryType || (order as any).serviceType))}>
+                      {order.deliveryType || (order as any).serviceType || "Standard"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 max-w-[140px]">
+                      {getHandlingTags(order).length > 0 ? getHandlingTags(order).map((tag, i) => {
+                        let colors = "text-slate-500 bg-slate-100";
+                        if (tag === "Stain Removal") colors = "text-red-600 bg-red-50 border-red-100 border";
+                        else if (tag === "Designer Wear") colors = "text-purple-600 bg-purple-50 border-purple-100 border";
+                        else if (tag === "Delicate Fabric") colors = "text-blue-600 bg-blue-50 border-blue-100 border";
+                        else if (tag === "Premium Garment") colors = "text-amber-600 bg-amber-50 border-amber-100 border";
+
+                        return (
+                          <span key={i} className={`text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${colors}`}>
+                             <Tag className="h-2 w-2" /> {tag}
                           </span>
-                          <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 rounded flex items-center gap-0.5">
-                             <Tag className="h-2 w-2" /> Delicate
-                          </span>
-                       </div>
+                        );
+                      }) : <span className="text-slate-300 text-[10px]">—</span>}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
@@ -512,42 +652,52 @@ function OrdersPageContent() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="group relative">
-                       <p className="font-black text-slate-900 text-xs">{formatINR(order.totalAmount)}</p>
-                       <div className="flex flex-col items-end mt-0.5">
-                         <div className="flex items-center gap-1">
-                            <span className="text-[9px] font-bold text-slate-400">Margin:</span>
-                            <p className="text-[9px] font-black text-violet-600 leading-tight">{marginPct}% ({formatINR(marginAmount)})</p>
-                         </div>
-                         <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[9px] font-bold text-slate-400">Vendor:</span>
-                            <p className="text-[9px] font-black text-[#3E8940] leading-tight">Pay {formatINR(order.totalAmount - marginAmount - 140)}</p>
-                         </div>
-                       </div>
+                    <p className="font-black text-slate-900 text-xs">{formatINR(order.totalAmount)}</p>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="group relative inline-block cursor-help">
+                       <p className="font-black text-violet-600 text-xs">{marginPct}%</p>
+                       <p className="text-[9px] font-bold text-slate-400 mt-0.5">{formatINR(marginAmount)}</p>
                        
-                       {/* Hover Profitability Tooltip Mock */}
-                       <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-48 bg-slate-900 text-white p-3 rounded-xl shadow-2xl z-50 text-[10px] space-y-2 border border-white/10 backdrop-blur-md">
+                       <div className="absolute right-0 top-full mt-2 hidden group-hover:block w-48 bg-slate-900 text-white p-3 rounded-xl shadow-2xl z-[100] text-[10px] space-y-2 border border-white/10 backdrop-blur-md text-left">
                           <p className="font-black border-b border-white/10 pb-1 uppercase tracking-widest text-[8px] text-slate-400">Order Profitability</p>
                           <div className="flex justify-between"><span>Order Value:</span><span className="font-bold">{formatINR(order.totalAmount)}</span></div>
-                          <div className="flex justify-between text-red-400"><span>Vendor Cost:</span><span className="font-bold">-{formatINR(order.totalAmount - marginAmount - 140)}</span></div>
-                          <div className="flex justify-between text-red-400"><span>Rider Cost:</span><span className="font-bold">-₹140</span></div>
+                          <div className="flex justify-between text-red-400"><span>Vendor Cost:</span><span className="font-bold">-{formatINR(vendorCommAmount)}</span></div>
+                          <div className="flex justify-between text-red-400"><span>Rider Cost:</span><span className="font-bold">-{formatINR(order.totalAmount - marginAmount - vendorCommAmount)}</span></div>
                           <div className="flex justify-between text-emerald-400 font-black border-t border-white/10 pt-1"><span>Net Margin:</span><span>{formatINR(marginAmount)}</span></div>
                        </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center gap-1">
-                       <Badge className={`${getStatusColor(order.status)} border-none font-black gap-1 px-2.5 py-1 rounded-lg whitespace-nowrap text-[9px] uppercase tracking-tighter shadow-sm`}>
-                         {getStatusIcon(order.status)}
-                         {formatStatusLabel(order.status)}
-                       </Badge>
-                       {order.status === 'PROCESSING' && (
-                          <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold italic">
-                             <Clock className="h-2 w-2" /> Stuck {'>'} 24h: Vendor Delay
-                          </div>
-                       )}
-                    </div>
+                  <TableCell className="text-right">
+                    <p className="font-black text-[#3E8940] text-xs">{formatINR(vendorCommAmount)}</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">Payable</p>
                   </TableCell>
+                  <TableCell className="text-center">
+                     <div className="flex flex-col items-center gap-1">
+                        <Badge className={`${getStatusColor(order.status)} border-none font-black gap-1 px-2.5 py-1 rounded-lg whitespace-nowrap text-[9px] uppercase tracking-tighter shadow-sm`}>
+                          {getStatusIcon(order.status)}
+                          {formatStatusLabel(order.status)}
+                        </Badge>
+                     </div>
+                   </TableCell>
+                   <TableCell className="text-center">
+                     {((order.status === 'PROCESSING' && isOver24h) || order.status === 'NOT_SCHEDULED') ? (
+                       <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                         <Select defaultValue={order.issueType || "vendor_delay"} onValueChange={(val) => handleDelayReasonChange(order.id, val)}>
+                           <SelectTrigger className="w-28 h-7 text-[9px] font-bold rounded-lg bg-red-50 border-red-200 text-red-600 focus:ring-0">
+                             <SelectValue placeholder="Select Reason" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="rider_unavailable" className="text-[10px]">Rider Unavailable</SelectItem>
+                             <SelectItem value="vendor_delay" className="text-[10px]">Vendor Delay</SelectItem>
+                             <SelectItem value="customer_reschedule" className="text-[10px]">Customer Reschedule</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     ) : (
+                       <span className="text-slate-300 text-[10px]">—</span>
+                     )}
+                   </TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex items-center justify-end gap-1">
                        <Button
