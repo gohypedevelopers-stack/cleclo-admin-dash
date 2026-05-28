@@ -392,7 +392,7 @@ export default function VerificationDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
-              {backgroundChecks.map((check, idx) => (
+              {backgroundChecks.map((check: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <check.icon className={cn("h-3.5 w-3.5", check.color)} />
