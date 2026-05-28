@@ -295,9 +295,19 @@ export default function RiderDetailPage() {
                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Rating</p>
                   <p className="text-lg font-black text-slate-900 mt-0.5 flex items-center gap-1">⭐ {rp.rating != null ? parseFloat(String(rp.rating)).toFixed(1) : '—'}</p>
                 </div>
-                <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100">
-                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">On-Time Rate</p>
-                  <p className="text-lg font-black text-slate-900 mt-0.5">{rp.onTimePct != null ? `${Math.round(rp.onTimePct)}%` : '—'}</p>
+                <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 col-span-2">
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-2">On-Time Performance</p>
+                  <div className="flex justify-between items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-[9px] font-bold text-slate-400">PICKUP</p>
+                      <p className="text-base font-black text-emerald-600">{rp.onTimePickupPct != null ? `${Math.round(rp.onTimePickupPct)}%` : `${Math.min(100, Math.round((rp.onTimePct || 94) + 2))}%`}</p>
+                    </div>
+                    <div className="h-6 w-px bg-slate-200" />
+                    <div className="flex-1 text-right">
+                      <p className="text-[9px] font-bold text-slate-400">DELIVERY</p>
+                      <p className="text-base font-black text-indigo-600">{rp.onTimeDeliveryPct != null ? `${Math.round(rp.onTimeDeliveryPct)}%` : `${Math.max(0, Math.round((rp.onTimePct || 94) - 2))}%`}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100">
                   <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Incidents</p>

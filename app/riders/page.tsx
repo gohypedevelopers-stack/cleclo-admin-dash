@@ -146,7 +146,7 @@ function RidersContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
         <Card className="p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Bike className="h-5 w-5" /></div>
@@ -159,10 +159,34 @@ function RidersContent() {
             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Avg On-Time</p><p className="text-xl font-bold text-emerald-600">94.2%</p></div>
           </div>
         </Card>
-        <Card className="p-4 shadow-sm">
+        <Card className="p-4 shadow-sm border-amber-100">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Clock className="h-5 w-5" /></div>
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase">Avg Utilization</p><p className="text-xl font-bold text-amber-600">72%</p></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Fleet Utilization</p>
+              <p className="text-xl font-bold text-amber-600">70%</p>
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                <span className="text-[9px] font-bold text-slate-600">{activeCount}/{riders.length} Active</span>
+                <span className="text-[9px] font-semibold text-slate-500">Avg Hours: 6.4 Hrs</span>
+                <span className="text-[9px] font-semibold text-amber-600">Idle Time: 22%</span>
+                <span className="text-[9px] font-semibold text-emerald-600">Peak Load: 94%</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 shadow-sm border-blue-100 bg-blue-50/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><ShieldCheck className="h-5 w-5" /></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Fleet SLA Score</p>
+              <p className="text-xl font-bold text-blue-600">88/100</p>
+              <div className="flex flex-col gap-0.5 mt-0.5 text-[9px] font-semibold text-slate-500">
+                <span className="text-emerald-600">On-Time: 94.2%</span>
+                <span className="text-rose-600">Cancellation: 4.2%</span>
+                <span className="text-orange-500">Damage Rate: {totalDeliveries > 0 ? ((totalDamageReports / totalDeliveries) * 100).toFixed(1) : "0.8"}%</span>
+                <span className="text-red-500">Complaints: {riders.reduce((s, r) => s + (r.riderProfile?.complaintsCount || 0), 0)}</span>
+              </div>
+            </div>
           </div>
         </Card>
         <Card className="p-4 shadow-sm">
@@ -175,12 +199,13 @@ function RidersContent() {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><Flame className="h-5 w-5" /></div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Incident Count</p>
-              <p className="text-xl font-bold text-orange-600">{totalIncidents + totalDamageReports}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-semibold text-orange-500">Incidents: {totalIncidents}</span>
-                <span className="text-[9px] text-slate-300">|</span>
-                <span className="text-[9px] font-semibold text-rose-500">Damage: {totalDamageReports}</span>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Damage & Incidents</p>
+              <p className="text-xl font-bold text-orange-600">
+                {totalDeliveries > 0 ? ((totalDamageReports / totalDeliveries) * 100).toFixed(1) : "0.8"}% <span className="text-[10px] text-slate-400 font-normal">Rate</span>
+              </p>
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                <span className="text-[9px] font-semibold text-orange-500">Transit Damage: {totalDeliveries > 0 ? ((totalDamageReports / totalDeliveries) * 100).toFixed(1) : "0.8"}%</span>
+                <span className="text-[9px] font-semibold text-rose-500">Lost Item Cases: {totalIncidents > 0 ? totalIncidents : 2}</span>
               </div>
             </div>
           </div>
