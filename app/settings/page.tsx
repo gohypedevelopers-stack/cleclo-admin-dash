@@ -392,6 +392,27 @@ export default function SettingsPage() {
   const [newVendorName, setNewVendorName] = useState("");
   const [newVendorRate, setNewVendorRate] = useState("");
 
+  useEffect(() => {
+    let active = true;
+    const fetchSettings = async () => {
+      try {
+        const res = await apiFetch(`${AUTH_API_URL}/settings`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok && active) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch (err) {
+        console.error("Failed to load settings from database:", err);
+      }
+    };
+    fetchSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const updateNestedField = (path: string, value: any) => {
     setConfig((prev) => {
       const newConfig = { ...prev };
@@ -414,16 +435,29 @@ export default function SettingsPage() {
     updateNestedField(path, newRoles);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      toast.success("Platform Governance Updated", {
-        description: "All configuration changes are now live across the system.",
-        className: "rounded-2xl border-emerald-100 font-bold"
+    try {
+      const res = await apiFetch(`${AUTH_API_URL}/settings`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(config),
       });
-      setHasChanges(false);
+      if (res.ok) {
+        toast.success("Platform Governance Updated", {
+          description: "All configuration changes are now live across the system.",
+          className: "rounded-2xl border-emerald-100 font-bold"
+        });
+        setHasChanges(false);
+      } else {
+        toast.error("Failed to update settings in database");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to deploy configuration changes");
+    } finally {
       setIsSaving(false);
-    }, 1200);
+    }
   };
 
   return (
