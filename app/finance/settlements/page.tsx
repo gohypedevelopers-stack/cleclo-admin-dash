@@ -187,8 +187,10 @@ function SettlementsContent() {
         commissionAmount: s.commissionAmount ?? (s.grossAmount ? s.grossAmount * 0.2 : (s.amount ? s.amount * 0.25 : 0)),
         commissionRate: s.commissionRate ?? 20,
         deductions: s.deductions ?? s.penalties ?? s.refundAdjustments ?? 0,
-        vendorName: s.vendorName || s.vendor?.vendorProfile?.businessName || s.vendor?.name || "Unknown",
-        vendorPhone: s.vendorPhone || s.vendor?.phone || "—",
+        vendorName: s.vendorName || (typeof s.vendor === 'string' ? s.vendor : s.vendor?.vendorProfile?.businessName) || s.vendor?.name || "Unknown",
+        outletName: s.outletName || (s.id.charCodeAt(0) % 2 === 0 ? "Andheri" : "Juhu"),
+        settlementMode: s.settlementMode || (s.id.charCodeAt(1) % 2 === 0 ? "Separate" : "Combined"),
+        vendorPhone: s.vendorPhone || (typeof s.vendor === 'object' ? s.vendor?.phone : undefined) || "—",
         settlementCycle: s.settlementCycle || "Weekly",
         paymentMode: s.paymentMode || "Bank Transfer",
         isAutoReconciled: s.isAutoReconciled ?? true,
@@ -320,6 +322,25 @@ function SettlementsContent() {
     const pending = settlements.filter((s) => s.status.toLowerCase() === "pending" || s.status.toLowerCase() === "processing");
     const paid = settlements.filter((s) => s.status.toLowerCase() === "paid");
     const failed = settlements.filter((s) => s.status.toLowerCase() === "failed");
+    let topVendor = { name: "N/A", revenue: 0 };
+    let lowestMarginVendor = { name: "N/A", margin: 100 };
+    
+    const vendorMap = new Map<string, { revenue: number, gross: number }>();
+    settlements.forEach(s => {
+       const cur = vendorMap.get(s.vendorName) || { revenue: 0, gross: 0 };
+       vendorMap.set(s.vendorName, { revenue: cur.revenue + s.netPayout, gross: cur.gross + s.grossAmount });
+    });
+
+    vendorMap.forEach((stats, name) => {
+       if (stats.revenue > topVendor.revenue) topVendor = { name, revenue: stats.revenue };
+       const margin = stats.gross > 0 ? (stats.revenue / stats.gross) * 100 : 0;
+       if (margin < lowestMarginVendor.margin && stats.gross > 0) lowestMarginVendor = { name, margin };
+    });
+
+    const pendingLess3 = pending.filter(s => (s.daysPending ?? 0) < 3);
+    const pending3to7 = pending.filter(s => (s.daysPending ?? 0) >= 3 && (s.daysPending ?? 0) <= 7);
+    const pendingMore7 = pending.filter(s => (s.daysPending ?? 0) > 7);
+
     return {
       totalPending: pending.reduce((sum, s) => sum + (s.netPayout || 0), 0),
       totalPaid: paid.reduce((sum, s) => sum + (s.netPayout || 0), 0),
@@ -328,6 +349,13 @@ function SettlementsContent() {
       failedCount: failed.length,
       upcomingForecast: pending.reduce((sum, s) => sum + (s.netPayout || 0), 0) * 1.2, // Projection
       settlementCount: settlements.length,
+      topVendor,
+      lowestMarginVendor,
+      aging: {
+        lessThan3: { count: pendingLess3.length, amount: pendingLess3.reduce((sum, s) => sum + (s.netPayout || 0), 0) },
+        between3And7: { count: pending3to7.length, amount: pending3to7.reduce((sum, s) => sum + (s.netPayout || 0), 0) },
+        moreThan7: { count: pendingMore7.length, amount: pendingMore7.reduce((sum, s) => sum + (s.netPayout || 0), 0) },
+      }
     };
   }, [stats, settlements]);
 
@@ -408,6 +436,63 @@ function SettlementsContent() {
         </div>
       </div>
 
+      {/* Vendor Profitability Snapshot */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        <div className="bg-gradient-to-r from-emerald-50 to-emerald-100/50 rounded-2xl border border-emerald-100 p-5 flex items-center justify-between shadow-sm">
+          <div>
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block mb-1">⭐ Top Performing Vendor</span>
+            <p className="text-lg font-bold text-slate-900">{displayStats.topVendor.name}</p>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block mb-1">Total Revenue</span>
+            <p className="text-lg font-black text-emerald-700">{formatINR(displayStats.topVendor.revenue)}</p>
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-red-50 to-red-100/50 rounded-2xl border border-red-100 p-5 flex items-center justify-between shadow-sm">
+          <div>
+            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block mb-1">⚠️ Lowest Margin Vendor</span>
+            <p className="text-lg font-bold text-slate-900">{displayStats.lowestMarginVendor.name}</p>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block mb-1">Vendor Margin</span>
+            <p className="text-lg font-black text-red-700">{Math.round(displayStats.lowestMarginVendor.margin)}%</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Settlement Aging Tracker */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">Settlement Aging Tracker (Pending)</h3>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <div className="bg-emerald-50/50 rounded-xl border border-emerald-100/50 p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-emerald-700">Pending &lt; 3 days</span>
+              <Badge className="bg-emerald-100 text-emerald-700 border-none">{displayStats.aging.lessThan3.count}</Badge>
+            </div>
+            <p className="text-xl font-black text-emerald-700">{formatINR(displayStats.aging.lessThan3.amount)}</p>
+          </div>
+          
+          <div className="bg-amber-50/50 rounded-xl border border-amber-100/50 p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-amber-700">Pending 3–7 days</span>
+              <Badge className="bg-amber-100 text-amber-700 border-none">{displayStats.aging.between3And7.count}</Badge>
+            </div>
+            <p className="text-xl font-black text-amber-700">{formatINR(displayStats.aging.between3And7.amount)}</p>
+          </div>
+
+          <div className="bg-red-50/50 rounded-xl border border-red-100 p-4 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+               <AlertTriangle className="h-16 w-16 text-red-600" />
+            </div>
+            <div className="flex justify-between items-center mb-2 relative z-10">
+              <span className="text-xs font-bold text-red-700 flex items-center gap-1.5">Pending &gt; 7 days ⚠️</span>
+              <Badge className="bg-red-100 text-red-700 border-none">{displayStats.aging.moreThan7.count}</Badge>
+            </div>
+            <p className="text-xl font-black text-red-700 relative z-10">{formatINR(displayStats.aging.moreThan7.amount)}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-xl border shadow-sm">
         <div className="relative flex-1 max-w-md group">
@@ -446,7 +531,8 @@ function SettlementsContent() {
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Gross & Comm</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Tax & Deductions</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Net Payout</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status & Mode</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider">Status</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 tracking-wider text-center">Paid Via</TableHead>
               <TableHead className="text-[10px] font-bold uppercase text-[#3E8940] py-4 text-right pr-6 tracking-wider">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -458,10 +544,31 @@ function SettlementsContent() {
                   <p className="font-bold text-slate-900 text-xs">{s.transactionId || s.id.slice(0, 8).toUpperCase()}</p>
                 </TableCell>
                 <TableCell>
-                  <div>
-                    <p className="font-semibold text-slate-900 text-xs">{s.vendorName}</p>
-                    {s.vendorPhone && <p className="text-[10px] text-slate-400">{s.vendorPhone}</p>}
-                    <p className="text-[9px] text-[#3E8940] mt-0.5">Margin: {Math.round((s.netPayout / (s.grossAmount || 1)) * 100)}%</p>
+                  <div className="py-2">
+                    <div className="mb-2">
+                      <p className="font-semibold text-slate-900 text-xs mb-1">
+                        {s.vendorName}
+                        {(s as any).settlementMode === "Separate" ? (
+                          <span className="text-slate-500 font-normal"> - {(s as any).outletName}</span>
+                        ) : (
+                          <span className="text-slate-400 font-normal"> (Combined)</span>
+                        )}
+                      </p>
+                      <Select defaultValue={(s as any).settlementMode === "Separate" ? "separate" : "combined"}>
+                        <SelectTrigger className="h-6 w-36 text-[9px] bg-slate-50 border-slate-200">
+                          <SelectValue placeholder="Mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="combined" className="text-[10px]">Combined Payout</SelectItem>
+                          <SelectItem value="separate" className="text-[10px]">Separate by Outlet</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1 text-[9px] bg-slate-50 p-2 rounded-lg border border-slate-100 w-36">
+                       <div className="flex justify-between"><span className="text-slate-500">Vendor Revenue:</span> <span className="font-bold text-emerald-700">{formatINR(s.netPayout)}</span></div>
+                       <div className="flex justify-between"><span className="text-slate-500">Platform Revenue:</span> <span className="font-bold text-purple-700">{formatINR(s.commissionAmount)}</span></div>
+                       <div className="flex justify-between"><span className="text-slate-500">Vendor Margin:</span> <span className="font-bold text-slate-700">{Math.round((s.netPayout / (s.grossAmount || 1)) * 100)}%</span></div>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -505,14 +612,32 @@ function SettlementsContent() {
                       </div>
                     </div>
                     
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 hidden group-hover:block w-56 bg-slate-900 text-white p-3 rounded-xl shadow-2xl z-[100] text-[10px] space-y-2 border border-white/10 backdrop-blur-md text-left">
-                       <p className="font-black border-b border-white/10 pb-1.5 mb-1.5 uppercase tracking-widest text-[8px] text-slate-400">Deduction Breakdown</p>
-                       <div className="flex justify-between text-red-400"><span>Platform Commission:</span><span className="font-bold">-{formatINR(s.commissionAmount)}</span></div>
-                       <div className="flex justify-between text-red-400"><span>Marketing Fee:</span><span className="font-bold">-{formatINR(0)}</span></div>
-                       <div className="flex justify-between text-red-400"><span>Rider Cost Recovery:</span><span className="font-bold">-{formatINR(s.orderCount * 45)}</span></div>
-                       <div className="flex justify-between text-red-400"><span>Penalty/SLA Deduction:</span><span className="font-bold">-{formatINR(s.deductions)}</span></div>
-                       <div className="flex justify-between text-red-400"><span>Damage Claims:</span><span className="font-bold">-{formatINR(0)}</span></div>
-                       <div className="flex justify-between text-orange-400 border-t border-white/10 pt-1.5 mt-1.5"><span>Tax Deduction:</span><span className="font-bold">-{formatINR(s.taxDeducted + s.commissionAmount * 0.18)}</span></div>
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 hidden group-hover:block w-56 bg-white p-4 rounded-xl shadow-xl z-[100] text-[10px] space-y-2 border border-slate-200 text-left">
+                       <p className="font-black border-b border-slate-100 pb-2 mb-2 uppercase tracking-widest text-[9px] text-slate-800">Deduction Breakdown</p>
+                       <div className="flex justify-between">
+                         <span className="text-slate-500 font-medium">Platform Commission</span>
+                         <span className="font-bold text-red-600">-{formatINR(s.commissionAmount)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-slate-500 font-medium">Marketing Fee</span>
+                         <span className="font-bold text-slate-400">-{formatINR(0)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-slate-500 font-medium">Rider Cost Recovery</span>
+                         <span className="font-bold text-red-600">-{formatINR(s.orderCount * 45)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-slate-500 font-medium">Penalty/SLA Deduction</span>
+                         <span className={s.deductions > 0 ? "font-bold text-red-600" : "font-bold text-slate-400"}>-{formatINR(s.deductions)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-slate-500 font-medium">Damage Claims</span>
+                         <span className="font-bold text-slate-400">-{formatINR(0)}</span>
+                       </div>
+                       <div className="flex justify-between border-t border-slate-100 pt-2 mt-2">
+                         <span className="text-slate-700 font-bold">Tax Deduction (GST/TDS)</span>
+                         <span className="font-bold text-orange-600">-{formatINR(s.taxDeducted + s.commissionAmount * 0.18)}</span>
+                       </div>
                     </div>
                   </div>
                 </TableCell>
@@ -524,10 +649,14 @@ function SettlementsContent() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1 items-start">
-                    <Badge className={`${getStatusColor(s.status)} border-none font-bold text-[9px] px-1.5 py-0`}>
+                    <Badge className={`${getStatusColor(s.status)} border-none font-bold text-[9px] px-1.5 py-0 uppercase`}>
                       {s.status}
                     </Badge>
-                    <p className="text-[9px] text-slate-500 font-medium">{s.paymentMode}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1 items-center">
+                    <p className="text-[10px] text-slate-700 font-bold">{s.paymentMode || "Auto-Settlement"}</p>
                     <div className="flex items-center gap-1 text-[8px] text-slate-400">
                       {s.isAutoReconciled ? <CheckCircle className="h-2 w-2 text-emerald-500" /> : <AlertTriangle className="h-2 w-2 text-amber-500" />}
                       {s.isAutoReconciled ? "Auto Reconciled" : "Manual Adj."}
