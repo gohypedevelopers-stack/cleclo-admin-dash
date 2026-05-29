@@ -41,7 +41,9 @@ import {
   AlertCircle,
   Calendar,
   GanttChartSquare,
-  Users2
+  Users2,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -79,11 +81,17 @@ interface NotificationSetting {
   roles: string[]; // ["Super Admin", "Finance Manager", etc.]
 }
 
+interface VendorCommission {
+  vendorName: string;
+  rate: number;
+}
+
 interface SettingsConfig {
   // General
   defaultCommissionRate: number;
   expressCommissionOverride: number;
   settlementCycle: "Weekly" | "Bi-Weekly" | "Monthly";
+  customVendorCommissions: VendorCommission[];
   
   // Notifications
   notifications: {
@@ -110,7 +118,7 @@ interface SettingsConfig {
   // Allocation
   allocation: {
     autoAssign: boolean;
-    priorityRule: "Nearest" | "Lowest Workload" | "Highest Rating";
+    priorityRule: "Nearest Rider" | "Lowest Workload" | "Highest Rating";
     expressMultiplier: number;
   };
 
@@ -153,6 +161,11 @@ const DEFAULT_CONFIG: SettingsConfig = {
   defaultCommissionRate: 15,
   expressCommissionOverride: 18,
   settlementCycle: "Weekly",
+  customVendorCommissions: [
+    { vendorName: "Royal Dry Cleaners", rate: 12 },
+    { vendorName: "EcoWash Solutions", rate: 14 },
+    { vendorName: "Express Laundry Hub", rate: 13.5 }
+  ],
   notifications: {
     orders: {
       expressAlert: { enabled: true, roles: ["Super Admin", "Operations Head"] },
@@ -175,7 +188,7 @@ const DEFAULT_CONFIG: SettingsConfig = {
   },
   allocation: {
     autoAssign: true,
-    priorityRule: "Nearest",
+    priorityRule: "Nearest Rider",
     expressMultiplier: 1.5,
   },
   riderPayout: {
@@ -375,6 +388,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [newCity, setNewCity] = useState("");
+  const [isAddingVendorComm, setIsAddingVendorComm] = useState(false);
+  const [newVendorName, setNewVendorName] = useState("");
+  const [newVendorRate, setNewVendorRate] = useState("");
 
   const updateNestedField = (path: string, value: any) => {
     setConfig((prev) => {
@@ -645,7 +661,12 @@ export default function SettingsPage() {
                           <CardDescription className="font-medium">Define how orders are distributed to riders</CardDescription>
                        </div>
                     </div>
-                    <Switch checked={config.allocation.autoAssign} onCheckedChange={(v) => updateNestedField('allocation.autoAssign', v)} className="data-[state=checked]:bg-purple-600" />
+                    <div className="flex items-center gap-3">
+                       <span className={cn("text-xs font-black uppercase tracking-wider", config.allocation.autoAssign ? "text-[#3E8940]" : "text-slate-400")}>
+                          Auto-Assign Rider: {config.allocation.autoAssign ? "ON" : "OFF"}
+                       </span>
+                       <Switch checked={config.allocation.autoAssign} onCheckedChange={(v) => updateNestedField('allocation.autoAssign', v)} className="data-[state=checked]:bg-[#3E8940]" />
+                    </div>
                  </div>
               </CardHeader>
               <CardContent className="pt-6 space-y-6 flex-1">
@@ -656,15 +677,15 @@ export default function SettingsPage() {
                           <SelectValue />
                        </SelectTrigger>
                        <SelectContent className="rounded-xl">
-                          <SelectItem value="Nearest" className="font-bold">Nearest Rider (Geo-fenced)</SelectItem>
-                          <SelectItem value="Lowest Workload" className="font-bold">Lowest Workload (Optimization)</SelectItem>
-                          <SelectItem value="Highest Rating" className="font-bold">Highest Rating (Premium Service)</SelectItem>
+                          <SelectItem value="Nearest Rider" className="font-bold">Nearest Rider</SelectItem>
+                          <SelectItem value="Lowest Workload" className="font-bold">Lowest Workload</SelectItem>
+                          <SelectItem value="Highest Rating" className="font-bold">Highest Rating</SelectItem>
                        </SelectContent>
                     </Select>
                  </div>
                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                       <Label className="text-xs font-black uppercase text-slate-400">Express Order Priority Multiplier</Label>
+                       <Label className="text-xs font-black uppercase text-slate-400">Express Orders → Priority Multiplier</Label>
                        <Badge className="bg-purple-50 text-purple-700 border-purple-100 font-black text-[10px]">Active</Badge>
                     </div>
                     <div className="relative">
@@ -676,7 +697,7 @@ export default function SettingsPage() {
                          onChange={(e) => updateNestedField('allocation.expressMultiplier', parseFloat(e.target.value))}
                          className="pl-10 rounded-xl border-slate-200 h-12 font-black text-lg" 
                        />
-                       <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">X Factor</span>
+                       <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">Multiplier Factor</span>
                     </div>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Higher value pulls riders from further distances for express pickups</p>
                  </div>
@@ -691,15 +712,15 @@ export default function SettingsPage() {
                        <Timer className="h-5 w-5 text-orange-600" />
                     </div>
                     <div className="space-y-1">
-                       <CardTitle className="text-xl font-black">SLA Engine</CardTitle>
-                       <CardDescription className="font-medium">Configure fulfillment time-limits and penalties</CardDescription>
+                       <CardTitle className="text-xl font-black">SLA Configuration Engine</CardTitle>
+                       <CardDescription className="font-medium">Configure fulfillment time-limits and automated actions</CardDescription>
                     </div>
                  </div>
               </CardHeader>
-              <CardContent className="pt-6 space-y-4">
+              <CardContent className="pt-6 space-y-4 flex-1">
                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400">Standard</Label>
+                       <Label className="text-[10px] font-black uppercase text-slate-400">Standard Orders SLA</Label>
                        <Input 
                          type="number" 
                          value={config.sla.standardHours} 
@@ -709,7 +730,7 @@ export default function SettingsPage() {
                        <p className="text-[9px] text-center font-black text-slate-300 uppercase">Hours</p>
                     </div>
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400 text-orange-500">Express</Label>
+                       <Label className="text-[10px] font-black uppercase text-orange-500">Express Orders SLA</Label>
                        <Input 
                          type="number" 
                          value={config.sla.expressHours} 
@@ -719,7 +740,7 @@ export default function SettingsPage() {
                        <p className="text-[9px] text-center font-black text-slate-300 uppercase">Hours</p>
                     </div>
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400">Pickup</Label>
+                       <Label className="text-[10px] font-black uppercase text-slate-400">Pickup SLA</Label>
                        <Input 
                          type="number" 
                          value={config.sla.pickupHours} 
@@ -751,80 +772,205 @@ export default function SettingsPage() {
 
         {/* Finance & Payouts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           {/* Commission & Settlement */}
-           <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
-              <CardHeader className="border-b bg-slate-50/50 pb-4">
-                 <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-100/50 rounded-xl border border-indigo-100 shadow-sm">
-                       <BadgePercent className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div className="space-y-1">
-                       <CardTitle className="text-xl font-black">Commission & Payouts</CardTitle>
-                       <CardDescription className="font-medium">Define platform revenue and settlement cycles</CardDescription>
-                    </div>
-                 </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <Label className="text-xs font-black uppercase text-slate-400">Default Rate</Label>
-                       <div className="relative">
-                          <Input 
-                            type="number" 
-                            value={config.defaultCommissionRate} 
-                            onChange={(e) => updateNestedField('defaultCommissionRate', parseFloat(e.target.value))}
-                            className="rounded-xl h-12 font-black text-lg pr-8" 
-                          />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300">%</span>
-                       </div>
-                    </div>
-                    <div className="space-y-2">
-                       <Label className="text-xs font-black uppercase text-slate-400 text-purple-600">Express Override</Label>
-                       <div className="relative">
-                          <Input 
-                            type="number" 
-                            value={config.expressCommissionOverride} 
-                            onChange={(e) => updateNestedField('expressCommissionOverride', parseFloat(e.target.value))}
-                            className="rounded-xl h-12 font-black text-lg pr-8 border-purple-100 bg-purple-50/30 text-purple-600" 
-                          />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300">%</span>
-                       </div>
-                    </div>
-                 </div>
-                 <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-slate-400">Settlement Cycle</Label>
-                    <Select value={config.settlementCycle} onValueChange={(v: any) => updateNestedField('settlementCycle', v)}>
-                       <SelectTrigger className="rounded-xl border-slate-200 h-12 font-bold">
-                          <Calendar className="h-4 w-4 mr-2 text-slate-400" />
-                          <SelectValue />
-                       </SelectTrigger>
-                       <SelectContent className="rounded-xl">
-                          <SelectItem value="Weekly" className="font-bold">Weekly (Standard)</SelectItem>
-                          <SelectItem value="Bi-Weekly" className="font-bold">Bi-Weekly (Fast Track)</SelectItem>
-                          <SelectItem value="Monthly" className="font-bold">Monthly (Legacy Vendors)</SelectItem>
-                       </SelectContent>
-                    </Select>
-                 </div>
-              </CardContent>
-           </Card>
+            {/* Commission & Settlement */}
+            <Card className="border-slate-200 shadow-md hover:shadow-lg overflow-hidden rounded-2xl flex flex-col transition-all duration-300">
+               <CardHeader className="border-b bg-slate-50/50 pb-5">
+                  <div className="flex items-center gap-3">
+                     <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100 shadow-sm transition-transform duration-300 hover:scale-105">
+                        <BadgePercent className="h-5 w-5 text-indigo-600" />
+                     </div>
+                     <div className="space-y-1">
+                        <CardTitle className="text-xl font-black text-slate-800">Commission Configuration Panel</CardTitle>
+                        <CardDescription className="font-medium text-slate-500">Define platform revenue overrides and custom vendor models</CardDescription>
+                     </div>
+                  </div>
+               </CardHeader>
+               <CardContent className="pt-6 space-y-6 flex-1 bg-white/50 backdrop-blur-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Default Commission %</Label>
+                        <div className="relative group">
+                           <Input 
+                             type="number" 
+                             value={config.defaultCommissionRate} 
+                             onChange={(e) => updateNestedField('defaultCommissionRate', parseFloat(e.target.value))}
+                             className="rounded-xl h-12 font-black text-lg pr-10 border-slate-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all shadow-sm" 
+                           />
+                           <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-400 group-focus-within:text-indigo-600 transition-colors">%</span>
+                        </div>
+                     </div>
+                     <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-purple-600 tracking-wider">Commission Override for Express Orders</Label>
+                        <div className="relative group">
+                           <Input 
+                             type="number" 
+                             value={config.expressCommissionOverride} 
+                             onChange={(e) => updateNestedField('expressCommissionOverride', parseFloat(e.target.value))}
+                             className="rounded-xl h-12 font-black text-lg pr-10 border-purple-100 bg-purple-50/20 hover:bg-purple-50/40 focus:bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all text-purple-700 shadow-sm" 
+                           />
+                           <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-purple-400 group-focus-within:text-purple-600 transition-colors">%</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                     <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Settlement Cycle</Label>
+                     <Select value={config.settlementCycle} onValueChange={(v: any) => updateNestedField('settlementCycle', v)}>
+                        <SelectTrigger className="rounded-xl border-slate-200 h-12 font-bold bg-slate-50/50 hover:bg-slate-50 transition-all">
+                           <Calendar className="h-4 w-4 mr-2 text-slate-400" />
+                           <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                           <SelectItem value="Weekly" className="font-bold">Weekly (Standard)</SelectItem>
+                           <SelectItem value="Bi-Weekly" className="font-bold">Bi-Weekly (Fast Track)</SelectItem>
+                           <SelectItem value="Monthly" className="font-bold">Monthly (Legacy Vendors)</SelectItem>
+                        </SelectContent>
+                     </Select>
+                  </div>
+
+                  {/* Custom Commission per Vendor overrides */}
+                  <div className="space-y-4 pt-5 border-t border-slate-100">
+                     <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Custom Commission per Vendor</Label>
+                        <Badge className="bg-indigo-50 text-indigo-700 border-indigo-100 font-black text-[9px] uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-sm">Active Overrides</Badge>
+                     </div>
+
+                     <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                        {config.customVendorCommissions?.map((vc, idx) => (
+                           <div key={idx} className="flex items-center justify-between bg-slate-50/40 hover:bg-slate-50 p-3 rounded-xl border border-slate-200/80 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 hover:-translate-y-[0.5px]">
+                              <div className="flex items-center gap-3">
+                                 <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                                    <Building2 className="h-4 w-4 text-indigo-600" />
+                                 </div>
+                                 <span className="text-xs font-black text-slate-700 tracking-tight">{vc.vendorName}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                 <div className="relative w-20">
+                                    <input
+                                      type="number"
+                                      value={vc.rate}
+                                      onChange={(e) => {
+                                        const newComms = [...config.customVendorCommissions];
+                                        newComms[idx].rate = parseFloat(e.target.value) || 0;
+                                        updateNestedField('customVendorCommissions', newComms);
+                                      }}
+                                      className="w-full h-8 rounded-lg border border-slate-200 text-xs font-black text-center pr-5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 focus:outline-none transition-all shadow-sm"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">%</span>
+                                 </div>
+                                 <Button
+                                   variant="ghost"
+                                   size="icon"
+                                   type="button"
+                                   className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50/60 rounded-lg border border-transparent hover:border-red-100 transition-all shrink-0 shadow-sm hover:shadow"
+                                   onClick={() => {
+                                      const newComms = config.customVendorCommissions.filter((_, i) => i !== idx);
+                                      updateNestedField('customVendorCommissions', newComms);
+                                   }}
+                                 >
+                                    <Trash2 className="h-4 w-4" />
+                                 </Button>
+                              </div>
+                           </div>
+                        ))}
+                        {(!config.customVendorCommissions || config.customVendorCommissions.length === 0) && (
+                           <p className="text-xs text-slate-400 font-bold text-center py-5 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">No custom vendor commissions configured.</p>
+                        )}
+                     </div>
+
+                     {isAddingVendorComm ? (
+                        <div className="space-y-3 p-3.5 bg-indigo-50/20 border border-indigo-100 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
+                           <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                 <Label className="text-[9px] font-black uppercase text-slate-400">Vendor Name</Label>
+                                 <Input
+                                   placeholder="e.g. CleClo Express"
+                                   value={newVendorName}
+                                   onChange={(e) => setNewVendorName(e.target.value)}
+                                   className="h-9 text-xs rounded-lg border-slate-200 bg-white"
+                                 />
+                              </div>
+                              <div className="space-y-1">
+                                 <Label className="text-[9px] font-black uppercase text-slate-400">Override Rate %</Label>
+                                 <div className="relative">
+                                    <Input
+                                      type="number"
+                                      placeholder="15"
+                                      value={newVendorRate}
+                                      onChange={(e) => setNewVendorRate(e.target.value)}
+                                      className="h-9 text-xs rounded-lg border-slate-200 bg-white pr-6"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-black text-slate-300">%</span>
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                type="button"
+                                className="h-8 text-[10px] font-black uppercase text-slate-400 hover:bg-slate-100 rounded-lg"
+                                onClick={() => {
+                                   setIsAddingVendorComm(false);
+                                   setNewVendorName("");
+                                   setNewVendorRate("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                className="h-8 px-3 text-[10px] font-black uppercase bg-[#3E8940] hover:bg-[#3E8940]/90 text-white rounded-lg shadow"
+                                onClick={() => {
+                                   if (newVendorName && newVendorRate) {
+                                      const newComms = [
+                                         ...(config.customVendorCommissions || []),
+                                         { vendorName: newVendorName, rate: parseFloat(newVendorRate) || 0 }
+                                      ];
+                                      updateNestedField('customVendorCommissions', newComms);
+                                      setNewVendorName("");
+                                      setNewVendorRate("");
+                                      setIsAddingVendorComm(false);
+                                   } else {
+                                      toast.error("Please specify vendor name and commission rate");
+                                   }
+                                }}
+                              >
+                                Add Override
+                              </Button>
+                           </div>
+                        </div>
+                     ) : (
+                        <Button
+                          variant="outline"
+                          type="button"
+                          className="w-full border-dashed border-indigo-200 hover:border-indigo-400 text-indigo-600 hover:bg-indigo-50/30 font-bold text-xs rounded-xl h-10 gap-1.5 transition-all duration-200 hover:shadow-sm"
+                          onClick={() => setIsAddingVendorComm(true)}
+                        >
+                           <Plus className="h-4 w-4" />
+                           Add Custom Vendor Override
+                        </Button>
+                     )}
+                  </div>
+               </CardContent>
+            </Card>
 
            {/* Rider Payout Model */}
-           <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+           <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl flex flex-col">
               <CardHeader className="border-b bg-slate-50/50 pb-4">
                  <div className="flex items-center gap-2">
                     <div className="p-2 bg-emerald-100/50 rounded-xl border border-emerald-100 shadow-sm">
                        <IndianRupee className="h-5 w-5 text-emerald-600" />
                     </div>
                     <div className="space-y-1">
-                       <CardTitle className="text-xl font-black">Rider Payment Model</CardTitle>
+                       <CardTitle className="text-xl font-black">Rider Payment Model Settings</CardTitle>
                        <CardDescription className="font-medium">Define fleet compensation and bonuses</CardDescription>
                     </div>
                  </div>
               </CardHeader>
-              <CardContent className="pt-6 space-y-4">
+              <CardContent className="pt-6 space-y-4 flex-1">
                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400">Base Rate</Label>
+                       <Label className="text-[10px] font-black uppercase text-slate-400">Per Delivery Base Rate</Label>
                        <div className="relative">
                           <Input 
                             type="number" 
@@ -836,7 +982,7 @@ export default function SettingsPage() {
                        </div>
                     </div>
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400">Distance (km)</Label>
+                       <Label className="text-[10px] font-black uppercase text-slate-400">Distance Rate (₹ per km)</Label>
                        <div className="relative">
                           <Input 
                             type="number" 
@@ -848,7 +994,7 @@ export default function SettingsPage() {
                        </div>
                     </div>
                     <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase text-slate-400 text-emerald-600">Peak Bonus</Label>
+                       <Label className="text-[10px] font-black uppercase text-[#3E8940]">Peak Hour Bonus</Label>
                        <div className="relative">
                           <Input 
                             type="number" 
@@ -861,7 +1007,7 @@ export default function SettingsPage() {
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-slate-400">Penalty Rules (Global)</Label>
+                    <Label className="text-xs font-black uppercase text-slate-400">Penalty Rules</Label>
                     <textarea 
                       value={config.riderPayout.penaltyRules}
                       onChange={(e) => updateNestedField('riderPayout.penaltyRules', e.target.value)}
@@ -883,7 +1029,7 @@ export default function SettingsPage() {
                        <Scale className="h-5 w-5 text-slate-600" />
                     </div>
                     <div className="space-y-1">
-                       <CardTitle className="text-xl font-black">Tax & Compliance</CardTitle>
+                       <CardTitle className="text-xl font-black">Tax & Compliance Settings</CardTitle>
                        <CardDescription className="font-medium">Regulatory settings and automated invoicing</CardDescription>
                     </div>
                  </div>
@@ -891,7 +1037,7 @@ export default function SettingsPage() {
               <CardContent className="pt-6 space-y-6">
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                       <Label className="text-xs font-black uppercase text-slate-400">GST on Commission</Label>
+                       <Label className="text-xs font-black uppercase text-slate-400">GST %</Label>
                        <div className="relative">
                           <Input 
                             type="number" 
@@ -903,7 +1049,7 @@ export default function SettingsPage() {
                        </div>
                     </div>
                     <div className="space-y-2">
-                       <Label className="text-xs font-black uppercase text-slate-400">TDS (Vendor Payout)</Label>
+                       <Label className="text-xs font-black uppercase text-slate-400">TDS %</Label>
                        <div className="relative">
                           <Input 
                             type="number" 
@@ -925,7 +1071,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                        <div className="space-y-0.5">
-                          <p className="text-sm font-black text-slate-800">Mandatory PAN/GST</p>
+                          <p className="text-sm font-black text-slate-800">PAN/GST Mandatory Toggle</p>
                           <p className="text-[10px] text-slate-400 font-bold uppercase text-red-500">Block registration without verification documents</p>
                        </div>
                        <Switch checked={config.compliance.mandatoryPanGst} onCheckedChange={(v) => updateNestedField('compliance.mandatoryPanGst', v)} className="data-[state=checked]:bg-red-600" />
@@ -942,14 +1088,14 @@ export default function SettingsPage() {
                        <AlertCircle className="h-5 w-5 text-red-600" />
                     </div>
                     <div className="space-y-1">
-                       <CardTitle className="text-xl font-black">Damage & Compensation</CardTitle>
+                       <CardTitle className="text-xl font-black">Damage & Compensation Policy Configuration</CardTitle>
                        <CardDescription className="font-medium">Define service recovery and liability policies</CardDescription>
                     </div>
                  </div>
               </CardHeader>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="pt-6 space-y-6 flex-1">
                  <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-slate-400">Damage Compensation Cap (Global)</Label>
+                    <Label className="text-xs font-black uppercase text-slate-400">Damage Compensation Cap</Label>
                     <div className="relative">
                        <Input 
                          type="number" 
@@ -958,11 +1104,11 @@ export default function SettingsPage() {
                          className="rounded-xl h-12 font-black text-lg pl-8" 
                        />
                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-slate-300">₹</span>
-                       <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-xs">Per Item</span>
+                       <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-xs">Per Item Cap</span>
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-slate-400">Late Delivery Flat Compensation</Label>
+                    <Label className="text-xs font-black uppercase text-slate-400">Late Delivery Compensation</Label>
                     <div className="relative">
                        <Input 
                          type="number" 
@@ -1005,9 +1151,10 @@ export default function SettingsPage() {
                    value={newCity}
                    onChange={(e) => setNewCity(e.target.value)}
                  />
-                 <Button variant="outline" className="rounded-xl h-10 font-bold px-4" onClick={() => {
-                   if(newCity) {
-                     setConfig(prev => ({ ...prev, supportedCities: [...prev.supportedCities, newCity] }));
+                 <Button type="button" variant="outline" className="rounded-xl h-10 font-bold px-4" onClick={(e) => {
+                   e.preventDefault();
+                   if(newCity.trim()) {
+                     setConfig(prev => ({ ...prev, supportedCities: [...prev.supportedCities, newCity.trim()] }));
                      setNewCity("");
                      setHasChanges(true);
                    }
@@ -1021,10 +1168,10 @@ export default function SettingsPage() {
                    <thead className="bg-slate-50/50 border-b border-slate-100">
                       <tr>
                          <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest pl-6">Active City/Region</th>
-                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Base Commission</th>
-                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">SLA Hours (Std)</th>
-                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Rider Base</th>
-                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Express Multiplier</th>
+                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Commission</th>
+                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">SLA</th>
+                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Rider Base Rate</th>
+                         <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Express Pricing</th>
                          <th className="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right pr-6">Status</th>
                       </tr>
                    </thead>
